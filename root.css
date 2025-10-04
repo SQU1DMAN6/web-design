@@ -1,0 +1,41 @@
+* {
+    margin: 0px;
+    padding: 0px;
+}
+
+main {
+    padding: 2px;
+    font-family: "Open Sans", sans-serif;
+    font-optical-sizing: auto;
+    font-weight: 400;
+    font-style: normal;
+    font-variation-settings: "wdth" 100;
+}
+
+:root {
+    --primary: #2d518d;
+    --secondary: #142540;
+    --grey: #4c4c4c;
+    --dark: #222222;
+    --light-blue: #488ecc;
+    --light: #eaeff4;
+    --dark-light: #cdcdcd;
+}
+
+h1.intro {
+    text-align: center;
+    margin: 20px;
+    width: 100%;
+    text-align: center;
+    text-shadow: 6px 6px 0px black;
+    font-size: 30pt;
+    line-height: 40px;
+    transition:
+        font-size 0.3s ease,
+        text-shadow 0.3s ease;
+}
+
+h1.intro:hover {
+    font-size: 32pt;
+    text-shadow: 6px 6px 3px #151515;
+}

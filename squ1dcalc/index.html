@@ -1,0 +1,62 @@
+<!doctype html>
+<html>
+    <head>
+        <meta charset="UTF-8" />
+        <link rel="stylesheet" href="/root.css" />
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+        <link
+            href="https://fonts.googleapis.com/css2?family=Open+Sans:ital,wght@0,300..800;1,300..800&family=Source+Code+Pro:ital@0;1&display=swap"
+            rel="stylesheet"
+        />
+    </head>
+    <body>
+        <main>
+            <h1 class="intro">Install Squ1dCalc</h1>
+            <hr style="margin: 0 auto; width: 80%; line-height: 5px" />
+            <div class="installations">
+                <a href="/assets/app/Squ1dCalc.zip">
+                    <button class="install-btn">
+                        Install for macOS aarch64
+                    </button>
+                </a>
+            </div>
+        </main>
+    </body>
+    <style>
+        body {
+            color: var(--light);
+            background-color: var(--primary);
+            display: flex;
+            flex-direction: column;
+        }
+
+        a {
+            text-decoration: none;
+            text-align: center;
+        }
+
+        .installations {
+            display: flex;
+            text-align: center;
+            align-items: center;
+            justify-content: center;
+            margin: 0px;
+            width: 100%;
+            height: max-content;
+            padding: 80px;
+        }
+
+        button.install-btn {
+            background-color: var(--light-blue);
+            color: var(--dark);
+            border: 1px solid var(--primary);
+            border-radius: 7px;
+            padding-top: 10px;
+            padding-bottom: 10px;
+            padding-left: 20px;
+            padding-right: 20px;
+            margin: 10px;
+        }
+    </style>
+</html>
