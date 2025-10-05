@@ -12,23 +12,52 @@
     </head>
     <body>
         <main>
-            <h1 class="intro">Install Squ1dCalc</h1>
-            <hr style="margin: 0 auto; width: 80%; line-height: 5px" />
-            <div class="installations">
-                <a href="/assets/app/Squ1dCalc.zip">
-                    <button class="install-btn">
-                        Install for macOS aarch64
+            <div style="height: 40vh">
+                <h1 class="intro">Install Squ1dCalc</h1>
+                <hr style="margin: 0 auto; width: 80%; line-height: 5px" />
+                <div class="installations">
+                    <a href="/assets/app/Squ1dCalc.zip">
+                        <button class="install-btn">
+                            Install for macOS aarch64
+                        </button>
+                    </a>
+                    <button class="install-btn" id="install-for-linux">
+                        Install for Linux
                     </button>
-                </a>
+                </div>
+            </div>
+            <div style="height: 60vh; position: relative">
+                <div id="install-instructions-for-linux" style="opacity: 0">
+                    <h3>Install Squ1dCalc for Linux:</h3>
+                    <br /><br /><br /><br />
+                    <p class="iifl_p">
+                        1. Install FileShare package manager if not already:
+                        <br /><br />
+                        <code>curl https://quanthai.net/installfs.sh | sh</code>
+                        <br /><br />
+                        2. Use FileShare to install Squ1dCalc:
+                        <br /><br />
+                        <code>sudo fileshare get qchef/squ1dcalc</code>
+                        <br /><br />
+                        3. Enjoy Squ1dCalc!
+                    </p>
+                </div>
             </div>
         </main>
     </body>
     <style>
+        * {
+            padding: 0px;
+            margin: 0px;
+        }
+
         body {
             color: var(--light);
             background-color: var(--primary);
             display: flex;
             flex-direction: column;
+            overflow: hidden;
+            height: 100vh;
         }
 
         a {
@@ -41,22 +70,101 @@
             text-align: center;
             align-items: center;
             justify-content: center;
-            margin: 0px;
             width: 100%;
+            margin-top: 80px;
             height: max-content;
-            padding: 80px;
         }
 
         button.install-btn {
             background-color: var(--light-blue);
             color: var(--dark);
-            border: 1px solid var(--primary);
+            border: 1px solid var(--secondary);
             border-radius: 7px;
-            padding-top: 10px;
-            padding-bottom: 10px;
-            padding-left: 20px;
-            padding-right: 20px;
+            padding-top: 20px;
+            padding-bottom: 20px;
+            padding-left: 40px;
+            padding-right: 40px;
             margin: 10px;
+            transition:
+                background-color 0.3s ease,
+                transform 0.3s ease,
+                box-shadow 0.3s ease;
+        }
+
+        button.install-btn:hover {
+            background-color: var(--light-light-blue);
+            transform: translate(2px, 3px);
+            box-shadow: -2px -3px 0px 0px black;
+        }
+
+        p.iifl_p {
+            font-size: 20pt;
+        }
+
+        code {
+            font-size: 20pt;
+            background-color: var(--dark);
+            color: var(--light);
+            border: 2px solid var(--light);
+            border-radius: 15px;
+            padding: 15px;
+        }
+
+        br {
+            line-height: 10px;
+        }
+
+        #install-instructions-for-linux {
+            background-color: var(--primary);
+            text-align: center;
+            flex-grow: 1;
+            position: absolute;
+            bottom: 0px;
+            padding-bottom: 1000000px;
+            width: 100%;
+            height: 100%;
+            padding: 0px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            margin: 0px;
+        }
+
+        .appear-animation {
+            animation: appear 1.5s ease;
+        }
+
+        .animation-done {
+            opacity: 1 !important;
+            background-color: none;
+            background-image: linear-gradient(
+                to bottom,
+                var(--primary) 20%,
+                var(--secondary) 90%,
+                var(--light-secondary)
+            ) !important;
+        }
+
+        @keyframes appear {
+            0% {
+                opacity: 0;
+                background-color: var(--primary);
+                background-image: none;
+            }
+
+            100% {
+                opacity: 1;
+                background-color: none;
+                background-image: linear-gradient(
+                    to bottom,
+                    var(--primary) 20%,
+                    var(--secondary) 70%,
+                    var(--light-secondary) 80%,
+                    var(--primary) 100%
+                );
+            }
         }
     </style>
+    <script src="installations.js"></script>
 </html>
