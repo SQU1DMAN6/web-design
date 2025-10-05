@@ -22,7 +22,14 @@
                     ><button class="btn-common redirect-btn">RWRiter</button></a
                 >
             </div>
-            <div class="main">
+            <div
+                class="main"
+                style="
+                    display: flex;
+                    flex-direction: column;
+                    justify-content: center;
+                "
+            >
                 <h1 class="intro">
                     This is quanthai.net. A hub for anything.
                     <br />Software included.
@@ -35,13 +42,12 @@
                 style="
                     display: flex;
                     flex-direction: column;
-                    overflow-x: auto;
-                    scrollbar-width: none;
-                    overflow-y: none;
+                    overflow-x: hidden;
+                    overflow-y: hidden;
                     padding: 40px;
                     margin: 0px;
-                    width: 100%;
-                    height: 400px;
+                    width: 90%;
+                    height: 300px;
                     position: relative;
                     align-items: center;
                     justify-content: center;
@@ -50,7 +56,6 @@
                 <h2 style="line-height: 20px">A place to install software.</h2>
                 <br />
                 <a href="/squ1dcalc" style="text-decoration: none">
-                    <div></div>
                     <div class="atropos" data-atropos>
                         <div
                             class="atropos-scale"
@@ -100,6 +105,74 @@
                     </div>
                 </a>
             </div>
+            <div
+                class="links"
+                style="
+                    display: flex;
+                    flex-direction: column;
+                    overflow-x: hidden;
+                    overflow-y: hidden;
+                    padding: 40px;
+                    margin: 0px;
+                    width: 90%;
+                    height: 300px;
+                    position: relative;
+                    align-items: center;
+                    justify-content: center;
+                "
+            >
+                <h2>A place to share files.</h2>
+                <br />
+                <a href="/inkdrop" style="text-decoration: none">
+                    <div class="atropos" data-atropos>
+                        <div
+                            class="atropos-scale"
+                            style="width: 200px; margin: 0px"
+                        >
+                            <div
+                                class="atropos-rotate"
+                                style="
+                                    width: 200px;
+                                    height: 200px;
+                                    border: 1px solid var(--light-blue);
+                                    border-radius: 6px;
+                                    background-color: white;
+                                    color: var(--secondary);
+                                "
+                            >
+                                <div class="atropos-inner">
+                                    <div
+                                        data-atropos-offset="0"
+                                        style="
+                                            position: relative;
+                                            display: flex;
+                                            flex-direction: column;
+                                            align-items: center;
+                                            justify-content: center;
+                                        "
+                                    >
+                                        <h2
+                                            style="
+                                                line-height: 35px;
+                                                width: 100%;
+                                                text-align: center;
+                                            "
+                                        >
+                                            InkDrop
+                                        </h2>
+                                        <img
+                                            src="assets/img/inkdrop_logo.png"
+                                            alt="image"
+                                            width="auto"
+                                            height="165"
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </a>
+            </div>
             <!--<div
                 class="atropos"
                 style="
@@ -138,10 +211,13 @@
         </main>
     </body>
     <style>
+        * {
+            scrollbar-width: none;
+        }
+
         main {
             width: 100%;
             height: 100vh;
-            overflow: auto;
             display: flex;
             flex-direction: column;
             /*https://www.svgbackgrounds.com/*/
@@ -163,7 +239,8 @@
             width: 100%;
             align-items: center;
             justify-content: center;
-            padding: 10px;
+            padding-top: 10px;
+            padding-bottom: 10px;
             background-color: var(--grey);
             border-bottom: 1px solid green;
         }
@@ -205,6 +282,12 @@
     <script>
         window.atropos = new Atropos({
             el: document.querySelectorAll(".atropos")[0],
+            shadowScale: 2,
+            alwaysActive: true,
+        });
+
+        window.atropos = new Atropos({
+            el: document.querySelectorAll(".atropos")[1],
             shadowScale: 2,
             alwaysActive: true,
         });
