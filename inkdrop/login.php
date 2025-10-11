@@ -31,7 +31,6 @@ if (isset($_SESSION["login"]) && isset($_SESSION["name"])) {
     }
 
     main {
-        background-color: var(--primary);
         background-image: linear-gradient(
             to bottom,
             var(--primary),
@@ -54,14 +53,13 @@ if (isset($_SESSION["login"]) && isset($_SESSION["name"])) {
 
     .login-box {
         padding: 60px;
-        background-color: var(--grey);
         background-image: linear-gradient(
             to bottom,
             var(--grey),
             var(--dark)
         );
-        opacity: 1;
         color: white;
+        border: 2px solid #fff;
         border-radius: 15px;
         box-shadow: 0px 0px 15px 5px var(--light-light-blue);
         display: flex;
@@ -74,13 +72,13 @@ if (isset($_SESSION["login"]) && isset($_SESSION["name"])) {
     <main>
         <div class="login-box">
             <h1 class="intro">Login with an existing InkDrop account</h1>
-            <br><hr style="margin: 0 auto; width: 80%; line-height: 5px" /><br>
+            <br><hr class="linebreaker" /><br>
             <form method="POST" name="login" action="login.php">
                 <input class="details" type="email" name="email" required placeholder="EMAIL OR NAME" /><br /><br />
                 <input class="details" type="password" name="password" required placeholder="PASSWORD" /><br /><br />
                 <button type="submit" class="redirect">Login</button><br /><br />
             </form>
-            <br /><hr style="margin: 0 auto; width: 80%; line-height: 5px" /><br />
+            <br /><hr class="linebreaker" /><br />
             <a href="register.php"><button class="redirect">Register for a new InkDrop account</button></a><br><br>
             <?php
             include "connect.php";

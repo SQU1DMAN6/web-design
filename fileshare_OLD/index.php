@@ -4,8 +4,8 @@ include "guard.php";
 $baseRepoDir = __DIR__ . "/repos/";
 $username = $_SESSION["name"];
 
-$viewPublic = ($_GET['view'] ?? '') === 'public';
-$publicUser = $_GET['user'] ?? null;
+$viewPublic = ($_GET["view"] ?? "") === "public";
+$publicUser = $_GET["user"] ?? null;
 
 $userRepoDir = $baseRepoDir . $username . "/";
 if (!is_dir($userRepoDir)) {
@@ -14,7 +14,11 @@ if (!is_dir($userRepoDir)) {
 
 $createMessage = "";
 
-if (!$viewPublic && $_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["reponame"])) {
+if (
+    !$viewPublic &&
+    $_SERVER["REQUEST_METHOD"] === "POST" &&
+    isset($_POST["reponame"])
+) {
     $reponame = trim($_POST["reponame"]);
 
     if (!preg_match("/^[a-zA-Z0-9_-]+$/", $reponame)) {
@@ -42,7 +46,7 @@ if (!$viewPublic && $_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["repon
 <main>
     <h1>FileShare</h1>
     <br>
-    <?php include "connect.php" ?>
+    <?php include "connect.php"; ?>
     <br>
 
     <?php if (!$viewPublic): ?>
@@ -66,7 +70,7 @@ if (!$viewPublic && $_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["repon
         <h2>Your Repos:</h2>
         <ul>
             <?php
-            $repos = array_filter(glob($userRepoDir . '*'), 'is_dir');
+            $repos = array_filter(glob($userRepoDir . "*"), "is_dir");
             if (empty($repos)) {
                 echo "<li>No repos yet.</li>";
             } else {
@@ -90,13 +94,17 @@ if (!$viewPublic && $_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["repon
             <h2>All Users</h2>
             <ul>
                 <?php
-                $users = array_filter(glob($baseRepoDir . '*'), 'is_dir');
+                $users = array_filter(glob($baseRepoDir . "*"), "is_dir");
                 if (empty($users)) {
                     echo "<li>No users found.</li>";
                 } else {
                     foreach ($users as $userDir) {
                         $user = basename($userDir);
-                        echo "<li><a href='?view=public&user=" . urlencode($user) . "'>" . htmlspecialchars($user) . "</a></li>";
+                        echo "<li><a href='?view=public&user=" .
+                            urlencode($user) .
+                            "'>" .
+                            htmlspecialchars($user) .
+                            "</a></li>";
                     }
                 }
                 ?>
@@ -110,14 +118,20 @@ if (!$viewPublic && $_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["repon
                 if (!is_dir($publicUserDir)) {
                     echo "<li>User not found.</li>";
                 } else {
-                    $repos = array_filter(glob($publicUserDir . '*'), 'is_dir');
+                    $repos = array_filter(glob($publicUserDir . "*"), "is_dir");
                     if (empty($repos)) {
                         echo "<li>No repos found.</li>";
                     } else {
                         foreach ($repos as $repoPath) {
                             $repoName = basename($repoPath);
-                            $link = "repo.php?name=" . urlencode($repoName) . "&user=" . urlencode($publicUser);
-                            echo "<li><a href='$link'>" . htmlspecialchars($repoName) . "</a></li>";
+                            $link =
+                                "repo.php?name=" .
+                                urlencode($repoName) .
+                                "&user=" .
+                                urlencode($publicUser);
+                            echo "<li><a href='$link'>" .
+                                htmlspecialchars($repoName) .
+                                "</a></li>";
                         }
                     }
                 }
