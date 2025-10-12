@@ -40,6 +40,7 @@ button.redirect {
     color: var(--light);
     border: 1px solid var(--light);
     border-radius: 6px;
+    margin: 3px;
     transition:
         background-color 0.3s ease,
         color 0.3s ease,
@@ -62,9 +63,12 @@ button.select {
         background-color 0.3s ease,
         color 0.3s ease,
         box-shadow 0.3s ease;
-    padding: 6px;
+    padding: 10px;
+    margin: 3px;
     font-size: 16pt;
     cursor: pointer;
+    border-radius: 6px;
+    border: 1px solid white;
 }
 
 button.select:hover {
@@ -112,4 +116,28 @@ h1.intro {
 h1.intro:hover {
     font-size: 32pt;
     text-shadow: 6px 6px 3px #151515;
+}
+
+div.main {
+    width: 90%;
+    padding: 50px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 20px;
+    border: 1px solid white;
+    color: white;
+    background-color: var(--dark);
+    flex-direction: column;
+    border-radius: 20px;
+}
+
+div.main1 {
+    background-color: var(--light);
+    color: var(--dark);
+}
+
+div.main3 {
+    background-color: var(--grey);
+    color: var(--light);
 }

@@ -8,7 +8,6 @@ $username = $_SESSION["name"];
 
 $viewPublic = ($_GET["view"] ?? "") === "public";
 $publicUser = $_GET["user"] ?? null;
-
 $userRepoDir = "$baseRepoDir/$username/";
 if (!is_dir($userRepoDir)) {
     mkdir($userRepoDir, 0775, true);
@@ -42,7 +41,7 @@ if (
 <html lang="en">
     <head>
         <meta charset="utf-8">
-        <link rel="stylesheet" href="root.css" />
+        <link rel="stylesheet" href="root.css?version=1.2" />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
         <link
@@ -53,12 +52,19 @@ if (
     </head>
     <body>
         <main>
-            <h1 class="intro">InkDrop Main Page, written by Quan Thai</h1>
+            <h1 class="intro" style="color: white">Welcome to InkDrop, the file sharing platform</h1>
             <br /><hr class="linebreaker"/><br /><br>
-            <?php include "connect.php"; ?>
-            <div class="main1">
-                <?php if (!$viewPublic):?>
-                <p style='font-size: 25pt'>Logged in as <b><?php echo htmlspecialchars($username); ?></b></p>
+            <?php
+            echo "<p style='display: none'>";
+            include "connect.php";
+            echo "</p>";
+            ?>
+            <?php if (!$viewPublic): ?>
+            <div class="main1 main">
+                <p style='font-size: 25pt'>Logged in as <b><?php echo htmlspecialchars(
+                    $username,
+                ); ?></b></p>
+                <br /><br />
                 <nav>
                     <a href="?view=public"><button class="select">Browse Repositories</button></a>
                 </nav>
@@ -68,19 +74,23 @@ if (
                     <button type="submit" class="redirect">Create Repo</button>
                 </form>
 
-                <?php $createMessage ? "<br><br>$createMessage" : ""?>
+                <?php $createMessage ? "<br><br>$createMessage" : ""; ?>
             </div>
-            <div class="main2">
-                <h2>Your Repositories:</h2>
+            <div class="main2 main">
+                <?php if (
+                    !empty(array_filter(glob($userRepoDir . "*"), "is_dir"))
+                ) {
+                    echo "<h2>Your Repositories:</h2><br />";
+                } ?>
                 <ul>
                     <?php
                     $repos = array_filter(glob($userRepoDir . "*"), "is_dir");
                     if (empty($repos)) {
-                        echo "<li>You do not have any repositories. Consider creating one to store files.</li>";
+                        echo "<li><b style='font-size: 24'>You do not have any repositories. Consider creating one to store files.</b></li>";
                     } else {
                         foreach ($repos as $repoPath) {
                             $repoName = basename($repoPath);
-                            echo "<li><a href='repo.php?name=$repoName&user=$username'>$repoName</a></li>";
+                            echo "<li><a href='repo.php?name=$repoName&user=$username' style='color: white; text-decoration: underline; font-size: 20pt'>$repoName</a></li>";
                         }
                     }
                     ?>
@@ -88,6 +98,67 @@ if (
                 <br /><br />
                 <a href="logout.php"><button class="redirect">Logout</button></a>
             </div>
+            <?php else: ?>
+            <a href="index.php"><button class="redirect">Back to main page</button></a>
+            <br /><br />
+            <div class="main3 main">
+                <?php if (!$publicUser): ?>
+                        <h2>All Users</h2>
+                        <ul>
+                            <?php
+                            $users = array_filter(
+                                glob($baseRepoDir . "*"),
+                                "is_dir",
+                            );
+                            if (empty($users)) {
+                                echo "<li>No users found.</li>";
+                            } else {
+                                foreach ($users as $userDir) {
+                                    $user = basename($userDir);
+                                    echo "<li><a href='?view=public&user=" .
+                                        urlencode($user) .
+                                        "'><button class='select'>" .
+                                        htmlspecialchars($user) .
+                                        "</button></a></li>";
+                                }
+                            }
+                            ?>
+                        </ul>
+                <?php else: ?>
+                <h2>Repositories of <?php echo htmlspecialchars(
+                    $publicUser,
+                ); ?></h2>
+                <ul>
+                    <?php
+                    $publicUserDir = $baseRepoDir . $publicUser . "/";
+                    if (!is_dir($publicUserDir)) {
+                        echo "<li>User not found.</li>";
+                    } else {
+                        $repos = array_filter(
+                            glob($publicUserDir . "*"),
+                            "is_dir",
+                        );
+                        if (empty($repos)) {
+                            echo "<li>This user does not have any repositories.</li>";
+                        } else {
+                            foreach ($repos as $repoPath) {
+                                $repoName = basename($repoPath);
+                                $link =
+                                    "repo.php?name=" .
+                                    urlencode($repoName) .
+                                    "&user=" .
+                                    urlencode($publicUser);
+                                echo "<li><a href='$link'><button class='select'>" .
+                                    htmlspecialchars($repoName) .
+                                    "</button></a></li>";
+                            }
+                        }
+                    }
+                    ?>
+                </ul>
+                <?php endif; ?>
+            </div>
+            <?php endif; ?>
         </main>
     </body>
     <style>
@@ -102,8 +173,10 @@ if (
         position: relative;
         display: flex;
         flex-direction: column;
-        justify-content: center;
+        align-items: center;
         word-break: break-word;
+        overflow: auto;
+        scrollbar-width: none;
     }
 
     * {
