@@ -88,7 +88,7 @@ if (isset($_GET["preview"])) {
                     break;
                 case "image":
                     $previewContent =
-                        "<h3>Preview of" .
+                        "<h3>Preview of " .
                         htmlspecialchars($previewFile) .
                         "</h3>" .
                         "<br><br>" .
@@ -97,8 +97,8 @@ if (isset($_GET["preview"])) {
                 case "text":
                     $content = file_get_contents($previewPath);
                     $previewContent =
-                        "<h3>Preview of" .
-                        htmlspecialchars($previewPath) .
+                        "<h3>Preview of " .
+                        htmlspecialchars($previewFile) .
                         "</h3>" .
                         "<br><br>" .
                         "<pre>" .
@@ -126,8 +126,8 @@ if (isset($_GET["preview"])) {
                     if (in_array($ext, $allowedExts)) {
                         $content = file_get_contents($previewPath);
                         $previewContent =
-                            "<h3>Preview of" .
-                            htmlspecialchars($previewPath) .
+                            "<h3>Preview of " .
+                            htmlspecialchars($previewFile) .
                             "</h3>" .
                             "<br><br>" .
                             "<pre>" .
@@ -336,18 +336,18 @@ if (isset($_GET["preview"])) {
     <script>
     document.getElementById('uploadForm')?.addEventListener('submit', function(e) {
         e.preventDefault();
-        
+
         const form = e.target;
         const formData = new FormData(form);
         const progressContainer = document.getElementById('progressContainer');
         const progressBar = document.getElementById('progressBar');
         const progressStatus = document.getElementById('progressStatus');
-        
+
         progressContainer.style.display = 'block';
-        
+
         const xhr = new XMLHttpRequest();
         xhr.open('POST', form.action, true);
-        
+
         xhr.upload.onprogress = function(e) {
             if (e.lengthComputable) {
                 const percentComplete = (e.loaded / e.total) * 100;
@@ -355,7 +355,7 @@ if (isset($_GET["preview"])) {
                 progressStatus.textContent = Math.round(percentComplete) + '%';
             }
         };
-        
+
         xhr.onload = function() {
             if (xhr.status === 200) {
                 window.location.reload();
@@ -364,12 +364,12 @@ if (isset($_GET["preview"])) {
                 progressContainer.style.display = 'none';
             }
         };
-        
+
         xhr.onerror = function() {
             alert('Upload failed. Please try again.');
             progressContainer.style.display = 'none';
         };
-        
+
         xhr.send(formData);
     });
     </script>

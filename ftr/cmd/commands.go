@@ -19,10 +19,4 @@ func init() {
 		removeCmd,
 		loginCmd,
 	)
-
-	// Add 'r' as an alias for 'remove'
-	rCmd := *removeCmd
-	rCmd.Use = "r"
-	rCmd.Aliases = []string{"rm"}
-	rootCmd.AddCommand(&rCmd)
 }

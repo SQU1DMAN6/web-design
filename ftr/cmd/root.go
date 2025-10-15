@@ -13,9 +13,7 @@ var rootCmd = &cobra.Command{
 and packages using the FSDL format. It integrates with InkDrop for file sharing.
 
 Commands:
-  get [user/repo]        Download and install a package
-  up [source] [repo]     Upload files to create a package
-  r, remove [repo]       Remove an installed package
+  remove [repository]       Remove an installed package
   clear                  Clean temporary directory
   login                  Log in to your account`,
 	PersistentPreRun: func(cmd *cobra.Command, args []string) {
