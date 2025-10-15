@@ -21,7 +21,7 @@ $isOwner = ($_SESSION["name"] ?? null) === $user;
 // Handle file delection, but only available to the owner of the repository
 if ($isOwner && isset($_GET["delete"])) {
     $fileToDelete = basename($_GET["delete"]);
-    $filePath = "$repoPath$fileToDelete";
+    $filePath = $repoPath . DIRECTORY_SEPARATOR . $fileToDelete;
 
     if (is_file($filePath)) {
         unlink($filePath);
@@ -38,11 +38,11 @@ if (
     isset($_FILES["upload"])
 ) {
     $file = $_FILES["upload"];
-    $target = $repoPath . basename($file["name"]);
+    $target = $repoPath . DIRECTORY_SEPARATOR . basename($file["name"]);
 
     if (move_uploaded_file($file["tmp_name"], $target)) {
         $message =
-            "<b style='color: #0f0'>Uploaded" .
+            "<b style='color: #0f0'>Uploaded " .
             htmlspecialchars($file["name"]) .
             ".</b>";
     } else {
@@ -55,13 +55,13 @@ $previewContent = "";
 
 if (isset($_GET["preview"])) {
     $previewFile = basename($_GET["preview"]);
-    $previewPath = "$repoPath$previewFile";
+    $previewPath = $repoPath . DIRECTORY_SEPARATOR . $previewFile;
 
     $finfo = finfo_open(FILEINFO_MIME_TYPE);
-    $mime_type = finfo_file($finfo, $filePath);
+    $mime_type = finfo_file($finfo, $previewPath);
     finfo_close($finfo);
 
-    if (is_file($previewFile)) {
+    if (is_file($previewPath)) {
         $finfo = finfo_open(FILEINFO_MIME_TYPE); // Return MIME type
         $mime_type = finfo_file($finfo, $previewPath);
         finfo_close($finfo);
@@ -155,11 +155,94 @@ if (isset($_GET["preview"])) {
             href="https://fonts.googleapis.com/css2?family=Open+Sans:ital,wght@0,300..800;1,300..800&family=Source+Code+Pro:ital@0;1&display=swap"
             rel="stylesheet"
         />
-        <title><?php htmlspecialchars($repo); ?> - InkDrop</title>
+        <title><?php echo htmlspecialchars($repo); ?> - InkDrop</title>
     </head>
     <body>
         <main>
-            <h1 class="intro"><?php htmlspecialchars($repo); ?></h1>
+            <h1 class="intro"><?php echo htmlspecialchars(
+                $repo,
+            ); ?> - InkDrop</h1>
+            <br><hr class='linebreaker'><br />
+
+            <div class="main main3">
+                <p style="font-size: 20pt">Logged in as <b><?php echo htmlspecialchars(
+                    $_SESSION["name"],
+                ); ?></b></p>
+                <?php if (!$isOwner): ?>
+                    <p style="color: orange"><i>Note: You are viewing a repository owned by <b><?php echo htmlspecialchars(
+                        $user,
+                    ); ?></b>. You cannot upload or delete files.</i></p>
+                <?php endif; ?>
+
+                <div class="btn-row">
+                    <a href="index.php"><button class="redirect">Back to main page</button></a>
+                    <a href="logout.php"><button class="redirect">Logout</button></a>
+                </div>
+            </div>
+
+            <div class="main main1">
+                <?php if ($isOwner): ?>
+                <form
+                    action="repo.php?name=<?= urlencode($repo) ?>"
+                    method="POST" enctype="multipart/form-data"
+                    id="uploadForm"
+                >
+                    <input type="file" name="upload" required />
+                    <button type="submit" class="select">Upload File</button>
+                    <div id="progressContainer" style="display: none;">
+                        <div id="progressBar"></div>
+                        <div id="progressStatus">0%</div>
+                    </div>
+                </form>
+                <?php if (isset($message)): ?>
+                    <p><?php echo $message; ?></p>
+                <?php endif; ?>
+                <?php endif; ?>
+            </div>
+            <hr class="linebreaker" />
+            <div class="main">
+                <h2>Files in repo:</h2>
+                <br /><br />
+                <ul>
+                    <?php
+                    $files = scandir($repoPath);
+                    foreach ($files as $file) {
+                        if ($file === "." || $file === "..") {
+                            continue;
+                        }
+
+                        $fullPath = $repoPath . $file;
+                        $size = round(filesize($fullPath) / 1024, 1);
+                        $modified = date("Y-m-d H:i", filemtime($fullPath));
+                        $downloadLink =
+                            "repos/$user/$repo/" . rawurlencode($file);
+                        $previewLink =
+                            "repo.php?name=" .
+                            urlencode($repo) .
+                            "&user=" .
+                            urlencode($user) .
+                            "&preview=" .
+                            urlencode($file);
+                        echo "<li><code>$file</code> ($size KB, $modified) ";
+                        echo "<a href='$downloadLink' download><button class='select small'>Download</button></a>";
+                        echo "<a href='$previewLink'><button class='select small'>Preview</button></a>";
+                        if ($isOwner) {
+                            $deleteLink =
+                                "repo.php?name=" .
+                                urlencode($repo) .
+                                "&delete=" .
+                                urlencode($file);
+                            echo "<a href='$deleteLink' onclick=\"return confirm('Delete $file?')\"><button class='select small'>Delete</button></a>";
+                        }
+
+                        echo "</li>";
+                    }
+                    ?>
+                </ul>
+
+                <hr class='linebreaker' />
+                <?php echo $previewContent; ?>
+            </div>
         </main>
     </body>
     <style>
@@ -180,6 +263,114 @@ if (isset($_GET["preview"])) {
         scrollbar-width: none;
         width: 100%;
         height: 100vh;
+        align-items: center;
+    }
+
+    .btn-row {
+        margin: 10px 0;
+    }
+
+    input[type="file"] {
+        margin: 8px;
+        madding: 8px;
+        border: 1px solid white;
+        color: white;
+        background-color: var(--dark);
+        border-radius: 5px;
+    }
+
+    ul {
+        padding-left: 20px;
+        list-style-type: square;
+    }
+
+    li {
+        margin-bottom: 3px;
+        font-size: 14pt;
+    }
+
+    a {
+        color: cyan;
+        text-decoration: none;
+        margin-left: 2px;
+    }
+
+    a:hover {
+        text-decoration: underline;
+    }
+
+    pre {
+        background-color: #222;
+        color: #ddd;
+        padding: 10px;
+        border: 1px solid #333;
+        border-radius: 4px;
+        white-space: pre-wrap;
+        overflow-y: auto;
+        width: 97%
+    }
+
+    #progressContainer {
+        width: 100%;
+        max-width: 400px;
+        margin: 10px 0;
+        padding: 5px;
+        background: rgba(0, 0, 0, 0.1);
+        border-radius: 4px;
+    }
+
+    #progressBar {
+        width: 0%;
+        height: 20px;
+        background: #00ff00;
+        border-radius: 4px;
+        transition: width 0.3s ease;
+    }
+
+    #progressStatus {
+        text-align: center;
+        margin-top: 5px;
+        color: white;
     }
     </style>
+    <script>
+    document.getElementById('uploadForm')?.addEventListener('submit', function(e) {
+        e.preventDefault();
+        
+        const form = e.target;
+        const formData = new FormData(form);
+        const progressContainer = document.getElementById('progressContainer');
+        const progressBar = document.getElementById('progressBar');
+        const progressStatus = document.getElementById('progressStatus');
+        
+        progressContainer.style.display = 'block';
+        
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', form.action, true);
+        
+        xhr.upload.onprogress = function(e) {
+            if (e.lengthComputable) {
+                const percentComplete = (e.loaded / e.total) * 100;
+                progressBar.style.width = percentComplete + '%';
+                progressStatus.textContent = Math.round(percentComplete) + '%';
+            }
+        };
+        
+        xhr.onload = function() {
+            if (xhr.status === 200) {
+                window.location.reload();
+            } else {
+                alert('Upload failed. Please try again.');
+                progressContainer.style.display = 'none';
+            }
+        };
+        
+        xhr.onerror = function() {
+            alert('Upload failed. Please try again.');
+            progressContainer.style.display = 'none';
+        };
+        
+        xhr.send(formData);
+    });
+    </script>
 </html>

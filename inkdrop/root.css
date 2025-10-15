@@ -77,6 +77,13 @@ button.select:hover {
     box-shadow: 0px 0px 10px var(--grey);
 }
 
+button.small {
+    padding: 4px;
+    margin-left: 4px;
+    margin-right: 4px;
+    font-size: 14pt;
+}
+
 input.details {
     background-color: var(--primary);
     color: var(--light);
@@ -125,6 +132,8 @@ div.main {
     align-items: center;
     justify-content: center;
     margin: 20px;
+    margin-left: 0px;
+    margin-right: 0px;
     border: 1px solid white;
     color: white;
     background-color: var(--dark);
@@ -133,11 +142,11 @@ div.main {
 }
 
 div.main1 {
-    background-color: var(--light);
-    color: var(--dark);
+    background-color: var(--light) !important;
+    color: var(--dark) !important;
 }
 
 div.main3 {
-    background-color: var(--grey);
-    color: var(--light);
+    background-color: var(--grey) !important;
+    color: var(--light) !important;
 }

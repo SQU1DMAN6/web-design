@@ -15,6 +15,31 @@ if (!is_dir($userRepoDir)) {
 
 $createMessage = "";
 
+// Handle repository deletion
+if (!$viewPublic && isset($_POST['delete_repo'])) {
+    $repoToDelete = trim($_POST['delete_repo']);
+    if (preg_match("/^[a-zA-Z0-9_-]{1,50}$/", $repoToDelete)) {
+        $repoPath = $userRepoDir . $repoToDelete;
+        if (is_dir($repoPath)) {
+            // Recursively delete the repository directory
+            $files = new RecursiveIteratorIterator(
+                new RecursiveDirectoryIterator($repoPath, RecursiveDirectoryIterator::SKIP_DOTS),
+                RecursiveIteratorIterator::CHILD_FIRST
+            );
+            
+            foreach ($files as $fileinfo) {
+                if ($fileinfo->isDir()) {
+                    rmdir($fileinfo->getRealPath());
+                } else {
+                    unlink($fileinfo->getRealPath());
+                }
+            }
+            rmdir($repoPath);
+            $createMessage = "<b style='color: #00FF00'>Repository deleted successfully.</b>";
+        }
+    }
+}
+
 if (
     !$viewPublic &&
     $_SERVER["REQUEST_METHOD"] === "POST" &&
@@ -90,7 +115,10 @@ if (
                     } else {
                         foreach ($repos as $repoPath) {
                             $repoName = basename($repoPath);
-                            echo "<li><a href='repo.php?name=$repoName&user=$username' style='color: white; text-decoration: underline; font-size: 20pt'>$repoName</a></li>";
+                            echo "<li>";
+                            echo "<a href='repo.php?name=$repoName&user=$username' style='color: white; text-decoration: underline; font-size: 20pt'>$repoName</a>";
+                            echo " <button onclick=\"deleteRepo('".htmlspecialchars($repoName, ENT_QUOTES)."')\" class='select small' style='margin-left: 10px; background: #ff3333'>Delete</button>";
+                            echo "</li>";
                         }
                     }
                     ?>
@@ -183,4 +211,22 @@ if (
         scrollbar-width: none;
     }
     </style>
+    <script>
+    function deleteRepo(repoName) {
+        if (confirm('Are you sure you want to delete the repository "' + repoName + '"?\nThis action cannot be undone and all files will be permanently deleted.')) {
+            const form = document.createElement('form');
+            form.method = 'POST';
+            form.style.display = 'none';
+            
+            const input = document.createElement('input');
+            input.type = 'hidden';
+            input.name = 'delete_repo';
+            input.value = repoName;
+            
+            form.appendChild(input);
+            document.body.appendChild(form);
+            form.submit();
+        }
+    }
+    </script>
 </html>
