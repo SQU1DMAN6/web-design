@@ -11,12 +11,21 @@ if (!$repo || !$user) {
 
 $repoPath = __DIR__ . "/repos/$user/$repo";
 
-if (!is_dir($repoPath)) {
-    echo "The repository is not found. Please proceed to <a href='index.php'>the main page</a>.";
-    exit();
-}
-
+// Handle repository creation
 $isOwner = ($_SESSION["name"] ?? null) === $user;
+
+if (!is_dir($repoPath)) {
+    // Only the owner can create a new repository
+    if ($isOwner && $_SERVER["REQUEST_METHOD"] === "POST") {
+        if (!mkdir($repoPath, 0755, true)) {
+            echo "Failed to create repository.";
+            exit();
+        }
+    } else {
+        echo "The repository is not found. Please proceed to <a href='index.php'>the main page</a>.";
+        exit();
+    }
+}
 
 // Handle file delection, but only available to the owner of the repository
 if ($isOwner && isset($_GET["delete"])) {
@@ -69,6 +78,10 @@ if (isset($_GET["preview"])) {
         if ($mime_type !== false) {
             $main_type = strtok($mime_type, "/"); // Get the part before the '/' in the MIME type
 
+            // Prepare web-accessible URL for media files
+            $mediaUrl =
+                "/inkdrop/repos/$user/$repo/" . rawurlencode($previewFile);
+
             switch ($main_type) {
                 case "video":
                     $previewContent =
@@ -76,7 +89,7 @@ if (isset($_GET["preview"])) {
                         htmlspecialchars($previewFile) .
                         "</h3>" .
                         "<br><br>" .
-                        "<video width='90%' controls><source src='$previewPath' type='$mime_type'>Your browser does not support HTML video.</video>";
+                        "<video width='90%' controls><source src='$mediaUrl' type='$mime_type'>Your browser does not support HTML video.</video>";
                     break;
                 case "audio":
                     $previewContent =
@@ -84,7 +97,7 @@ if (isset($_GET["preview"])) {
                         htmlspecialchars($previewFile) .
                         "</h3>" .
                         "<br><br>" .
-                        "<audio controls><source src='$previewPath' type='$mime_type'>Your browser does not support the audio element.</audio>";
+                        "<audio controls><source src='$mediaUrl' type='$mime_type'>Your browser does not support the audio element.</audio>";
                     break;
                 case "image":
                     $previewContent =
@@ -92,7 +105,7 @@ if (isset($_GET["preview"])) {
                         htmlspecialchars($previewFile) .
                         "</h3>" .
                         "<br><br>" .
-                        "<img src='$previewPath'>";
+                        "<img src='$mediaUrl' style='max-width: 90%; height: auto;'>";
                     break;
                 case "text":
                     $content = file_get_contents($previewPath);
@@ -211,19 +224,35 @@ if (isset($_GET["preview"])) {
                             continue;
                         }
 
-                        $fullPath = $repoPath . $file;
-                        $size = round(filesize($fullPath) / 1024, 1);
-                        $modified = date("Y-m-d H:i", filemtime($fullPath));
+                        $fullPath = $repoPath . DIRECTORY_SEPARATOR . $file;
+                        // Handle file size with larger units if needed
+                        $fileSize = filesize($fullPath);
+                        if ($fileSize < 1024) {
+                            $size = $fileSize . " B";
+                        } elseif ($fileSize < 1024 * 1024) {
+                            $size = round($fileSize / 1024, 1) . " KB";
+                        } elseif ($fileSize < 1024 * 1024 * 1024) {
+                            $size = round($fileSize / (1024 * 1024), 1) . " MB";
+                        } else {
+                            $size =
+                                round($fileSize / (1024 * 1024 * 1024), 1) .
+                                " GB";
+                        }
+
+                        // More detailed timestamp
+                        $modified = date("Y-m-d H:i:s T", filemtime($fullPath));
+
+                        // Use web paths for downloads and previews
                         $downloadLink =
-                            "repos/$user/$repo/" . rawurlencode($file);
+                            "/inkdrop/repos/$user/$repo/" . rawurlencode($file);
                         $previewLink =
-                            "repo.php?name=" .
+                            "/inkdrop/repo.php?name=" .
                             urlencode($repo) .
                             "&user=" .
                             urlencode($user) .
                             "&preview=" .
                             urlencode($file);
-                        echo "<li><code>$file</code> ($size KB, $modified) ";
+                        echo "<li><code>$file</code> ($size, $modified) ";
                         echo "<a href='$downloadLink' download><button class='select small'>Download</button></a>";
                         echo "<a href='$previewLink'><button class='select small'>Preview</button></a>";
                         if ($isOwner) {
