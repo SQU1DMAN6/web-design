@@ -2,20 +2,16 @@ package cmd
 
 import (
 	"fmt"
-	"github.com/spf13/cobra"
 	"os"
+
+	"github.com/spf13/cobra"
 )
 
 var rootCmd = &cobra.Command{
 	Use:   "ftr",
-	Short: "FtR - File Transfer and Repository Manager",
-	Long: `FtR (File Transfer) is a command-line tool for managing file repositories
-and packages using the FSDL format. It integrates with InkDrop for file sharing.
-
-Commands:
-  remove [repository]       Remove an installed package
-  clear                  Clean temporary directory
-  login                  Log in to your account`,
+	Short: "FtR - Package Manager, written by Quan Thai",
+	Long: `FtR is a command-line tool for managing file repositories
+and packages using the FSDL format. It integrates with InkDrop for file sharing.`,
 	PersistentPreRun: func(cmd *cobra.Command, args []string) {
 		// Skip root check for help and completion commands
 		if cmd.Name() != "help" && cmd.Name() != "completion" {

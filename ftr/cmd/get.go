@@ -13,9 +13,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// init registers this command to the root command
 func init() {
-	rootCmd.AddCommand(getCmd)
 	getCmd.Flags().Bool("no-unzip", false, "Skip extraction and installation")
 }
 

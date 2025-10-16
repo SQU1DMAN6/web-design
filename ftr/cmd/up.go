@@ -4,23 +4,20 @@ import (
 	"fmt"
 	"github.com/spf13/cobra"
 	"ftr/pkg/api"
-	"ftr/pkg/fsdl"
 	"os"
 	"path/filepath"
 )
 
-// init registers this command to the root command
 func init() {
-	rootCmd.AddCommand(upCmd)
+	// No need to register here as it's done in commands.go
 }
 
 var upCmd = &cobra.Command{
-	Use:   "up [source] [user/repo]",
-	Short: "Upload files to a repository",
-	Long: `Upload files to a repository by creating an FSDL package.
-The source directory will be packed into an FSDL file and uploaded.
+	Use:   "up [file] [user/repo]",
+	Short: "Upload a file to a repository",
+	Long: `Upload a file to a repository on the InkDrop server.
 
-Example: ftr up ./myapp user/myapp`,
+Example: ftr up myfile.txt user/repo`,
 	Args: cobra.ExactArgs(2),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		sourcePath := args[0]
@@ -31,28 +28,8 @@ Example: ftr up ./myapp user/myapp`,
 		if err != nil {
 			return fmt.Errorf("failed to access source path: %w", err)
 		}
-		if !info.IsDir() {
-			return fmt.Errorf("source must be a directory")
-		}
-
-		// Create temporary directory
-		tmpDir := "/tmp/fsdl"
-		if err := os.MkdirAll(tmpDir, 0755); err != nil {
-			return fmt.Errorf("failed to create temp directory: %w", err)
-		}
-
-		// Create and pack FSDL
-		repoName := filepath.Base(sourcePath)
-		pkg, err := fsdl.Create(repoName, sourcePath)
-		if err != nil {
-			return fmt.Errorf("failed to create package: %w", err)
-		}
-
-		fsdlPath := filepath.Join(tmpDir, repoName+".fsdl")
-		fmt.Println("Creating FSDL package...")
-		err = pkg.Pack(sourcePath, fsdlPath)
-		if err != nil {
-			return fmt.Errorf("failed to pack files: %w", err)
+		if info.IsDir() {
+			return fmt.Errorf("source must be a file, not a directory")
 		}
 
 		// Upload to server
@@ -61,18 +38,18 @@ Example: ftr up ./myapp user/myapp`,
 			return fmt.Errorf("failed to create API client: %w", err)
 		}
 
-		fmt.Printf("Uploading package to %s...\n", repoPath)
-		f, err := os.Open(fsdlPath)
+		fmt.Printf("Uploading %s to %s...\n", sourcePath, repoPath)
+		f, err := os.Open(sourcePath)
 		if err != nil {
-			return fmt.Errorf("failed to open package file: %w", err)
+			return fmt.Errorf("failed to open file: %w", err)
 		}
 		defer f.Close()
 
-		if err := client.UploadFile(repoPath, repoName+".fsdl", f); err != nil {
+		if err := client.UploadFile(repoPath, filepath.Base(sourcePath), f); err != nil {
 			return fmt.Errorf("upload failed: %w", err)
 		}
 
-		fmt.Println("Package uploaded successfully")
+		fmt.Printf("File %s uploaded successfully\n", filepath.Base(sourcePath))
 		return nil
 	},
 }

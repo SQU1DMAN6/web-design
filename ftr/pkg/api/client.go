@@ -2,7 +2,6 @@ package api
 
 import (
 	"bytes"
-	"encoding/json"
 	"fmt"
 	"io"
 	"mime/multipart"
@@ -11,10 +10,12 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 const (
-	BaseURL = "https://quanthai.net/inkdrop/repos"
+	BaseURL = "https://quanthai.net/inkdrop"
+	RepoURL = BaseURL + "/repos"
 )
 
 type Client struct {
@@ -23,25 +24,21 @@ type Client struct {
 	configDir string
 }
 
-type loginResponse struct {
-	Success bool   `json:"success"`
-	Message string `json:"message"`
-}
-
 func NewClient() (*Client, error) {
 	jar, err := cookiejar.New(nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create cookie jar: %w", err)
 	}
 
-	// Create config directory in user's home
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get home directory: %w", err)
-	}
-	configDir := filepath.Join(home, ".config", "ftr")
-	if err := os.MkdirAll(configDir, 0755); err != nil {
+	// Create config directory in /var/lib for shared access
+	configDir := "/var/lib/ftr"
+	if err := os.MkdirAll(configDir, 0777); err != nil {
 		return nil, fmt.Errorf("failed to create config directory: %w", err)
+	}
+
+	// Ensure permissions allow both user and sudo access
+	if err := os.Chmod(configDir, 0777); err != nil {
+		fmt.Printf("Warning: Failed to set directory permissions: %v\n", err)
 	}
 
 	client := &Client{
@@ -71,12 +68,16 @@ func (c *Client) loadSession() error {
 
 func (c *Client) saveSession() error {
 	sessionFile := filepath.Join(c.configDir, "session")
-	return os.WriteFile(sessionFile, []byte(c.sessionID), 0600)
+	if err := os.WriteFile(sessionFile, []byte(c.sessionID), 0666); err != nil {
+		return err
+	}
+	// Ensure file is readable/writable by both user and sudo
+	return os.Chmod(sessionFile, 0666)
 }
 
-func (c *Client) Login(username, password string) error {
+func (c *Client) Login(email, password string) error {
 	data := url.Values{}
-	data.Set("username", username)
+	data.Set("email", email)
 	data.Set("password", password)
 
 	resp, err := c.http.PostForm(BaseURL+"/login.php", data)
@@ -85,32 +86,87 @@ func (c *Client) Login(username, password string) error {
 	}
 	defer resp.Body.Close()
 
-	var loginResp loginResponse
-	if err := json.NewDecoder(resp.Body).Decode(&loginResp); err != nil {
-		return fmt.Errorf("failed to parse login response: %w", err)
+	// Read response body to check for errors
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return fmt.Errorf("failed to read response: %w", err)
 	}
 
-	if !loginResp.Success {
-		return fmt.Errorf("login failed: %s", loginResp.Message)
+	// Check if login failed by looking for error message in HTML
+	if bytes.Contains(body, []byte("Error logging in")) {
+		return fmt.Errorf("invalid credentials")
 	}
 
-	// Save session cookies
+	// Look for session cookie
+	var foundSession bool
 	for _, cookie := range resp.Cookies() {
 		if cookie.Name == "PHPSESSID" {
 			c.sessionID = cookie.Value
 			if err := c.saveSession(); err != nil {
 				fmt.Println("Warning: Failed to save session")
 			}
+			foundSession = true
 			break
 		}
+	}
+
+	if !foundSession {
+		return fmt.Errorf("login failed: no session cookie received")
 	}
 
 	return nil
 }
 
+func (c *Client) CreateRepo(user, repoName string) error {
+	// The repository will be created automatically when we try to upload
+	// Just verify we have the right permissions
+	if user != os.Getenv("USER") {
+		return fmt.Errorf("cannot create repository - not authorized")
+	}
+	return nil
+}
+
 func (c *Client) UploadFile(repoPath string, fileName string, reader io.Reader) error {
+	// Get real username regardless of sudo
+	realUser := os.Getenv("SUDO_USER")
+	if realUser == "" {
+		realUser = os.Getenv("USER")
+	}
+
 	if c.sessionID == "" {
-		return fmt.Errorf("not logged in")
+		return fmt.Errorf("not logged in. Please run 'ftr login' first")
+	}
+
+	// Split user/repo
+	parts := strings.Split(repoPath, "/")
+	if len(parts) != 2 {
+		return fmt.Errorf("invalid repository path. Must be in format user/repo")
+	}
+	user, repoName := parts[0], parts[1]
+
+	// First try to access the repo
+	resp, err := c.http.Get(fmt.Sprintf("%s/repo.php?name=%s&user=%s", BaseURL, url.QueryEscape(repoName), url.QueryEscape(user)))
+	if err != nil {
+		return fmt.Errorf("failed to check repository: %w", err)
+	}
+
+	body, err := io.ReadAll(resp.Body)
+	resp.Body.Close()
+
+	// If repo doesn't exist and we're the owner, create it
+	if bytes.Contains(body, []byte("repository is not found")) {
+		// Get real username regardless of sudo
+		realUser := os.Getenv("SUDO_USER")
+		if realUser == "" {
+			realUser = os.Getenv("USER")
+		}
+
+		if user != realUser { // Only create if we're the owner
+			return fmt.Errorf("repository does not exist and you are not the owner")
+		}
+		if err := c.CreateRepo(user, repoName); err != nil {
+			return fmt.Errorf("failed to create repository: %w", err)
+		}
 	}
 
 	// Create multipart form
@@ -127,31 +183,63 @@ func (c *Client) UploadFile(repoPath string, fileName string, reader io.Reader) 
 	}
 	w.Close()
 
-	// Create request
-	req, err := http.NewRequest("POST", fmt.Sprintf("%s/%s", BaseURL, repoPath), &b)
+	// Create request to repo.php with appropriate query parameters
+	uploadURL := fmt.Sprintf("%s/repo.php?name=%s&user=%s", BaseURL, url.QueryEscape(repoName), url.QueryEscape(user))
+	req, err := http.NewRequest("POST", uploadURL, &b)
 	if err != nil {
 		return fmt.Errorf("failed to create request: %w", err)
 	}
 	req.Header.Set("Content-Type", w.FormDataContentType())
 
 	// Send request
-	resp, err := c.http.Do(req)
+	resp, err = c.http.Do(req)
 	if err != nil {
 		return fmt.Errorf("upload request failed: %w", err)
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("upload failed with status: %s", resp.Status)
+	// Read response to check for success/failure message
+	body, err = io.ReadAll(resp.Body)
+	if err != nil {
+		return fmt.Errorf("failed to read response: %w", err)
 	}
 
-	return nil
+	// Debug output to see what we're getting back
+	fmt.Printf("Server response: %s\n", string(body))
+
+	// Check if we got redirected to login page
+	if bytes.Contains(body, []byte("Login with an existing InkDrop account")) {
+		c.sessionID = "" // Clear invalid session
+		_ = os.Remove(filepath.Join(c.configDir, "session")) // Remove invalid session file
+		return fmt.Errorf("session expired or invalid - please run 'ftr login' again")
+	}
+
+	// Look for success message in the response
+	if bytes.Contains(body, []byte("color: #0f0")) && bytes.Contains(body, []byte("Uploaded")) {
+		return nil // Success case
+	}
+
+	// Error cases
+	if bytes.Contains(body, []byte("Failed to create repository")) {
+		return fmt.Errorf("failed to create repository - permission denied")
+	}
+
+	if bytes.Contains(body, []byte("Upload failed")) || bytes.Contains(body, []byte("color: red")) {
+		return fmt.Errorf("upload failed - server rejected the file")
+	}
+
+	if bytes.Contains(body, []byte("cannot upload")) || !bytes.Contains(body, []byte("uploadForm")) {
+		return fmt.Errorf("upload failed - not authorized to upload to this repository")
+	}
+
+	return fmt.Errorf("upload failed - unexpected server response. Try 'ftr login' if you haven't logged in recently")
 }
 
 func (c *Client) DownloadFile(repoPath string, fileName string) (io.ReadCloser, error) {
-	url := fmt.Sprintf("%s/%s/%s", BaseURL, repoPath, fileName)
+	// Download from /inkdrop/repos/USER/REPO/filename
+	downloadURL := fmt.Sprintf("%s/repos/%s/%s", BaseURL, repoPath, fileName)
 
-	resp, err := c.http.Get(url)
+	resp, err := c.http.Get(downloadURL)
 	if err != nil {
 		return nil, fmt.Errorf("download request failed: %w", err)
 	}
