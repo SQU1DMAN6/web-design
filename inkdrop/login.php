@@ -74,7 +74,7 @@ if (isset($_SESSION["login"]) && isset($_SESSION["name"])) {
             <h1 class="intro">Login with an existing InkDrop account</h1>
             <br><hr class="linebreaker" /><br>
             <form method="POST" name="login" action="login.php">
-                <input class="details" type="email" name="email" required placeholder="EMAIL OR NAME" /><br /><br />
+                <input class="details" type="email" name="email" required placeholder="EMAIL" /><br /><br />
                 <input class="details" type="password" name="password" required placeholder="PASSWORD" /><br /><br />
                 <button type="submit" class="redirect">Login</button><br /><br />
             </form>
@@ -87,8 +87,7 @@ if (isset($_SESSION["login"]) && isset($_SESSION["name"])) {
                 $email = trim($_POST["email"]);
                 $password = $_POST["password"];
 
-                $query =
-                    "SELECT * FROM fileshare.users WHERE email = $1 OR name = $1";
+                $query = "SELECT * FROM fileshare.users WHERE email = $1";
                 $result = pg_query_params($db_handle, $query, [$email]);
 
                 if (!$result) {
