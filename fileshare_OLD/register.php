@@ -1,13 +1,15 @@
 <?php
 session_start();
 
-if (isset($_SESSION['login'])) {
+if (isset($_SESSION["login"])) {
     header("Location: index.php");
     exit();
 }
 
-if (empty($_SERVER['HTTPS']) || $_SERVER['HTTPS'] === "off") {
-    header("Location: https://" . $_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI']);
+if (empty($_SERVER["HTTPS"]) || $_SERVER["HTTPS"] === "off") {
+    header(
+        "Location: https://" . $_SERVER["HTTP_HOST"] . $_SERVER["REQUEST_URI"],
+    );
     exit();
 }
 ?>
@@ -42,36 +44,44 @@ if (empty($_SERVER['HTTPS']) || $_SERVER['HTTPS'] === "off") {
         $store = false;
 
         // Displaying form results once submitted
-        if (isset($_POST['name'])) {
-            $name = $_POST['name'];
+        if (isset($_POST["name"])) {
+            $name = $_POST["name"];
 
-            $email = strtolower(trim($_POST['email']));
+            $email = strtolower(trim($_POST["email"]));
             if (!isValidEmail($email)) {
                 echo "Your email address is not correct!";
                 return;
             }
 
-
-            $password_raw = $_POST['password'];
+            $password_raw = $_POST["password"];
             $password_cooked = password_hash($password_raw, PASSWORD_DEFAULT);
-            echo "Hello, " . $name . "<br><br>";
-            echo "Your email is: " . $email . "<br><br>";
-            echo "Your password is: " . $password_raw . "<br>Encrypted to: " . $password_cooked . "<br><br>";
+            echo "Hello, $name<br><br>";
+            echo "Your email is: $email<br><br>";
+            echo "Your password is: $password_raw<br>Encrypted to: $password_cooked<br><br>";
             $store = true;
         }
 
         // Validate information before we proceed. (for example use regex to validate email format)
-        
+
         if ($store) {
-            $checkQuery = "SELECT * FROM fileshare.users WHERE name = $1 OR email = $2";
-            $checkResult = pg_query_params($db_handle, $checkQuery, array($name, $email));
+            $checkQuery =
+                "SELECT * FROM fileshare.users WHERE name = $1 OR email = $2";
+            $checkResult = pg_query_params($db_handle, $checkQuery, [
+                $name,
+                $email,
+            ]);
 
             if (pg_num_rows($checkResult) > 0) {
                 echo "<br><b style='color: orange;'>Username or email already exists.</b><br>";
                 $store = false;
             } else {
-                $query = "INSERT INTO fileshare.users (name, email, password) VALUES ($1, $2, $3)";
-                $result = pg_query_params($db_handle, $query, array($name, $email, $password_cooked));
+                $query =
+                    "INSERT INTO fileshare.users (name, email, password) VALUES ($1, $2, $3)";
+                $result = pg_query_params($db_handle, $query, [
+                    $name,
+                    $email,
+                    $password_cooked,
+                ]);
 
                 if ($result) {
                     echo "<br><br><b style='color: green; background-color: black;'>New record created</b><br><br>";
@@ -82,7 +92,6 @@ if (empty($_SERVER['HTTPS']) || $_SERVER['HTTPS'] === "off") {
             }
             $store = false;
         }
-
         ?>
     </main>
 </body>

@@ -1,5 +1,11 @@
 <?php
-// Force HTTPS
+session_start();
+
+if (isset($_SESSION["login"])) {
+    header("Location: index.php");
+    exit();
+}
+
 if (empty($_SERVER["HTTPS"]) || $_SERVER["HTTPS"] === "off") {
     header(
         "Location: https://" . $_SERVER["HTTP_HOST"] . $_SERVER["REQUEST_URI"],
@@ -7,139 +13,150 @@ if (empty($_SERVER["HTTPS"]) || $_SERVER["HTTPS"] === "off") {
     exit();
 }
 
-// Include DB and utilities at the top
-include "connect.php"; // ensure this does NOT echo "Connected successfully"
-include "util.php";
-
-$store = false;
-$name = "";
-$email = "";
-$password_cooked = "";
 $message = "";
-
-if ($_SERVER["REQUEST_METHOD"] === "POST") {
-    $nam = trim($_POST["name"] ?? "");
-    $name = str_replace(" ", "_", $nam);
-    $email = strtolower(trim($_POST["email"] ?? ""));
-    $password_raw = $_POST["password"] ?? "";
-
-    if (!preg_match("/^[a-zA-Z0-9_-]{1,20}$/", $name)) {
-        $message = "Name '$name' contains invalid characters or is too long.";
-    } elseif (!isValidEmail($email)) {
-        $message = "Your email address is not correct!";
-    } else {
-        $password_cooked = password_hash($password_raw, PASSWORD_DEFAULT);
-        $store = true;
-
-        // Check if user exists
-        $checkQuery =
-            "SELECT * FROM fileshare.users WHERE name = $1 OR email = $2";
-        $checkResult = pg_query_params($db_handle, $checkQuery, [
-            $name,
-            $email,
-        ]);
-
-        if (pg_num_rows($checkResult) > 0) {
-            $message = "Username or email already exists.";
-            $store = false;
-        } else {
-            // Insert new user
-            $insertQuery =
-                "INSERT INTO fileshare.users (name, email, password) VALUES ($1, $2, $3)";
-            $result = pg_query_params($db_handle, $insertQuery, [
-                $name,
-                $email,
-                $password_cooked,
-            ]);
-
-            if ($result) {
-                $store = true;
-                $message = "New record created successfully!";
-            } else {
-                $message = "Error inserting into database.";
-                $store = false;
-            }
-        }
-    }
-}
+$message2 = "";
 ?>
+
 <!DOCTYPE html>
 <html lang="en">
-<head>
-<meta charset="utf-8">
-<link rel="stylesheet" href="root.css">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Open+Sans:ital,wght@0,300..800;1,300..800&family=Source+Code+Pro:ital@0;1&display=swap" rel="stylesheet">
-<title>InkDrop Register</title>
-<style>
-main {
-    background-image: linear-gradient(to bottom, var(--primary) 30%, var(--secondary), var(--light-blue));
-    color: white;
-    height: 100vh;
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    align-items: center;
-    text-align: center;
-    margin: 0;
-    padding: 0;
-}
-div.register-box, div.d2s {
-    background-image: linear-gradient(to bottom, var(--primary), var(--light-secondary), var(--secondary));
-    border-radius: 15px;
-    box-shadow: 0 0 15px 5px var(--light-light-blue);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    flex-direction: column;
-    text-align: center;
-    padding: 20px;
-}
-div.register-box {
-    border: 2px solid #fff;
-}
-div.d2s {
-    border: 1px solid #fff;
-}
-.details {
-    width: 200px;
-    padding: 5px;
-    margin: 5px 0;
-}
-.redirect {
-    padding: 5px 15px;
-    margin-top: 10px;
-}
-</style>
-</head>
-<body>
-<main>
-    <!-- Registration Form -->
-    <div class="register-box" style="display: <?= $store ? "none" : "flex" ?>">
-        <h1>Register for an InkDrop account</h1>
-        <hr class="linebreaker"><br>
-        <form method="POST">
-            <input class="details" type="text" name="name" placeholder="NAME" required><br>
-            <input class="details" type="email" name="email" placeholder="EMAIL" required><br>
-            <input class="details" type="password" name="password" placeholder="PASSWORD" required><br>
-            <button type="submit" class="redirect">Register</button>
-        </form>
-        <p>If you already have an account: <a href="login.php"><button class="redirect">Login</button></a></p>
-        <?php if (!$store && $message): ?>
-            <p style="color: orange;"><?= htmlspecialchars($message) ?></p>
-        <?php endif; ?>
-    </div>
+    <head>
+        <meta charset="UTF-8"/>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <link rel="stylesheet" href="root.css?version=1.2" />
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+        <link
+            href="https://fonts.googleapis.com/css2?family=Open+Sans:ital,wght@0,300..800;1,300..800&family=Source+Code+Pro:ital@0;1&display=swap"
+            rel="stylesheet"
+        />
+        <title>InkDrop Register</title>
+    </head>
+    <body>
+        <main>
+            <h1 class="intro">Register for a new InkDrop account</h1>
+            <br/><hr class="linebreaker"/><br/>
+            <div class="register-box">
+                <?php if (!$store): ?>
+                <form action="register.php" method="POST" name="register">
+                    <input class="details" type="text" name="name" placeholder="USERNAME" required/><br />
+                    <input class="details" type="email" name="email" placeholder="EMAIL" required/><br />
+                    <input class="details" type="password" name="password" placeholder="PASSWORD" required/><br />
+                    <button type="submit" class="redirect">Register</button><br />
+                </form>
+                <br />
+                <h2>If you already have an account, please proceed to <a href="login.php"><button class="redirect">Login</button></a></h2><br/><br/>
+                <?php endif; ?>
+                <?php
+                include "connect.php";
+                include "util.php";
 
-    <!-- Success Message -->
-    <div class="d2s" style="display: <?= $store ? "flex" : "none" ?>">
-        <h1>Registration Successful!</h1>
-        <p><?= htmlspecialchars($message) ?></p>
-        <p>Hello, <?= htmlspecialchars($name) ?>!</p>
-        <p>Your email: <?= htmlspecialchars($email) ?></p>
-        <p>Your password is stored encrypted (hashed) in the database.</p>
-        <p>Go to <a href="login.php"><button class="redirect">Login</button></a></p>
-    </div>
-</main>
-</body>
+                $store = false;
+
+                // Displaying form results once submitted
+
+                if (
+                    isset($_POST["name"]) &&
+                    isset($_POST["email"]) &&
+                    isset($_POST["password"])
+                ) {
+                    $nam = $_POST["name"];
+                    $name = str_replace(" ", "_", $nam);
+
+                    $email = strtolower(trim($_POST["email"]));
+                    if (!isValidEmail($email)) {
+                        echo "Your email address is not correct.";
+                        return;
+                    }
+
+                    $password_raw = $_POST["password"];
+                    $password_cooked = password_hash(
+                        $password_raw,
+                        PASSWORD_DEFAULT,
+                    );
+                    $store = true;
+                }
+
+                if ($store) {
+                    if (!preg_match("/^[a-zA-Z0-9_-]{1,21}$/", $name)) {
+                        echo "Your name contains invalid characters or is too long.";
+                        $store = false;
+                    }
+                    $checkQuery =
+                        "SELECT * FROM fileshare.users WHERE name = \$1 OR email = \$2";
+                    $checkResult = pg_query_params($db_handle, $checkQuery, [
+                        $name,
+                        $email,
+                    ]);
+
+                    if (pg_num_rows($checkResult) > 0) {
+                        echo "<b style='color: orange'>ERROR: Username or email already exists.</b>";
+                        $store = false;
+                    } else {
+                        $query =
+                            "INSERT INTO fileshare.users (name, email, password) VALUES (\$1, \$2, \$3)";
+                        $result = pg_query_params($db_handle, $query, [
+                            $name,
+                            $email,
+                            $password_cooked,
+                        ]);
+
+                        if ($result) {
+                            $message =
+                                "<b style='color: green;'>New record created successfully.</b><br><br><p>Please proceed to the login page: <a href='login.php'><button class='redirect'>Login</button></a></p>";
+                        } else {
+                            echo "<b style='color: orange'>Error registering.</b>";
+                            $store = false;
+                        }
+                    }
+                }
+                ?>
+            </div>
+            <?php
+            if ($store) {
+                echo "
+                <div class='main main1'>
+                    $message
+                    Hello, $name<br><br>
+                    Your email is $email<br><br>
+                </div>
+                ";
+            }
+            $store = false;
+            ?>
+        </main>
+    </body>
+    <style>
+        * {
+            scrollbar-width: none;
+        }
+
+        main {
+            width: 100%;
+            height: 100vh;
+            color: #fff;
+            background-color: var(--secondary);
+            display: flex;
+            flex-direction: column;
+            overflow: auto;
+            scrollbar-width: none;
+            align-items: center;
+            text-align: center;
+        }
+
+        div.register-box {
+            display: flex;
+            flex-direction: column;
+            background-image: linear-gradient(
+                to bottom,
+                var(--primary),
+                var(--light-blue)
+            );
+            align-items: center;
+            justify-content: center;
+            padding: 40px;
+            border: 1px solid white;
+            border-radius: 20px;
+            width: 90%;
+        }
+    </style>
 </html>
