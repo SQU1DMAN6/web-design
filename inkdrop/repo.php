@@ -79,9 +79,8 @@ if (isset($_GET["preview"])) {
             $main_type = strtok($mime_type, "/"); // Get the part before the '/' in the MIME type
 
             // Prepare web-accessible URL for media files
-            $mediaUrl =
-                "/inkdrop/repos/$user/$repo/" . rawurlencode($previewFile);
-
+            $mediaUrl = "/inkdrop/repos/$user/$repo/" . rawurlencode($previewFile);
+            
             switch ($main_type) {
                 case "video":
                     $previewContent =
@@ -229,30 +228,26 @@ if (isset($_GET["preview"])) {
                         $fileSize = filesize($fullPath);
                         if ($fileSize < 1024) {
                             $size = $fileSize . " B";
-                        } elseif ($fileSize < 1024 * 1024) {
-                            $size = round($fileSize / 1024, 1) . " KB";
-                        } elseif ($fileSize < 1024 * 1024 * 1024) {
-                            $size = round($fileSize / (1024 * 1024), 1) . " MB";
+                        } elseif ($fileSize < 1024*1024) {
+                            $size = round($fileSize/1024, 1) . " KB";
+                        } elseif ($fileSize < 1024*1024*1024) {
+                            $size = round($fileSize/(1024*1024), 1) . " MB";
                         } else {
-                            $size =
-                                round($fileSize / (1024 * 1024 * 1024), 1) .
-                                " GB";
+                            $size = round($fileSize/(1024*1024*1024), 1) . " GB";
                         }
-
+                        
                         // More detailed timestamp
                         $modified = date("Y-m-d H:i:s T", filemtime($fullPath));
-
+                        
                         // Use web paths for downloads and previews
-                        $downloadLink =
-                            "/inkdrop/repos/$user/$repo/" . rawurlencode($file);
-                        $previewLink =
-                            "/inkdrop/repo.php?name=" .
+                        $downloadLink = "/inkdrop/repos/$user/$repo/" . rawurlencode($file);
+                        $previewLink = "/inkdrop/repo.php?name=" .
                             urlencode($repo) .
                             "&user=" .
                             urlencode($user) .
                             "&preview=" .
                             urlencode($file);
-                        echo "<li><code>$file</code> ($size, $modified) ";
+                        echo "<li><code>$file</code> ($size KB, $modified) ";
                         echo "<a href='$downloadLink' download><button class='select small'>Download</button></a>";
                         echo "<a href='$previewLink'><button class='select small'>Preview</button></a>";
                         if ($isOwner) {
