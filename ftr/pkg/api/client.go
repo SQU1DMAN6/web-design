@@ -9,6 +9,7 @@ import (
 	"net/http/cookiejar"
 	"net/url"
 	"os"
+	"os/user"
 	"path/filepath"
 	"strings"
 )
@@ -30,26 +31,54 @@ func NewClient() (*Client, error) {
 		return nil, fmt.Errorf("failed to create cookie jar: %w", err)
 	}
 
-	// Create config directory in /var/lib for shared access
-	configDir := "/var/lib/ftr"
-	if err := os.MkdirAll(configDir, 0777); err != nil {
-		return nil, fmt.Errorf("failed to create config directory: %w", err)
+	// Create config directory in user's home. If running as root via sudo,
+	// prefer the original user's home directory so session files are stored
+	// where the interactive user expects them.
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get home directory: %w", err)
 	}
-
-	// Ensure permissions allow both user and sudo access
-	if err := os.Chmod(configDir, 0777); err != nil {
-		fmt.Printf("Warning: Failed to set directory permissions: %v\n", err)
+	if os.Geteuid() == 0 {
+		if sudoUser := os.Getenv("SUDO_USER"); sudoUser != "" {
+			if u, err := user.Lookup(sudoUser); err == nil {
+				home = u.HomeDir
+			}
+		}
+	}
+	configDir := filepath.Join(home, ".config", "ftr")
+	if err := os.MkdirAll(configDir, 0755); err != nil {
+		return nil, fmt.Errorf("failed to create config directory: %w", err)
 	}
 
 	client := &Client{
 		http: &http.Client{
 			Jar: jar,
+			// Keep a simple redirect limiter. Let the default transport and cookie jar
+			// handle Set-Cookie headers so cookies get stored with proper domain/path
+			// attributes.
+			CheckRedirect: func(req *http.Request, via []*http.Request) error {
+				if len(via) >= 10 {
+					return fmt.Errorf("too many redirects")
+				}
+				return nil
+			},
 		},
 		configDir: configDir,
 	}
 
 	// Try to load existing session
 	if err := client.loadSession(); err == nil {
+		// Pre-populate cookie jar with saved session
+		baseURLParsed, err := url.Parse(BaseURL)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse base URL: %w", err)
+		}
+		jar.SetCookies(baseURLParsed, []*http.Cookie{{
+			Name:   "PHPSESSID",
+			Value:  client.sessionID,
+			Path:   "/",
+			Domain: baseURLParsed.Hostname(),
+		}})
 		return client, nil
 	}
 
@@ -68,19 +97,33 @@ func (c *Client) loadSession() error {
 
 func (c *Client) saveSession() error {
 	sessionFile := filepath.Join(c.configDir, "session")
-	if err := os.WriteFile(sessionFile, []byte(c.sessionID), 0666); err != nil {
-		return err
-	}
-	// Ensure file is readable/writable by both user and sudo
-	return os.Chmod(sessionFile, 0666)
+	return os.WriteFile(sessionFile, []byte(c.sessionID), 0600)
 }
 
 func (c *Client) Login(email, password string) error {
+	// Initialize base URL for cookies
+	baseURLParsed, err := url.Parse(BaseURL)
+	if err != nil {
+		return fmt.Errorf("failed to parse base URL: %w", err)
+	}
+
+	// Send login credentials using an explicit request so we can set headers
 	data := url.Values{}
 	data.Set("email", email)
 	data.Set("password", password)
 
-	resp, err := c.http.PostForm(BaseURL+"/login.php", data)
+	loginURL := BaseURL + "/login.php"
+	req, err := http.NewRequest("POST", loginURL, strings.NewReader(data.Encode()))
+	if err != nil {
+		return fmt.Errorf("failed to create login request: %w", err)
+	}
+	// Typical browser-like headers to avoid server-side filtering
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Set("User-Agent", "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/85.0.4183.121 Safari/537.36")
+	req.Header.Set("Referer", BaseURL+"/login.php")
+	req.Header.Set("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8")
+
+	resp, err := c.http.Do(req)
 	if err != nil {
 		return fmt.Errorf("login request failed: %w", err)
 	}
@@ -92,26 +135,167 @@ func (c *Client) Login(email, password string) error {
 		return fmt.Errorf("failed to read response: %w", err)
 	}
 
+	fmt.Printf("Debug: login response status: %s\n", resp.Status)
+	fmt.Println("Debug: login response Set-Cookie headers:")
+	for _, sc := range resp.Header["Set-Cookie"] {
+		fmt.Println("  ", sc)
+	}
+	if resp.StatusCode >= 400 {
+		snippet := string(body)
+		if len(snippet) > 2048 {
+			snippet = snippet[:2048]
+		}
+		fmt.Println("Debug: login response body (snippet):")
+		fmt.Println(snippet)
+	}
+
 	// Check if login failed by looking for error message in HTML
 	if bytes.Contains(body, []byte("Error logging in")) {
 		return fmt.Errorf("invalid credentials")
 	}
 
-	// Look for session cookie
-	var foundSession bool
-	for _, cookie := range resp.Cookies() {
-		if cookie.Name == "PHPSESSID" {
-			c.sessionID = cookie.Value
-			if err := c.saveSession(); err != nil {
-				fmt.Println("Warning: Failed to save session")
+	// Parse Set-Cookie headers explicitly and normalize attributes before
+	// storing into the cookie jar. This ensures Domain/Path/Secure are set so
+	// the cookie will be sent on subsequent requests.
+	foundSession := false
+	// Parse Set-Cookie header strings manually. We only need to find the
+	// PHPSESSID cookie and extract Domain/Path/Secure/HttpOnly if present.
+	for _, sc := range resp.Header["Set-Cookie"] {
+		parts := strings.Split(sc, ";")
+		if len(parts) == 0 {
+			continue
+		}
+		// first part should be NAME=VALUE
+		nv := strings.SplitN(strings.TrimSpace(parts[0]), "=", 2)
+		if len(nv) != 2 {
+			continue
+		}
+		name := nv[0]
+		value := nv[1]
+		if name != "PHPSESSID" {
+			continue
+		}
+		cookie := &http.Cookie{Name: name, Value: value}
+		for _, attr := range parts[1:] {
+			attr = strings.TrimSpace(attr)
+			if strings.EqualFold(attr, "secure") {
+				cookie.Secure = true
+				continue
 			}
-			foundSession = true
-			break
+			if strings.EqualFold(attr, "httponly") {
+				cookie.HttpOnly = true
+				continue
+			}
+			if strings.HasPrefix(strings.ToLower(attr), "domain=") {
+				cookie.Domain = strings.TrimPrefix(attr, "Domain=")
+				cookie.Domain = strings.TrimPrefix(cookie.Domain, "domain=")
+				cookie.Domain = strings.TrimSpace(cookie.Domain)
+				continue
+			}
+			if strings.HasPrefix(strings.ToLower(attr), "path=") {
+				cookie.Path = strings.TrimPrefix(attr, "Path=")
+				cookie.Path = strings.TrimPrefix(cookie.Path, "path=")
+				cookie.Path = strings.TrimSpace(cookie.Path)
+				continue
+			}
+		}
+		if cookie.Domain == "" {
+			cookie.Domain = baseURLParsed.Hostname()
+		}
+		if cookie.Path == "" {
+			cookie.Path = "/"
+		}
+		if !cookie.Secure && baseURLParsed.Scheme == "https" {
+			cookie.Secure = true
+		}
+		c.http.Jar.SetCookies(baseURLParsed, []*http.Cookie{cookie})
+		c.sessionID = cookie.Value
+		if err := c.saveSession(); err != nil {
+			fmt.Println("Warning: Failed to save session")
+		}
+		foundSession = true
+		break
+	}
+
+	// If not found in the Set-Cookie headers, check the cookie jar where the
+	// transport may have stored cookies for redirects.
+	if !foundSession {
+		for _, cookie := range c.http.Jar.Cookies(baseURLParsed) {
+			if cookie.Name == "PHPSESSID" {
+				if cookie.Domain == "" {
+					cookie.Domain = baseURLParsed.Hostname()
+				}
+				if cookie.Path == "" {
+					cookie.Path = "/"
+				}
+				c.sessionID = cookie.Value
+				if err := c.saveSession(); err != nil {
+					fmt.Println("Warning: Failed to save session")
+				}
+				foundSession = true
+				break
+			}
 		}
 	}
 
 	if !foundSession {
+		// Emit some debug hints to help diagnose why the cookie wasn't set.
+		fmt.Println("Debug: response Set-Cookie headers:")
+		for _, sc := range resp.Header["Set-Cookie"] {
+			fmt.Println("  ", sc)
+		}
+		fmt.Println("Debug: cookies currently in jar for base URL:")
+		for _, cck := range c.http.Jar.Cookies(baseURLParsed) {
+			fmt.Printf("  - %s=%s; Domain=%s; Path=%s; Secure=%t; HttpOnly=%t\n", cck.Name, cck.Value, cck.Domain, cck.Path, cck.Secure, cck.HttpOnly)
+		}
 		return fmt.Errorf("login failed: no session cookie received")
+	}
+
+	// Verify session by accessing index.php
+	// Build a verification request and explicitly include the PHPSESSID cookie
+	// as a header to ensure it is sent to the server (this helps isolate
+	// whether the cookie jar matching is the issue).
+	verifyReq, err := http.NewRequest("GET", BaseURL+"/index.php", nil)
+	if err != nil {
+		return fmt.Errorf("failed to create verification request: %w", err)
+	}
+	if c.sessionID != "" {
+		cookieHeader := "PHPSESSID=" + c.sessionID
+		verifyReq.Header.Set("Cookie", cookieHeader)
+		fmt.Printf("Debug: sending verification request with Cookie: %s\n", cookieHeader)
+	}
+
+	verifyResp, err := c.http.Do(verifyReq)
+	if err != nil {
+		return fmt.Errorf("failed to verify session: %w", err)
+	}
+	verifyBody, err := io.ReadAll(verifyResp.Body)
+	verifyResp.Body.Close()
+
+	if bytes.Contains(verifyBody, []byte("Login with an existing InkDrop account")) {
+		// Provide debug information to help diagnose why the session cookie
+		// didn't result in an authenticated page.
+		fmt.Printf("Debug: verification request returned status: %s\n", verifyResp.Status)
+		fmt.Println("Debug: verification response headers:")
+		for k, v := range verifyResp.Header {
+			fmt.Printf("  %s: %v\n", k, v)
+		}
+		// Print a short snippet of the body
+		snippet := string(verifyBody)
+		if len(snippet) > 1024 {
+			snippet = snippet[:1024]
+		}
+		fmt.Println("Debug: verification response body (snippet):")
+		fmt.Println(snippet)
+
+		// Print cookies currently in the jar for the base URL
+		fmt.Println("Debug: cookies currently in jar for base URL:")
+		for _, cck := range c.http.Jar.Cookies(baseURLParsed) {
+			fmt.Printf("  - %s=%s; Domain=%s; Path=%s; Secure=%t; HttpOnly=%t\n",
+				cck.Name, cck.Value, cck.Domain, cck.Path, cck.Secure, cck.HttpOnly)
+		}
+
+		return fmt.Errorf("session verification failed")
 	}
 
 	return nil
@@ -127,14 +311,8 @@ func (c *Client) CreateRepo(user, repoName string) error {
 }
 
 func (c *Client) UploadFile(repoPath string, fileName string, reader io.Reader) error {
-	// Get real username regardless of sudo
-	realUser := os.Getenv("SUDO_USER")
-	if realUser == "" {
-		realUser = os.Getenv("USER")
-	}
-
 	if c.sessionID == "" {
-		return fmt.Errorf("not logged in. Please run 'ftr login' first")
+		return fmt.Errorf("not logged in")
 	}
 
 	// Split user/repo
@@ -144,29 +322,34 @@ func (c *Client) UploadFile(repoPath string, fileName string, reader io.Reader) 
 	}
 	user, repoName := parts[0], parts[1]
 
-	// First try to access the repo
-	resp, err := c.http.Get(fmt.Sprintf("%s/repo.php?name=%s&user=%s", BaseURL, url.QueryEscape(repoName), url.QueryEscape(user)))
+	// First verify our session is still valid
+	resp, err := c.http.Get(BaseURL + "/index.php")
+	if err != nil {
+		return fmt.Errorf("session verification failed: %w", err)
+	}
+	body, err := io.ReadAll(resp.Body)
+	resp.Body.Close()
+
+	// If we got redirected to login, our session is invalid
+	if bytes.Contains(body, []byte("Login with an existing InkDrop account")) {
+		return fmt.Errorf("session expired - please login again")
+	}
+
+	// Now try to access or create the repo
+	resp, err = c.http.Get(fmt.Sprintf("%s/repo.php?name=%s&user=%s", BaseURL, url.QueryEscape(repoName), url.QueryEscape(user)))
 	if err != nil {
 		return fmt.Errorf("failed to check repository: %w", err)
 	}
 
-	body, err := io.ReadAll(resp.Body)
+	body, err = io.ReadAll(resp.Body)
 	resp.Body.Close()
 
-	// If repo doesn't exist and we're the owner, create it
+	// If repo doesn't exist, create it with our first upload
 	if bytes.Contains(body, []byte("repository is not found")) {
-		// Get real username regardless of sudo
-		realUser := os.Getenv("SUDO_USER")
-		if realUser == "" {
-			realUser = os.Getenv("USER")
-		}
-
-		if user != realUser { // Only create if we're the owner
+		if os.Getenv("USER") != user {
 			return fmt.Errorf("repository does not exist and you are not the owner")
 		}
-		if err := c.CreateRepo(user, repoName); err != nil {
-			return fmt.Errorf("failed to create repository: %w", err)
-		}
+		// Repository will be created automatically by the upload
 	}
 
 	// Create multipart form
@@ -207,14 +390,7 @@ func (c *Client) UploadFile(repoPath string, fileName string, reader io.Reader) 
 	// Debug output to see what we're getting back
 	fmt.Printf("Server response: %s\n", string(body))
 
-	// Check if we got redirected to login page
-	if bytes.Contains(body, []byte("Login with an existing InkDrop account")) {
-		c.sessionID = "" // Clear invalid session
-		_ = os.Remove(filepath.Join(c.configDir, "session")) // Remove invalid session file
-		return fmt.Errorf("session expired or invalid - please run 'ftr login' again")
-	}
-
-	// Look for success message in the response
+	// Look for the success message in the response
 	if bytes.Contains(body, []byte("color: #0f0")) && bytes.Contains(body, []byte("Uploaded")) {
 		return nil // Success case
 	}
@@ -232,7 +408,7 @@ func (c *Client) UploadFile(repoPath string, fileName string, reader io.Reader) 
 		return fmt.Errorf("upload failed - not authorized to upload to this repository")
 	}
 
-	return fmt.Errorf("upload failed - unexpected server response. Try 'ftr login' if you haven't logged in recently")
+	return fmt.Errorf("upload failed - unexpected response from server")
 }
 
 func (c *Client) DownloadFile(repoPath string, fileName string) (io.ReadCloser, error) {

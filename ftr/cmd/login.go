@@ -3,11 +3,12 @@ package cmd
 import (
 	"bufio"
 	"fmt"
-	"github.com/spf13/cobra"
 	"ftr/pkg/api"
 	"os"
 	"strings"
 	"syscall"
+
+	"github.com/spf13/cobra"
 	"golang.org/x/term"
 )
 
@@ -20,13 +21,13 @@ Required for uploading packages with 'up' command.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		reader := bufio.NewReader(os.Stdin)
 
-		// Get username
-		fmt.Print("Username: ")
-		username, err := reader.ReadString('\n')
+		// Get email
+		fmt.Print("Email: ")
+		email, err := reader.ReadString('\n')
 		if err != nil {
-			return fmt.Errorf("failed to read username: %w", err)
+			return fmt.Errorf("failed to read email: %w", err)
 		}
-		username = strings.TrimSpace(username)
+		email = strings.TrimSpace(email)
 
 		// Get password securely
 		fmt.Print("Password: ")
@@ -42,7 +43,7 @@ Required for uploading packages with 'up' command.`,
 			return fmt.Errorf("failed to create API client: %w", err)
 		}
 
-		if err := client.Login(username, string(password)); err != nil {
+		if err := client.Login(email, string(password)); err != nil {
 			return fmt.Errorf("login failed: %w", err)
 		}
 
