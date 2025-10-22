@@ -344,6 +344,26 @@ zip -r ../myapp.fsdl *</code></pre>
             </p>
         </section>
 
+        <section>
+            <h2>Version Control for .fsdl</h2>
+            <p>
+                Keep history and distribute .fsdl packages with minimal fuss.
+                We provide a lightweight, local VCS prototype you can try now —
+                it stores package blobs by content-hash and records immutable
+                versions so you can publish, list, inspect, and retrieve builds.
+            </p>
+            <div class="code-block">
+                <pre><code>python3 ftr_vcs.py init
+python3 ftr_vcs.py publish ./myapp.fsdl --name username/myapp --version 1.0.0 --desc "Initial"
+python3 ftr_vcs.py list
+python3 ftr_vcs.py get username/myapp 1.0.0 --out myapp.fsdl</code></pre>
+                <button class="copy-btn">Copy</button>
+            </div>
+            <p>
+                Read the docs: <a href="vcs/README.md">vcs/README.md</a>
+            </p>
+        </section>
+
         <footer>© 2025 Quan Thai</footer>
 
         <script>
