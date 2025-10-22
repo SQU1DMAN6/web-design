@@ -31,9 +31,6 @@ func NewClient() (*Client, error) {
 		return nil, fmt.Errorf("failed to create cookie jar: %w", err)
 	}
 
-	// Create config directory in user's home. If running as root via sudo,
-	// prefer the original user's home directory so session files are stored
-	// where the interactive user expects them.
 	home, err := os.UserHomeDir()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get home directory: %w", err)
@@ -135,20 +132,6 @@ func (c *Client) Login(email, password string) error {
 		return fmt.Errorf("failed to read response: %w", err)
 	}
 
-	fmt.Printf("Debug: login response status: %s\n", resp.Status)
-	fmt.Println("Debug: login response Set-Cookie headers:")
-	for _, sc := range resp.Header["Set-Cookie"] {
-		fmt.Println("  ", sc)
-	}
-	if resp.StatusCode >= 400 {
-		snippet := string(body)
-		if len(snippet) > 2048 {
-			snippet = snippet[:2048]
-		}
-		fmt.Println("Debug: login response body (snippet):")
-		fmt.Println(snippet)
-	}
-
 	// Check if login failed by looking for error message in HTML
 	if bytes.Contains(body, []byte("Error logging in")) {
 		return fmt.Errorf("invalid credentials")
@@ -238,19 +221,6 @@ func (c *Client) Login(email, password string) error {
 		}
 	}
 
-	if !foundSession {
-		// Emit some debug hints to help diagnose why the cookie wasn't set.
-		fmt.Println("Debug: response Set-Cookie headers:")
-		for _, sc := range resp.Header["Set-Cookie"] {
-			fmt.Println("  ", sc)
-		}
-		fmt.Println("Debug: cookies currently in jar for base URL:")
-		for _, cck := range c.http.Jar.Cookies(baseURLParsed) {
-			fmt.Printf("  - %s=%s; Domain=%s; Path=%s; Secure=%t; HttpOnly=%t\n", cck.Name, cck.Value, cck.Domain, cck.Path, cck.Secure, cck.HttpOnly)
-		}
-		return fmt.Errorf("login failed: no session cookie received")
-	}
-
 	// Verify session by accessing index.php
 	// Build a verification request and explicitly include the PHPSESSID cookie
 	// as a header to ensure it is sent to the server (this helps isolate
@@ -262,7 +232,6 @@ func (c *Client) Login(email, password string) error {
 	if c.sessionID != "" {
 		cookieHeader := "PHPSESSID=" + c.sessionID
 		verifyReq.Header.Set("Cookie", cookieHeader)
-		fmt.Printf("Debug: sending verification request with Cookie: %s\n", cookieHeader)
 	}
 
 	verifyResp, err := c.http.Do(verifyReq)
@@ -273,10 +242,6 @@ func (c *Client) Login(email, password string) error {
 	verifyResp.Body.Close()
 
 	if bytes.Contains(verifyBody, []byte("Login with an existing InkDrop account")) {
-		// Provide debug information to help diagnose why the session cookie
-		// didn't result in an authenticated page.
-		fmt.Printf("Debug: verification request returned status: %s\n", verifyResp.Status)
-		fmt.Println("Debug: verification response headers:")
 		for k, v := range verifyResp.Header {
 			fmt.Printf("  %s: %v\n", k, v)
 		}
@@ -284,15 +249,6 @@ func (c *Client) Login(email, password string) error {
 		snippet := string(verifyBody)
 		if len(snippet) > 1024 {
 			snippet = snippet[:1024]
-		}
-		fmt.Println("Debug: verification response body (snippet):")
-		fmt.Println(snippet)
-
-		// Print cookies currently in the jar for the base URL
-		fmt.Println("Debug: cookies currently in jar for base URL:")
-		for _, cck := range c.http.Jar.Cookies(baseURLParsed) {
-			fmt.Printf("  - %s=%s; Domain=%s; Path=%s; Secure=%t; HttpOnly=%t\n",
-				cck.Name, cck.Value, cck.Domain, cck.Path, cck.Secure, cck.HttpOnly)
 		}
 
 		return fmt.Errorf("session verification failed")
@@ -386,9 +342,6 @@ func (c *Client) UploadFile(repoPath string, fileName string, reader io.Reader) 
 	if err != nil {
 		return fmt.Errorf("failed to read response: %w", err)
 	}
-
-	// Debug output to see what we're getting back
-	fmt.Printf("Server response: %s\n", string(body))
 
 	// Look for the success message in the response
 	if bytes.Contains(body, []byte("color: #0f0")) && bytes.Contains(body, []byte("Uploaded")) {

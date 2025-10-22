@@ -2,9 +2,8 @@ package main
 
 import (
 	"fmt"
-	"os"
-	_ "ftr/cmd/all" // Import all commands
 	"ftr/cmd"
+	"os"
 )
 
 func main() {
