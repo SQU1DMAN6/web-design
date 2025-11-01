@@ -20,9 +20,7 @@ go build -o ftr .
 
 chmod 755 ./ftr
 
-sudo mkdir /usr/share/ftr/
 sudo cp ./ftr /usr/local/bin/ftr
-sudo cp ./ftr /usr/share/ftr/ftr
 
 echo "FtR package manager has been installed successfully. Use 'ftr' as shell command to use it."
 echo "=> ftr --help"
