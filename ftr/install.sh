@@ -18,7 +18,7 @@ echo "Creating share directory at /usr/local/share/ftr..."
 sudo mkdir -p "/usr/local/share/ftr"
 
 echo "Building FtR..."
-go build -o ftr . -buildvcs=falses
+go build -o ftr . -buildvcs=false
 echo "Making binary executable..."
 chmod 755 ./ftr
 
