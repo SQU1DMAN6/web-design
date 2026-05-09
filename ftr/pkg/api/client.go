@@ -58,11 +58,12 @@ func inkdropURL(resource string) string {
 }
 
 type Client struct {
-	http      *http.Client
-	sessionID string
-	email     string
-	username  string
-	configDir string
+	http       *http.Client
+	sessionID  string
+	email      string
+	username   string
+	configDir  string
+	quietStats bool
 }
 
 func NewClient() (*Client, error) {
@@ -105,7 +106,12 @@ func NewClient() (*Client, error) {
 	if client.http.Transport == nil {
 		client.http.Transport = http.DefaultTransport
 	}
-	client.http.Transport = &StatsTransport{rt: client.http.Transport}
+	client.http.Transport = &StatsTransport{
+		rt: client.http.Transport,
+		quiet: func() bool {
+			return client.quietStats
+		},
+	}
 
 	// Try to load existing session
 	if err := client.loadSession(); err == nil {
@@ -138,7 +144,8 @@ func NewClient() (*Client, error) {
 // ReadCloser to responses so we can print simple transfer statistics when the
 // response body is closed.
 type StatsTransport struct {
-	rt http.RoundTripper
+	rt    http.RoundTripper
+	quiet func() bool
 }
 
 type countingReadCloser struct {
@@ -148,6 +155,7 @@ type countingReadCloser struct {
 	url     string
 	reqSize int64
 	read    int64
+	quiet   func() bool
 }
 
 func (t *StatsTransport) RoundTrip(req *http.Request) (*http.Response, error) {
@@ -161,7 +169,7 @@ func (t *StatsTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 		return resp, err
 	}
 	if resp.Body != nil {
-		resp.Body = &countingReadCloser{ReadCloser: resp.Body, start: start, method: req.Method, url: req.URL.String(), reqSize: reqSize}
+		resp.Body = &countingReadCloser{ReadCloser: resp.Body, start: start, method: req.Method, url: req.URL.String(), reqSize: reqSize, quiet: t.quiet}
 	}
 	return resp, nil
 }
@@ -174,7 +182,9 @@ func (c *countingReadCloser) Read(p []byte) (n int, err error) {
 
 func (c *countingReadCloser) Close() error {
 	elapsed := time.Since(c.start)
-	fmt.Printf("[ftr-stats] %s %s req=%dB resp=%dB elapsed=%s\n", c.method, c.url, c.reqSize, c.read, elapsed)
+	if c.quiet == nil || !c.quiet() {
+		fmt.Printf("[ftr-stats] %s %s req=%dB resp=%dB elapsed=%s\n", c.method, c.url, c.reqSize, c.read, elapsed)
+	}
 	return c.ReadCloser.Close()
 }
 
@@ -230,6 +240,10 @@ func (c *Client) loadUserInfo() error {
 
 func (c *Client) GetSessionInfo() (email, username string) {
 	return c.email, c.username
+}
+
+func (c *Client) SetStatsEnabled(enabled bool) {
+	c.quietStats = !enabled
 }
 
 // IsLoggedIn returns true if we have a session ID stored.
@@ -773,7 +787,9 @@ func (c *Client) UploadFile(repoPath string, fileName string, reader io.Reader, 
 				return nil
 			}
 			errMsg := "upload failed - server error"
-			if msg, ok := apiResp["message"].(string); ok {
+			if msg, ok := apiResp["message"].(string); ok && msg != "" {
+				errMsg = msg
+			} else if msg, ok := apiResp["error"].(string); ok && msg != "" {
 				errMsg = msg
 			}
 			if debug, ok := apiResp["debug"].(map[string]interface{}); ok {
@@ -789,7 +805,6 @@ func (c *Client) UploadFile(repoPath string, fileName string, reader io.Reader, 
 					errMsg = fmt.Sprintf("upload failed: %s (logged in as '%s', repository owner is '%s')", errMsg, dLogged, dOwner)
 				}
 			}
-			// server returned error
 			return fmt.Errorf("%s", errMsg)
 		}
 	} else {
@@ -995,6 +1010,9 @@ func (c *Client) ListRepoFiles(user, repo string) ([]map[string]interface{}, err
 		return nil, fmt.Errorf("failed to create list request: %w", err)
 	}
 	req.Header.Set("X-FTR-CLIENT", "FtR-CLI")
+	if c.sessionID != "" {
+		req.Header.Set("Cookie", "PHPSESSID="+c.sessionID)
+	}
 	resp, err := c.http.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("list request failed: %w", err)
@@ -1058,6 +1076,9 @@ func (c *Client) GetRepoMeta(user, repo string) (map[string]interface{}, error) 
 		return nil, fmt.Errorf("failed to create meta request: %w", err)
 	}
 	req.Header.Set("X-FTR-CLIENT", "FtR-CLI")
+	if c.sessionID != "" {
+		req.Header.Set("Cookie", "PHPSESSID="+c.sessionID)
+	}
 	resp, err := c.http.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("meta request failed: %w", err)

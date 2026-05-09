@@ -31,6 +31,7 @@ func init() {
 		syncCmd,
 		queryCmd,
 		remoteCmd,
+		daemonCmd,
 		upgradeCmd,
 	)
 }

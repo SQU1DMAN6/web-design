@@ -11,7 +11,7 @@ import (
 var initCmd = &cobra.Command{
 	Use:   "init",
 	Short: "Initialize local FtR sync directory",
-	Long:  "Creates a local directory `~/FtRSync` for syncing packages (like Dropbox).",
+	Long:  "Creates a local directory `~/FtR` for syncing packages (like Dropbox).",
 	Args:  cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		home, err := os.UserHomeDir()

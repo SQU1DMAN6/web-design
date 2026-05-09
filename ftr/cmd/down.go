@@ -15,14 +15,14 @@ var downDest string
 var downWorkers int
 
 func init() {
-	downCmd.Flags().StringVarP(&downDest, "dest", "D", "", "Destination directory (defaults to ~/FtRSync)")
+	downCmd.Flags().StringVarP(&downDest, "dest", "D", "", "Destination directory (defaults to ~/FtR)")
 	downCmd.Flags().IntVarP(&downWorkers, "workers", "w", 10, "Number of parallel workers")
 }
 
 var downCmd = &cobra.Command{
 	Use:   "down [user/repo]",
 	Short: "Download all files from a repository into the FtR home dir",
-	Long:  "Recursively download every file in the repo into ~/FtRSync or the directory provided with -D",
+	Long:  "Recursively download every file in the repo into ~/FtR or the directory provided with -D",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		repoPath := args[0]
@@ -47,7 +47,7 @@ var downCmd = &cobra.Command{
 			if err != nil {
 				return fmt.Errorf("failed to determine home directory: %w", err)
 			}
-			dest = filepath.Join(home, "FtRSync", user, repo)
+			dest = filepath.Join(home, "FtR", user, repo)
 		}
 
 		if err := os.MkdirAll(dest, 0755); err != nil {

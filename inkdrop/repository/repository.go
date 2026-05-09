@@ -344,6 +344,75 @@ func ListRepositoryFilesRecursive(userName, repoName string) ([]map[string]inter
 	return files, nil
 }
 
+func ListRepositoryEntriesRecursive(userName, repoName string) ([]map[string]interface{}, error) {
+	root := repositoryRoot(userName, repoName)
+	if ok, err := DirExists(root); err != nil || !ok {
+		return nil, fmt.Errorf("repository %s/%s not found", userName, repoName)
+	}
+
+	var entries []map[string]interface{}
+	walkErr := filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return nil
+		}
+		if path == root {
+			return nil
+		}
+		info, err := d.Info()
+		if err != nil {
+			return nil
+		}
+		rel, err := filepath.Rel(root, path)
+		if err != nil {
+			return nil
+		}
+		kind := "file"
+		if d.IsDir() {
+			kind = "dir"
+		}
+		entry := map[string]interface{}{
+			"path":     filepath.ToSlash(rel),
+			"type":     kind,
+			"size":     info.Size(),
+			"modified": info.ModTime().Unix(),
+		}
+		if !d.IsDir() {
+			if hash, err := CalculateFileHash(path); err == nil {
+				entry["hash"] = hash
+			}
+		}
+		entries = append(entries, entry)
+		return nil
+	})
+	if walkErr != nil {
+		return nil, walkErr
+	}
+
+	return entries, nil
+}
+
+func CreateDirectoryAtRepoPath(userName, repoName, repoPath string) (string, error) {
+	rawPath := strings.TrimSpace(repoPath)
+	if rawPath == "" || rawPath == "/" {
+		return "", errors.New("invalid directory path")
+	}
+
+	cleanRepoPath := normalizeWorkingDir(rawPath)
+	relativePath := strings.TrimPrefix(cleanRepoPath, "/")
+	if relativePath == "" {
+		return "", errors.New("invalid directory path")
+	}
+
+	targetPath, err := GetItemPath(userName, repoName, "/", relativePath)
+	if err != nil {
+		return "", err
+	}
+	if err := os.MkdirAll(targetPath, 0755); err != nil {
+		return "", err
+	}
+	return targetPath, nil
+}
+
 func CalculateFileHash(filePath string) (string, error) {
 	file, err := os.Open(filePath)
 	if err != nil {
