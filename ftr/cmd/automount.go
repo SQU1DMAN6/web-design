@@ -88,7 +88,6 @@ var automountinstallCmd = &cobra.Command{
 		opts := []*unit.UnitOption{
 			// [Unit] section of service file
 			unit.NewUnitOption("Unit", "Description", fmt.Sprintf("Mount %s/%s to %s", repoOwner, repo, mountPoint)),
-			unit.NewUnitOption("Unit", "After", "multi-user.target"),
 
 			// [Service] section of service file
 			unit.NewUnitOption("Service", "Type", "simple"),
@@ -98,7 +97,7 @@ var automountinstallCmd = &cobra.Command{
 			unit.NewUnitOption("Service", "RestartSec", "5s"),
 
 			// [Install] section of service file
-			unit.NewUnitOption("Install", "WantedBy", "multi-user.target"),
+			unit.NewUnitOption("Install", "WantedBy", "default.target"),
 		}
 
 		readerRaw := unit.Serialize(opts)
