@@ -21,7 +21,7 @@ var upgradeCmd = &cobra.Command{
 If no package names are specified, all upgradeable packages will be listed for upgrade.
 
 Example: ftr upgrade myapp
-Example: ftr upgrade  # upgrades all upgradeable packages`,
+Example: ftr upgrade`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		yes, _ := cmd.Flags().GetBool("yes")
 
@@ -297,5 +297,4 @@ func fetchRemoteVersion(client *api.Client, user, repo, packageName string) (str
 
 func init() {
 	upgradeCmd.Flags().BoolP("yes", "y", false, "Skip confirmation prompt")
-	rootCmd.AddCommand(upgradeCmd)
 }

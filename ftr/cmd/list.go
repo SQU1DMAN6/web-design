@@ -139,7 +139,6 @@ func init() {
 	listCmd.Flags().BoolP("quiet", "q", false, "Quiet: list only package names")
 	listCmd.Flags().BoolP("alternative", "a", false, "Alternative display: list package sources")
 	listCmd.Flags().BoolP("description", "d", false, "Show package description under each package")
-	rootCmd.AddCommand(listCmd)
 }
 
 func compareVersions(a, b string) int {

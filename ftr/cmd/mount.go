@@ -125,7 +125,11 @@ Writes are uploaded back to the remote repository when file handles are closed.
 			mountOpts = append(mountOpts, fuse.ReadOnly())
 		}
 
-		ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+		ctx, stop := signal.NotifyContext(
+			context.Background(),
+			os.Interrupt,
+			syscall.SIGTERM,
+		)
 		defer stop()
 
 		conn, err := fuse.Mount(mountPoint, mountOpts...)
@@ -137,6 +141,7 @@ Writes are uploaded back to the remote repository when file handles are closed.
 		go func() {
 			<-ctx.Done()
 			_ = fuse.Unmount(mountPoint)
+			_ = os.RemoveAll(mountPoint)
 		}()
 
 		fmt.Printf("Mounted %s at %s\n", repoPath, mountPoint)

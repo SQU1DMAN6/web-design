@@ -3,7 +3,6 @@ package cmd
 import (
 	"fmt"
 	"ftr/pkg/api"
-	"ftr/pkg/daemon"
 	"os"
 	"path/filepath"
 	"strings"
@@ -50,7 +49,6 @@ Example: ftr up myfile.txt user/repo`,
 		if len(parts) != 2 {
 			return fmt.Errorf("repository path must be in format user/repo")
 		}
-		user, repo := parts[0], parts[1]
 
 		// Parallel upload with a small concurrency limit
 		sem := make(chan struct{}, 6)
@@ -104,23 +102,6 @@ Example: ftr up myfile.txt user/repo`,
 		for e := range errCh {
 			if e != nil {
 				lastErr = e
-			}
-		}
-
-		if lastErr == nil {
-			home, err := os.UserHomeDir()
-			if err == nil {
-				syncDir := filepath.Join(home, "FtR", user, repo)
-				if info, err := os.Stat(syncDir); err == nil && info.IsDir() {
-					execPath, err := resolveInstallableExecutable()
-					if err == nil {
-						if err := daemon.InstallService(repoPath, execPath); err != nil {
-							fmt.Fprintf(os.Stderr, "Warning: could not auto-start sync daemon for %s: %v\n", repoPath, err)
-						} else {
-							fmt.Printf("Auto-started sync daemon for %s. Local changes will now sync automatically.\n", repoPath)
-						}
-					}
-				}
 			}
 		}
 
