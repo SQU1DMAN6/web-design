@@ -77,6 +77,12 @@ The project is open-source under a **MIT License with Commons Clause** restricti
 - Search and discover packages in remote repositories
 - Encrypt/decrypt sensitive files with AES-256
 
+**Fresh improvements:**
+- Trash-first delete behavior in InkDrop browser: file removals now preserve content in `.Trash-1000` for restore instead of permanent deletion
+- Drag-and-drop moving in the browser now shows a visible drag preview and highlights valid destination folders
+- Workspace repo listings refresh automatically by polling for repository-level changes
+- FUSE mounts refresh remote entries and invalidate directory caches more aggressively, improving desktop file manager refresh behavior
+
 **Ideal For:**
 - Developers managing multi-language projects
 - Teams distributing pre-compiled binaries
@@ -369,12 +375,25 @@ Supported languages:
 
 **Registry Location:** `~/.local/share/ftr/registry.json`
 
-#### 10. **Additional Commands**
+#### 10. **FUSE Repository Mounting**
+- Mount remote Inkdrop repositories as local directories using FUSE
+- On-demand file downloading (placeholders until accessed)
+- Automatic upload of local changes back to remote repository
+- Refresh notifications for seamless file manager integration
+- Read-only and read-write modes
+- Parallel upload/download with 6 concurrent workers
+
+**Commands:**
+- `ftr mount [user/repo] [mountpoint]` - Mount repository at specified path
+- `ftr automount install [user/repo] [mountpoint]` - Create systemd service for auto-mounting
+- `ftr automount enable [user/repo]` - Enable and start the mount service
+- `ftr automount disable [user/repo]` - Stop and disable the mount service
+
+#### 11. **Additional Commands**
 - `ftr list` - List installed packages and upgradeable versions
 - `ftr remove` - Uninstall packages
 - `ftr upgrade` - Upgrade installed packages
 - `ftr build` - Build projects from source
-- `ftr sync` - Sync packages across systems
 - `ftr query` - Query package information
 - `ftr remote` - Manage remote repositories
 - `ftr version` - Display version information
@@ -506,7 +525,7 @@ ftr/
 │   ├── get.go                   # Download and install packages
 │   ├── up.go                    # Upload files to repositories
 │   ├── down.go                  # Download all files from repository
-│   ├── init.go                  # Initialize FtR sync directory
+│   ├── init.go                  # Initialize FtR directory
 │   ├── pack.go                  # Pack directories into SQAR/FSDL
 │   ├── login.go                 # Authenticate to server
 │   ├── logout.go                # Clear session
@@ -514,7 +533,8 @@ ftr/
 │   ├── list.go                  # List installed/upgradeable packages
 │   ├── version.go               # Display version info
 │   ├── build.go                 # Build projects
-│   ├── sync.go                  # Sync packages
+│   ├── mount.go                 # Mount remote repositories as FUSE
+│   ├── automount.go             # Manage systemd services for mounting
 │   ├── query.go                 # Query information
 │   ├── remote.go                # Manage remotes
 │   ├── session.go               # Session management
@@ -998,7 +1018,8 @@ ftr get company/internal-tools
 | `list` | List installed packages | `ftr list [options]` |
 | `version` | Display version info | `ftr version` |
 | `build` | Build projects | `ftr build [path]` |
-| `sync` | Sync packages | `ftr sync` |
+| `mount` | Mount remote repository as FUSE | `ftr mount [user/repo] [mountpoint]` |
+| `automount` | Manage systemd mount services | `ftr automount [subcommand]` |
 | `query` | Query package info | `ftr query [user/repo]` |
 | `remote` | Manage remotes | `ftr remote [subcommand]` |
 | `session` | Show session info | `ftr session` |

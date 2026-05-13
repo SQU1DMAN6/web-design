@@ -17,6 +17,7 @@ type FrontEndParams struct {
 	LoggedIn                  bool
 	IsViewingPublic           bool
 	UserOwnsRepository        bool
+	IsTrashView               bool
 	Error                     map[string]string
 	RepoList                  []string
 	RepoMatches               []map[string]string

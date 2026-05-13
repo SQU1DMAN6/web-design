@@ -127,6 +127,16 @@
             border-color: rgba(59, 130, 246, 0.34);
         }
 
+        .repo-card.dragging {
+            opacity: 0.45;
+            transform: scale(0.98);
+        }
+
+        .repo-card.drop-target {
+            border-color: rgba(56, 189, 248, 0.9);
+            box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.18);
+        }
+
         .repo-card.folder {
             background:
                 linear-gradient(180deg, rgba(255, 251, 235, 0.98), rgba(255, 244, 214, 0.94));
@@ -347,13 +357,26 @@
                 <div style="display: flex; flex-direction: column; gap: 10px;">
                     <h2 class="section">Repository Manager</h2>
                     <div class="row">
+                        {{if .IsTrashView}}
+                        <form method="post" action="/trash/empty" id="emptyTrashTopForm">
+                            <input type="hidden" name="repository" value="{{.Message3}}" />
+                            <input type="hidden" name="user" value="{{.Message2}}" />
+                            <button type="submit" class="button-link small danger" id="emptyTrashTopBtn">Empty Trash</button>
+                        </form>
+                        <button type="button" class="button-link small" id="restoreTrashTopBtn">Restore Selected</button>
+                        {{else}}
                         <button type="button" class="button-link small" id="newFileBtnInline">New File</button>
                         <button type="button" class="button-link small" id="newFolderBtnInline">New Folder</button>
                         <button type="button" class="button-link small" id="uploadFileBtnInline">Upload Files</button>
                         <a href="/downloadrepo/{{.Message2}}/{{.Message3}}"><button type="button" class="button-link small" id="downloadRepoInline">Download Repository</button></a>
+                        {{end}}
                     </div>
                 </div>
+                {{if .IsTrashView}}
+                <p class="subtle">Trash is synced from FtR/FUSE deletes. Restore selected files to their original location when possible, or empty the trash permanently.</p>
+                {{else}}
                 <p class="subtle">Tips: Double-click folders to open them. Double-click editable files to jump into the editor, or download non-editable files. Select a folder then press <strong>F2</strong> or <strong>Enter</strong> to rename/move, <strong>Del</strong> or <strong>Backspace</strong> to delete.</p>
+                {{end}}
 
                 {{if .Error}}
                 <div class="alert">
@@ -369,6 +392,11 @@
                     <li class="repo-card folder parent" data-kind="parent" data-name=".." tabindex="0" title="Go up">
                         <div class="repo-icon" aria-hidden="true">↩</div>
                         <p class="repo-name">..</p>
+                    </li>
+                    {{else if eq $entry "Trash/"}}
+                    <li class="repo-card folder trash-entry" data-kind="trash" data-name="Trash" tabindex="0" title="Trash">
+                        <div class="repo-icon" aria-hidden="true">🗑</div>
+                        <p class="repo-name">Trash</p>
                     </li>
                     {{else if hasSuffix $entry "/"}}
                     <li class="repo-card folder" data-kind="folder" data-name="{{trimSuffix $entry "/"}}" tabindex="0" title="{{trimSuffix $entry "/"}}">
@@ -412,6 +440,8 @@
                     <button type="button" class="menu-item" id="renameBtn">Rename / Move</button>
                     <button type="button" class="menu-item" id="downloadBtn">Download File</button>
                     <button type="button" class="menu-item" id="liveEditBtn">Edit File</button>
+                    <button type="button" class="menu-item" id="restoreTrashBtn">Restore Files</button>
+                    <button type="button" class="menu-item danger-item" id="emptyTrashBtn">Empty Trash</button>
                     <button type="button" class="menu-item danger-item" id="deleteBtn">Delete Folder</button>
                     <button type="button" class="menu-item danger-item" id="deleteFileBtn">Delete File</button>
                 </div>
@@ -555,6 +585,18 @@
                     <input type="hidden" name="itemName" id="downloadItemName">
                 </form>
 
+                <form id="restoreTrashForm" method="post" action="/trash/restore" hidden>
+                    <input type="hidden" name="repository" value="{{.Message3}}" />
+                    <input type="hidden" name="user" value="{{.Message2}}" />
+                    <input type="hidden" name="working-directory" value="{{.Path}}" />
+                    <input type="hidden" name="itemName" id="restoreTrashItemName" />
+                </form>
+
+                <form id="emptyTrashForm" method="post" action="/trash/empty" hidden>
+                    <input type="hidden" name="repository" value="{{.Message3}}" />
+                    <input type="hidden" name="user" value="{{.Message2}}" />
+                </form>
+
                 <!-- Hidden top-level form used to delete the entire repository. Kept outside the settings form to avoid nested-form issues. -->
                 <form id="deleteRepoForm" method="post" action="/deleterepo" hidden>
                     <input type="hidden" name="reponame" value="{{.Message3}}" />
@@ -636,6 +678,7 @@
             var currentPath = "{{.Path}}";
             var currentUser = "{{.Message2}}";
             var currentRepo = "{{.Message3}}";
+            var isTrashView = {{if .IsTrashView}}true{{else}}false{{end}};
 
             var panel = document.getElementById("filePanel");
             var contextMenu = document.getElementById("contextMenu");
@@ -677,6 +720,12 @@
             var cancelSettings = document.getElementById("cancelSettings")
             var cancelDeleteSettings = document.getElementById("cancelDeleteSettings")
             var liveEditBtn = document.getElementById("liveEditBtn")
+            var restoreTrashBtn = document.getElementById("restoreTrashBtn")
+            var emptyTrashBtn = document.getElementById("emptyTrashBtn")
+            var restoreTrashTopBtn = document.getElementById("restoreTrashTopBtn")
+            var restoreTrashForm = document.getElementById("restoreTrashForm")
+            var restoreTrashItemName = document.getElementById("restoreTrashItemName")
+            var emptyTrashForm = document.getElementById("emptyTrashForm")
 
             var previewPanel = document.getElementById("filePreviewPanel")
             var previewContent = document.getElementById("previewContent")
@@ -688,6 +737,8 @@
             var selectionAnchorEntry = null;
             var selectionBox = null;
             var selectionDragState = null;
+            var dragGhost = null;
+            var dragOverTarget = null;
             var newFileDefaultExtensions = {
                 text: ".txt",
                 document: ".docx",
@@ -758,6 +809,37 @@
                 return getSelectedEntries().map(function (entry) {
                     return entry.getAttribute("data-name");
                 }).filter(Boolean);
+            }
+
+            function createDragGhost(entry) {
+                var label = entry.getAttribute("data-name") || "item";
+                var iconElem = entry.querySelector(".repo-icon");
+                var iconText = iconElem ? iconElem.textContent.trim() : (entryKind(entry) === "folder" ? "📁" : "📄");
+                var ghost = document.createElement("div");
+                ghost.textContent = iconText + " " + label;
+                ghost.style.position = "absolute";
+                ghost.style.top = "-9999px";
+                ghost.style.left = "-9999px";
+                ghost.style.opacity = "0.9";
+                ghost.style.background = "#ffffff";
+                ghost.style.color = "#0f172a";
+                ghost.style.border = "1px solid rgba(148, 163, 184, 0.5)";
+                ghost.style.borderRadius = "6px";
+                ghost.style.padding = "6px 10px";
+                ghost.style.pointerEvents = "none";
+                ghost.style.fontSize = "14px";
+                ghost.style.fontWeight = "600";
+                ghost.style.whiteSpace = "nowrap";
+                ghost.style.boxShadow = "0 4px 16px rgba(15, 23, 42, 0.18)";
+                document.body.appendChild(ghost);
+                return ghost;
+            }
+
+            function clearDragGhost() {
+                if (dragGhost && dragGhost.parentElement) {
+                    dragGhost.parentElement.removeChild(dragGhost);
+                }
+                dragGhost = null;
             }
 
             function applySelection(entries, anchorEntry) {
@@ -961,15 +1043,15 @@
             }
 
             function canRename(entry) {
-                return entry && (entryKind(entry) === "folder" || entryKind(entry) === "file");
+                return !isTrashView && entry && (entryKind(entry) === "folder" || entryKind(entry) === "file");
             }
 
             function canDelete(entry) {
-                return entry && entryKind(entry) === "folder";
+                return !isTrashView && entry && entryKind(entry) === "folder";
             }
 
             function canDeleteFile(entry) {
-                return entry && entryKind(entry) === "file";
+                return !isTrashView && entry && entryKind(entry) === "file";
             }
 
             function canDownload(entry) {
@@ -1052,6 +1134,10 @@
                     window.location.href = buildBrowseURL(next);
                     return;
                 }
+                if (kind === "trash") {
+                    window.location.href = buildBrowseURL("/Trash");
+                    return;
+                }
                 if (kind === "file") {
                     if (canEditFile(entry)) {
                         window.location.href = buildEditURL(name, currentPath);
@@ -1068,6 +1154,10 @@
                 var singleSelection = selected.length <= 1 ? primary : null;
                 var hasFolders = selected.some(function (entry) { return canDelete(entry); });
                 var hasFiles = selected.some(function (entry) { return canDeleteFile(entry); });
+                var isTrashEntry = selected.length === 1 && entryKind(singleSelection) === "trash";
+                var canRestoreTrash = isTrashView && selected.length > 0 && selected.every(function (entry) {
+                    return entryKind(entry) === "file" || entryKind(entry) === "folder";
+                });
                 var canDownloadSelection = selected.length > 0 && selected.every(function (entry) {
                     return entryKind(entry) === "file" || entryKind(entry) === "folder";
                 });
@@ -1078,6 +1168,8 @@
                 deleteFileBtn.disabled = !hasFiles;
                 downloadBtn.disabled = !canDownloadSelection;
                 liveEditBtn.disabled = !canEditSelection;
+                if (restoreTrashBtn) restoreTrashBtn.disabled = !(canRestoreTrash || isTrashEntry);
+                if (emptyTrashBtn) emptyTrashBtn.disabled = !(isTrashEntry || isTrashView);
 
                 if (hasFolders === true) {
                     deleteBtn.style.display = "block"
@@ -1103,6 +1195,12 @@
                     liveEditBtn.style.display = "block"
                 } else {
                     liveEditBtn.style.display = "none"
+                }
+                if (restoreTrashBtn) {
+                    restoreTrashBtn.style.display = (canRestoreTrash || isTrashEntry) ? "block" : "none";
+                }
+                if (emptyTrashBtn) {
+                    emptyTrashBtn.style.display = (isTrashEntry || isTrashView) ? "block" : "none";
                 }
 
                 contextMenu.hidden = false;
@@ -1247,6 +1345,49 @@
                 deleteItemName.value = fileNames[0] || "";
                 setRepeatedHiddenValues(deleteForm, "itemName", fileNames.slice(1));
                 deleteForm.submit();
+            }
+
+            function deleteSelectedEntries() {
+                var names = getSelectedEntries().filter(function (entry) {
+                    return entryKind(entry) === "file" || entryKind(entry) === "folder";
+                }).map(function (entry) {
+                    return entry.getAttribute("data-name");
+                }).filter(Boolean);
+                if (names.length === 0) return;
+                var ok = window.confirm("Delete " + names.length + " item(s)? This cannot be undone.");
+                if (!ok) return;
+                deleteItemName.value = names[0] || "";
+                setRepeatedHiddenValues(deleteForm, "itemName", names.slice(1));
+                deleteForm.submit();
+            }
+
+            function restoreSelectedTrash() {
+                if (!restoreTrashForm) {
+                    if (!isTrashView) window.location.href = buildBrowseURL("/Trash");
+                    return;
+                }
+                if (!isTrashView) {
+                    window.location.href = buildBrowseURL("/Trash");
+                    return;
+                }
+                var names = getSelectedEntries().filter(function (entry) {
+                    return entryKind(entry) === "file" || entryKind(entry) === "folder";
+                }).map(function (entry) {
+                    return entry.getAttribute("data-name");
+                });
+                if (names.length === 0) return;
+                var ok = window.confirm("Restore " + names.length + " item(s) from Trash?");
+                if (!ok) return;
+                restoreTrashItemName.value = names[0] || "";
+                setRepeatedHiddenValues(restoreTrashForm, "itemName", names.slice(1));
+                restoreTrashForm.submit();
+            }
+
+            function emptyTrash() {
+                if (!emptyTrashForm) return;
+                var ok = window.confirm("Empty Trash permanently?");
+                if (!ok) return;
+                emptyTrashForm.submit();
             }
 
             function downloadSelectedFile() {
@@ -1470,6 +1611,55 @@
             });
 
             if (entryList) {
+                entryList.addEventListener("dragover", function (event) {
+                    var entry = event.target.closest(".repo-card");
+                    if (!entry || (entryKind(entry) !== "folder" && entryKind(entry) !== "parent" && entryKind(entry) !== "trash")) return;
+                    event.preventDefault();
+                    event.dataTransfer.dropEffect = "move";
+                    if (dragOverTarget !== entry) {
+                        if (dragOverTarget) {
+                            dragOverTarget.classList.remove("drop-target");
+                        }
+                        dragOverTarget = entry;
+                        entry.classList.add("drop-target");
+                    }
+                });
+
+                entryList.addEventListener("dragleave", function (event) {
+                    var entry = event.target.closest(".repo-card");
+                    if (!entry || entry !== dragOverTarget) return;
+                    entry.classList.remove("drop-target");
+                    dragOverTarget = null;
+                });
+
+                entryList.addEventListener("drop", function (event) {
+                    var entry = event.target.closest(".repo-card");
+                    if (!entry || (entryKind(entry) !== "folder" && entryKind(entry) !== "parent" && entryKind(entry) !== "trash")) return;
+                    event.preventDefault();
+                    if (dragOverTarget) {
+                        dragOverTarget.classList.remove("drop-target");
+                        dragOverTarget = null;
+                    }
+                    if (entryKind(entry) === "trash") {
+                        deleteSelectedEntries();
+                        return;
+                    }
+                    moveSelectedEntriesToFolder(entry.getAttribute("data-name")).catch(function (error) {
+                        window.alert(error.message || "Move failed");
+                    });
+                });
+
+                entryList.addEventListener("dragend", function (event) {
+                    var entry = event.target.closest(".repo-card");
+                    if (!entry) return;
+                    entry.classList.remove("dragging");
+                    if (dragOverTarget) {
+                        dragOverTarget.classList.remove("drop-target");
+                        dragOverTarget = null;
+                    }
+                    clearDragGhost();
+                });
+
                 entryList.addEventListener("dragstart", function (event) {
                     var entry = event.target.closest(".repo-card");
                     if (!entry) return;
@@ -1478,22 +1668,12 @@
                     }
                     event.dataTransfer.effectAllowed = "move";
                     event.dataTransfer.setData("text/plain", entry.getAttribute("data-name") || "");
-                });
-
-                entryList.addEventListener("dragover", function (event) {
-                    var entry = event.target.closest(".repo-card");
-                    if (!entry || (entryKind(entry) !== "folder" && entryKind(entry) !== "parent")) return;
-                    event.preventDefault();
-                    event.dataTransfer.dropEffect = "move";
-                });
-
-                entryList.addEventListener("drop", function (event) {
-                    var entry = event.target.closest(".repo-card");
-                    if (!entry || (entryKind(entry) !== "folder" && entryKind(entry) !== "parent")) return;
-                    event.preventDefault();
-                    moveSelectedEntriesToFolder(entry.getAttribute("data-name")).catch(function (error) {
-                        window.alert(error.message || "Move failed");
-                    });
+                    entry.classList.add("dragging");
+                    if (event.dataTransfer.setDragImage) {
+                        clearDragGhost();
+                        dragGhost = createDragGhost(entry);
+                        event.dataTransfer.setDragImage(dragGhost, 24, 24);
+                    }
                 });
             }
 
@@ -1507,18 +1687,21 @@
 
             if (newFileBtn) newFileBtn.addEventListener("click", openNewFileDialog);
             if (newFileBtnInline) newFileBtnInline.addEventListener("click", openNewFileDialog);
-            newFolderBtn.addEventListener("click", openNewFolderDialog);
-            newFolderBtnInline.addEventListener("click", openNewFolderDialog);
+            if (newFolderBtn) newFolderBtn.addEventListener("click", openNewFolderDialog);
+            if (newFolderBtnInline) newFolderBtnInline.addEventListener("click", openNewFolderDialog);
             if (openSettingsBtnMenu) {
                 openSettingsBtnMenu.addEventListener("click", function () {
                     hideContextMenu();
                     if (settingsDialog) settingsDialog.showModal();
                 });
             }
-            uploadFileBtnInline.addEventListener("click", openUploadDialog);
-            renameBtn.addEventListener("click", openRenameDialog);
-            deleteBtn.addEventListener("click", deleteSelectedFolder);
-            deleteFileBtn.addEventListener("click", deleteSelectedFile);
+            if (uploadFileBtnInline) uploadFileBtnInline.addEventListener("click", openUploadDialog);
+            if (renameBtn) renameBtn.addEventListener("click", openRenameDialog);
+            if (deleteBtn) deleteBtn.addEventListener("click", deleteSelectedFolder);
+            if (deleteFileBtn) deleteFileBtn.addEventListener("click", deleteSelectedFile);
+            if (restoreTrashBtn) restoreTrashBtn.addEventListener("click", restoreSelectedTrash);
+            if (restoreTrashTopBtn) restoreTrashTopBtn.addEventListener("click", restoreSelectedTrash);
+            if (emptyTrashBtn) emptyTrashBtn.addEventListener("click", emptyTrash);
             if (previewRefreshBtn) {
                 previewRefreshBtn.addEventListener("click", previewSelectedFile);
             }
@@ -1548,13 +1731,13 @@
                     if (newFileDialog) newFileDialog.close();
                 });
             }
-            cancelDialog.addEventListener("click", function () {
+            if (cancelDialog) cancelDialog.addEventListener("click", function () {
                 newFolderDialog.close();
             });
-            cancelRename.addEventListener("click", function () {
+            if (cancelRename) cancelRename.addEventListener("click", function () {
                 renameDialog.close();
             });
-            cancelUpload.addEventListener("click", function () {
+            if (cancelUpload) cancelUpload.addEventListener("click", function () {
                 uploadDialog.close()
             });
             if (cancelSettings) {
@@ -1576,8 +1759,8 @@
                     }
                 });
             }
-            downloadBtn.addEventListener("click", downloadSelectedFile);
-            liveEditBtn.addEventListener("click", liveEditSelectedFile);
+            if (downloadBtn) downloadBtn.addEventListener("click", downloadSelectedFile);
+            if (liveEditBtn) liveEditBtn.addEventListener("click", liveEditSelectedFile);
 
             // deletion is handled via the settings dialog's Danger Zone form
 

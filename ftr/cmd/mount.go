@@ -9,6 +9,7 @@ import (
 	"os/signal"
 	"path"
 	"path/filepath"
+	"sort"
 	"strings"
 	"sync"
 	"syscall"
@@ -30,6 +31,8 @@ type RemoteFS struct {
 	lastRefresh     time.Time
 	readOnly        bool
 	mu              sync.Mutex
+	refreshMu       sync.Mutex
+	server          *fs.Server
 }
 
 type RemoteDir struct {
@@ -53,6 +56,29 @@ type RemoteFileHandle struct {
 	writable bool
 	dirty    bool
 	mu       sync.Mutex
+}
+
+type remoteEntryState struct {
+	path     string
+	kind     string
+	size     int64
+	modified int64
+	hash     string
+}
+
+type remoteChangeKind int
+
+const (
+	remoteChangeAdded remoteChangeKind = iota
+	remoteChangeRemoved
+	remoteChangeModified
+)
+
+type remoteChange struct {
+	kind   remoteChangeKind
+	parent *RemoteDir
+	node   fs.Node
+	name   string
 }
 
 var mountCmd = &cobra.Command{
@@ -141,11 +167,14 @@ Writes are uploaded back to the remote repository when file handles are closed.
 		go func() {
 			<-ctx.Done()
 			_ = fuse.Unmount(mountPoint)
-			_ = os.RemoveAll(mountPoint)
 		}()
 
+		server := fs.New(conn, nil)
+		rfs.setServer(server)
+		go rfs.watchRemoteChanges(ctx)
+
 		fmt.Printf("Mounted %s at %s\n", repoPath, mountPoint)
-		return fs.Serve(conn, rfs)
+		return server.Serve(rfs)
 	},
 }
 
@@ -171,6 +200,41 @@ func (rfs *RemoteFS) Root() (fs.Node, error) {
 	return rfs.root, nil
 }
 
+func (rfs *RemoteFS) cacheTTL() time.Duration {
+	if rfs.refreshInterval <= 0 {
+		return 500 * time.Millisecond
+	}
+	return rfs.refreshInterval
+}
+
+func (rfs *RemoteFS) setServer(server *fs.Server) {
+	rfs.mu.Lock()
+	rfs.server = server
+	rfs.mu.Unlock()
+}
+
+func (rfs *RemoteFS) currentServer() *fs.Server {
+	rfs.mu.Lock()
+	defer rfs.mu.Unlock()
+	return rfs.server
+}
+
+func (rfs *RemoteFS) watchRemoteChanges(ctx context.Context) {
+	ticker := time.NewTicker(rfs.cacheTTL())
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			if err := rfs.refreshTree(true); err != nil {
+				fmt.Fprintf(os.Stderr, "ftr mount refresh failed: %v\n", err)
+			}
+		}
+	}
+}
+
 func (rfs *RemoteFS) refreshTreeIfNeeded() error {
 	rfs.mu.Lock()
 	if time.Since(rfs.lastRefresh) < rfs.refreshInterval {
@@ -179,21 +243,289 @@ func (rfs *RemoteFS) refreshTreeIfNeeded() error {
 	}
 	rfs.mu.Unlock()
 
+	return rfs.refreshTree(true)
+}
+
+func (rfs *RemoteFS) refreshTree(sendNotifications bool) error {
+	rfs.refreshMu.Lock()
+	defer rfs.refreshMu.Unlock()
+
 	fileList, err := rfs.client.FSListRepo(rfs.user, rfs.repo)
 	if err != nil {
 		return err
 	}
 
-	newRoot := buildRemoteTree(rfs, fileList)
-
-	rfs.root.mu.Lock()
-	rfs.root.entries = newRoot.entries
-	rfs.root.mu.Unlock()
+	changes := rfs.syncRemoteEntries(fileList)
+	if sendNotifications {
+		rfs.notifyRemoteChanges(changes)
+	}
 
 	rfs.mu.Lock()
 	rfs.lastRefresh = time.Now()
 	rfs.mu.Unlock()
 	return nil
+}
+
+func (rfs *RemoteFS) syncRemoteEntries(fileList []api.RepoEntry) []remoteChange {
+	desired := buildDesiredEntryState(fileList)
+	existing := map[string]fs.Node{}
+	collectRemoteNodes(rfs.root, existing)
+
+	changes := make([]remoteChange, 0)
+	deletePaths := make([]string, 0)
+	for remotePath := range existing {
+		if _, ok := desired[remotePath]; !ok {
+			deletePaths = append(deletePaths, remotePath)
+		}
+	}
+	sort.Slice(deletePaths, func(i, j int) bool {
+		return remotePathDepth(deletePaths[i]) > remotePathDepth(deletePaths[j])
+	})
+	for _, remotePath := range deletePaths {
+		parent, name := rfs.parentDirAndName(remotePath)
+		if parent == nil || name == "" {
+			continue
+		}
+		parent.mu.Lock()
+		node := parent.entries[name]
+		delete(parent.entries, name)
+		parent.mu.Unlock()
+		if node != nil {
+			changes = append(changes, remoteChange{kind: remoteChangeRemoved, parent: parent, node: node, name: name})
+		}
+	}
+
+	upsertPaths := make([]string, 0, len(desired))
+	for remotePath := range desired {
+		if remotePath != "" {
+			upsertPaths = append(upsertPaths, remotePath)
+		}
+	}
+	sort.Slice(upsertPaths, func(i, j int) bool {
+		leftDepth := remotePathDepth(upsertPaths[i])
+		rightDepth := remotePathDepth(upsertPaths[j])
+		if leftDepth == rightDepth {
+			return upsertPaths[i] < upsertPaths[j]
+		}
+		return leftDepth < rightDepth
+	})
+
+	for _, remotePath := range upsertPaths {
+		entry := desired[remotePath]
+		parent, name := rfs.ensureParentDir(remotePath, &changes)
+		if parent == nil || name == "" {
+			continue
+		}
+
+		parent.mu.Lock()
+		node := parent.entries[name]
+		if node == nil {
+			node = rfs.newNodeFromState(entry)
+			parent.entries[name] = node
+			parent.mu.Unlock()
+			changes = append(changes, remoteChange{kind: remoteChangeAdded, parent: parent, node: node, name: name})
+			continue
+		}
+
+		currentKind := remoteNodeKind(node)
+		if currentKind != entry.kind {
+			oldNode := node
+			node = rfs.newNodeFromState(entry)
+			parent.entries[name] = node
+			parent.mu.Unlock()
+			changes = append(changes, remoteChange{kind: remoteChangeRemoved, parent: parent, node: oldNode, name: name})
+			changes = append(changes, remoteChange{kind: remoteChangeAdded, parent: parent, node: node, name: name})
+			continue
+		}
+
+		if file, ok := node.(*RemoteFile); ok && file.applyState(entry) {
+			parent.mu.Unlock()
+			changes = append(changes, remoteChange{kind: remoteChangeModified, parent: parent, node: file, name: name})
+			continue
+		}
+		parent.mu.Unlock()
+	}
+
+	return changes
+}
+
+func buildDesiredEntryState(fileList []api.RepoEntry) map[string]remoteEntryState {
+	desired := map[string]remoteEntryState{}
+	for _, entry := range fileList {
+		remotePath := cleanRemotePath(entry.Path)
+		if remotePath == "" {
+			continue
+		}
+		parts := strings.Split(remotePath, "/")
+		for index := 1; index < len(parts); index++ {
+			parentPath := strings.Join(parts[:index], "/")
+			desired[parentPath] = remoteEntryState{path: parentPath, kind: "dir"}
+		}
+		kind := strings.ToLower(strings.TrimSpace(entry.Type))
+		if kind != "dir" {
+			kind = "file"
+		}
+		desired[remotePath] = remoteEntryState{
+			path:     remotePath,
+			kind:     kind,
+			size:     entry.Size,
+			modified: entry.Modified,
+			hash:     entry.Hash,
+		}
+	}
+	return desired
+}
+
+func collectRemoteNodes(dir *RemoteDir, out map[string]fs.Node) {
+	dir.mu.Lock()
+	snapshot := make(map[string]fs.Node, len(dir.entries))
+	for name, node := range dir.entries {
+		snapshot[name] = node
+	}
+	dir.mu.Unlock()
+
+	for name, node := range snapshot {
+		remotePath := path.Join(dir.path, name)
+		out[remotePath] = node
+		if childDir, ok := node.(*RemoteDir); ok {
+			collectRemoteNodes(childDir, out)
+		}
+	}
+}
+
+func (rfs *RemoteFS) ensureParentDir(remotePath string, changes *[]remoteChange) (*RemoteDir, string) {
+	parentPath, name := splitRemoteParent(remotePath)
+	parent := rfs.root
+	if parentPath == "" {
+		return parent, name
+	}
+
+	for _, part := range strings.Split(parentPath, "/") {
+		if part == "" {
+			continue
+		}
+		parent.mu.Lock()
+		node := parent.entries[part]
+		if node == nil {
+			dirPath := path.Join(parent.path, part)
+			dir := &RemoteDir{
+				fsys:    rfs,
+				path:    dirPath,
+				entries: make(map[string]fs.Node),
+			}
+			parent.entries[part] = dir
+			parent.mu.Unlock()
+			*changes = append(*changes, remoteChange{kind: remoteChangeAdded, parent: parent, node: dir, name: part})
+			parent = dir
+			continue
+		}
+		dir, ok := node.(*RemoteDir)
+		if !ok {
+			parent.mu.Unlock()
+			return nil, ""
+		}
+		parent.mu.Unlock()
+		parent = dir
+	}
+	return parent, name
+}
+
+func (rfs *RemoteFS) parentDirAndName(remotePath string) (*RemoteDir, string) {
+	parentPath, name := splitRemoteParent(remotePath)
+	if parentPath == "" {
+		return rfs.root, name
+	}
+	dir := rfs.findDir(parentPath)
+	return dir, name
+}
+
+func (rfs *RemoteFS) findDir(remotePath string) *RemoteDir {
+	remotePath = cleanRemotePath(remotePath)
+	if remotePath == "" {
+		return rfs.root
+	}
+	current := rfs.root
+	for _, part := range strings.Split(remotePath, "/") {
+		current.mu.Lock()
+		node := current.entries[part]
+		current.mu.Unlock()
+		next, ok := node.(*RemoteDir)
+		if !ok {
+			return nil
+		}
+		current = next
+	}
+	return current
+}
+
+func (rfs *RemoteFS) newNodeFromState(entry remoteEntryState) fs.Node {
+	if entry.kind == "dir" {
+		return &RemoteDir{
+			fsys:    rfs,
+			path:    entry.path,
+			entries: make(map[string]fs.Node),
+		}
+	}
+	return &RemoteFile{
+		fsys:  rfs,
+		path:  entry.path,
+		size:  uint64(max(entry.size, 0)),
+		mtime: remoteEntryModTime(entry.modified),
+		hash:  entry.hash,
+	}
+}
+
+func (f *RemoteFile) applyState(entry remoteEntryState) bool {
+	newSize := uint64(max(entry.size, 0))
+	newMtime := remoteEntryModTime(entry.modified)
+	changed := f.size != newSize || !f.mtime.Equal(newMtime) || f.hash != entry.hash
+	f.size = newSize
+	f.mtime = newMtime
+	f.hash = entry.hash
+	return changed
+}
+
+func remoteEntryModTime(modified int64) time.Time {
+	if modified <= 0 {
+		return time.Now()
+	}
+	return time.Unix(modified, 0)
+}
+
+func remoteNodeKind(node fs.Node) string {
+	switch node.(type) {
+	case *RemoteDir:
+		return "dir"
+	case *RemoteFile:
+		return "file"
+	default:
+		return ""
+	}
+}
+
+func cleanRemotePath(raw string) string {
+	clean := path.Clean("/" + strings.TrimSpace(raw))
+	if clean == "." || clean == "/" {
+		return ""
+	}
+	return strings.TrimPrefix(clean, "/")
+}
+
+func splitRemoteParent(remotePath string) (string, string) {
+	remotePath = cleanRemotePath(remotePath)
+	if remotePath == "" {
+		return "", ""
+	}
+	parent, name := path.Split(remotePath)
+	return strings.Trim(parent, "/"), strings.Trim(name, "/")
+}
+
+func remotePathDepth(remotePath string) int {
+	remotePath = cleanRemotePath(remotePath)
+	if remotePath == "" {
+		return 0
+	}
+	return strings.Count(remotePath, "/") + 1
 }
 
 func buildRemoteTree(rfs *RemoteFS, fileList []api.RepoEntry) *RemoteDir {
@@ -262,6 +594,55 @@ func buildRemoteTree(rfs *RemoteFS, fileList []api.RepoEntry) *RemoteDir {
 	return root
 }
 
+func (rfs *RemoteFS) notifyRemoteChanges(changes []remoteChange) {
+	if len(changes) == 0 {
+		return
+	}
+	server := rfs.currentServer()
+	if server == nil {
+		return
+	}
+	changedDirs := map[*RemoteDir]struct{}{}
+	for _, change := range changes {
+		if change.parent != nil {
+			changedDirs[change.parent] = struct{}{}
+		}
+		switch change.kind {
+		case remoteChangeRemoved:
+			if change.parent != nil {
+				ignoreFuseNotifyError(server.NotifyDelete(change.parent, change.node, change.name))
+				ignoreFuseNotifyError(server.InvalidateEntry(change.parent, change.name))
+			}
+			if change.node != nil {
+				ignoreFuseNotifyError(server.InvalidateNodeData(change.node))
+			}
+		case remoteChangeAdded:
+			if change.parent != nil {
+				ignoreFuseNotifyError(server.InvalidateEntry(change.parent, change.name))
+			}
+			if change.node != nil {
+				ignoreFuseNotifyError(server.InvalidateNodeData(change.node))
+			}
+		case remoteChangeModified:
+			if change.parent != nil {
+				ignoreFuseNotifyError(server.InvalidateEntry(change.parent, change.name))
+			}
+			if change.node != nil {
+				ignoreFuseNotifyError(server.InvalidateNodeData(change.node))
+			}
+		}
+	}
+	for dir := range changedDirs {
+		ignoreFuseNotifyError(server.InvalidateNodeData(dir))
+	}
+}
+
+func ignoreFuseNotifyError(err error) {
+	if err == nil || errors.Is(err, fuse.ErrNotCached) || errors.Is(err, fuse.ENOSYS) || errors.Is(err, fuse.ENOENT) {
+		return
+	}
+}
+
 func (d *RemoteDir) refreshEntriesFromRoot() {
 	if d.path == "" {
 		return
@@ -289,6 +670,14 @@ func (d *RemoteDir) refreshEntriesFromRoot() {
 	d.mu.Unlock()
 }
 
+func (d *RemoteDir) Getattr(ctx context.Context, req *fuse.GetattrRequest, resp *fuse.GetattrResponse) error {
+	if err := d.Attr(ctx, &resp.Attr); err != nil {
+		return err
+	}
+	resp.Attr.Valid = d.fsys.cacheTTL()
+	return nil
+}
+
 func (d *RemoteDir) Attr(ctx context.Context, a *fuse.Attr) error {
 	if d.fsys.readOnly {
 		a.Mode = os.ModeDir | 0555
@@ -298,18 +687,19 @@ func (d *RemoteDir) Attr(ctx context.Context, a *fuse.Attr) error {
 	return nil
 }
 
-func (d *RemoteDir) Lookup(ctx context.Context, name string) (fs.Node, error) {
+func (d *RemoteDir) Lookup(ctx context.Context, req *fuse.LookupRequest, resp *fuse.LookupResponse) (fs.Node, error) {
 	if err := d.fsys.refreshTreeIfNeeded(); err != nil {
 		return nil, err
 	}
 	d.refreshEntriesFromRoot()
 
 	d.mu.Lock()
-	node, ok := d.entries[name]
+	node, ok := d.entries[req.Name]
 	d.mu.Unlock()
 	if !ok {
 		return nil, fuse.ENOENT
 	}
+	resp.EntryValid = d.fsys.cacheTTL()
 	return node, nil
 }
 
@@ -487,6 +877,14 @@ func (f *RemoteFile) Attr(ctx context.Context, a *fuse.Attr) error {
 	}
 	a.Size = f.size
 	a.Mtime = f.mtime
+	return nil
+}
+
+func (f *RemoteFile) Getattr(ctx context.Context, req *fuse.GetattrRequest, resp *fuse.GetattrResponse) error {
+	if err := f.Attr(ctx, &resp.Attr); err != nil {
+		return err
+	}
+	resp.Attr.Valid = f.fsys.cacheTTL()
 	return nil
 }
 

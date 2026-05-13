@@ -18,6 +18,13 @@ import (
 
 var ErrItemExists = errors.New("item already exists")
 
+const (
+	TrashDisplayName  = "Trash"
+	TrashInternalRoot = ".Trash-1000"
+	TrashFilesPath    = ".Trash-1000/files"
+	TrashInfoPath     = ".Trash-1000/info"
+)
+
 var (
 	// Shared FtR storage root. Override with FTR_ROOT_DIR when needed.
 	GlobalInkDropRootDir = "/srv/ftr"
@@ -490,6 +497,9 @@ func RenameItem(userName, repoName, workingDir, oldName, newName string) error {
 }
 
 func DeleteItem(userName, repoName, workingDir, name string) error {
+	if IsProtectedTrashTarget(workingDir, name) {
+		return errors.New("trash cannot be deleted; empty it instead")
+	}
 	root := repositoryRoot(userName, repoName)
 	target, err := resolvePathInRepo(root, workingDir, name)
 	if err != nil {
@@ -499,7 +509,216 @@ func DeleteItem(userName, repoName, workingDir, name string) error {
 		return errors.New("cannot delete repository root")
 	}
 
-	return os.RemoveAll(target)
+	if repositoryPathContainsTrash(root, target) {
+		return os.RemoveAll(target)
+	}
+
+	if err := EnsureTrash(userName, repoName); err != nil {
+		return err
+	}
+
+	trashPath, err := nextAvailableTrashPath(root, filepath.Base(target))
+	if err != nil {
+		return err
+	}
+	if err := os.MkdirAll(filepath.Dir(trashPath), 0755); err != nil {
+		return err
+	}
+	if err := os.Rename(target, trashPath); err != nil {
+		return err
+	}
+
+	infoPath := filepath.Join(root, filepath.FromSlash(TrashInfoPath), filepath.Base(trashPath)+".trashinfo")
+	originalPath := normalizeWorkingDir(filepath.ToSlash(filepath.Join(workingDir, name)))
+	originalPath = strings.TrimPrefix(originalPath, "/")
+	trashInfo := fmt.Sprintf("Path=%s\n", originalPath)
+	if err := os.WriteFile(infoPath, []byte(trashInfo), 0644); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func repositoryPathContainsTrash(root, target string) bool {
+	trashDir := filepath.Join(root, filepath.FromSlash(TrashFilesPath))
+	return isWithinRoot(trashDir, target)
+}
+
+func nextAvailableTrashPath(root, baseName string) (string, error) {
+	trashRoot := filepath.Join(root, filepath.FromSlash(TrashFilesPath))
+	target := filepath.Join(trashRoot, baseName)
+	if _, err := os.Stat(target); errors.Is(err, os.ErrNotExist) {
+		return target, nil
+	}
+	ext := filepath.Ext(target)
+	base := strings.TrimSuffix(target, ext)
+	for index := 1; index < 1000; index++ {
+		candidate := fmt.Sprintf("%s (%d)%s", base, index, ext)
+		if _, err := os.Stat(candidate); errors.Is(err, os.ErrNotExist) {
+			return candidate, nil
+		}
+	}
+	return "", errors.New("could not find an available trash path")
+}
+
+func IsTrashBrowserPath(rawPath string) bool {
+	clean := normalizeWorkingDir(rawPath)
+	return clean == "/"+TrashDisplayName || strings.HasPrefix(clean, "/"+TrashDisplayName+"/")
+}
+
+func MapTrashBrowserPath(rawPath string) string {
+	clean := normalizeWorkingDir(rawPath)
+	if clean == "/"+TrashDisplayName {
+		return "/" + TrashFilesPath
+	}
+	if strings.HasPrefix(clean, "/"+TrashDisplayName+"/") {
+		suffix := strings.TrimPrefix(clean, "/"+TrashDisplayName+"/")
+		return "/" + strings.TrimSuffix(TrashFilesPath, "/") + "/" + suffix
+	}
+	return clean
+}
+
+func IsTrashStoragePath(rawPath string) bool {
+	clean := normalizeWorkingDir(rawPath)
+	return clean == "/"+TrashInternalRoot || strings.HasPrefix(clean, "/"+TrashInternalRoot+"/")
+}
+
+func IsProtectedTrashTarget(workingDir, name string) bool {
+	target := normalizeWorkingDir(filepath.ToSlash(filepath.Join(workingDir, name)))
+	return target == "/"+TrashDisplayName || target == "/"+TrashInternalRoot
+}
+
+func HasTrash(userName, repoName string) bool {
+	filesDir := filepath.Join(repositoryRoot(userName, repoName), filepath.FromSlash(TrashFilesPath))
+	ok, err := DirExists(filesDir)
+	return err == nil && ok
+}
+
+func EnsureTrash(userName, repoName string) error {
+	root := repositoryRoot(userName, repoName)
+	if ok, err := DirExists(root); err != nil || !ok {
+		return fmt.Errorf("repository %s/%s not found", userName, repoName)
+	}
+	if err := os.MkdirAll(filepath.Join(root, filepath.FromSlash(TrashFilesPath)), 0755); err != nil {
+		return err
+	}
+	return os.MkdirAll(filepath.Join(root, filepath.FromSlash(TrashInfoPath)), 0755)
+}
+
+func EmptyTrash(userName, repoName string) error {
+	root := repositoryRoot(userName, repoName)
+	for _, trashPath := range []string{TrashFilesPath, TrashInfoPath} {
+		target := filepath.Join(root, filepath.FromSlash(trashPath))
+		if !isWithinRoot(root, target) {
+			return errors.New("trash path escapes repository root")
+		}
+		if err := os.RemoveAll(target); err != nil {
+			return err
+		}
+	}
+	return EnsureTrash(userName, repoName)
+}
+
+func RestoreTrashItem(userName, repoName, itemName string) (string, error) {
+	cleanName := filepath.ToSlash(strings.TrimSpace(itemName))
+	cleanName = strings.Trim(cleanName, "/")
+	if cleanName == "" || cleanName == "." || cleanName == ".." || strings.Contains(cleanName, "../") {
+		return "", errors.New("invalid trash item")
+	}
+
+	root := repositoryRoot(userName, repoName)
+	source, err := resolvePathInRepo(root, "/"+TrashFilesPath, cleanName)
+	if err != nil {
+		return "", err
+	}
+	if !isWithinRoot(filepath.Join(root, filepath.FromSlash(TrashFilesPath)), source) {
+		return "", errors.New("invalid trash item")
+	}
+	if _, err := os.Stat(source); err != nil {
+		return "", err
+	}
+
+	originalPath := readTrashOriginalPath(root, cleanName)
+	if originalPath == "" || IsTrashStoragePath(originalPath) {
+		originalPath = "/" + filepath.Base(cleanName)
+	}
+	dest, err := nextAvailableRestorePath(root, originalPath)
+	if err != nil {
+		return "", err
+	}
+	if err := os.MkdirAll(filepath.Dir(dest), 0755); err != nil {
+		return "", err
+	}
+	if err := os.Rename(source, dest); err != nil {
+		return "", err
+	}
+	_ = os.Remove(filepath.Join(root, filepath.FromSlash(TrashInfoPath), filepath.Base(cleanName)+".trashinfo"))
+	_ = pruneEmptyDirs(filepath.Dir(source), filepath.Join(root, filepath.FromSlash(TrashFilesPath)))
+	return filepath.ToSlash(strings.TrimPrefix(dest, root+string(filepath.Separator))), nil
+}
+
+func readTrashOriginalPath(root, itemName string) string {
+	infoPath := filepath.Join(root, filepath.FromSlash(TrashInfoPath), filepath.Base(itemName)+".trashinfo")
+	data, err := os.ReadFile(infoPath)
+	if err != nil {
+		return ""
+	}
+	lines := strings.Split(string(data), "\n")
+	for _, line := range lines {
+		if strings.HasPrefix(line, "Path=") {
+			value := strings.TrimSpace(strings.TrimPrefix(line, "Path="))
+			value = strings.TrimPrefix(filepath.ToSlash(value), "/")
+			if value == "" {
+				return ""
+			}
+			parts := strings.Split(value, "/")
+			for index := 0; index < len(parts)-1; index++ {
+				if parts[index] == filepath.Base(filepath.Dir(root)) && parts[index+1] == filepath.Base(root) {
+					return "/" + strings.Join(parts[index+2:], "/")
+				}
+			}
+			return "/" + value
+		}
+	}
+	return ""
+}
+
+func nextAvailableRestorePath(root, originalPath string) (string, error) {
+	cleanOriginal := strings.TrimPrefix(normalizeWorkingDir(originalPath), "/")
+	if cleanOriginal == "" {
+		cleanOriginal = "Restored Item"
+	}
+	target, err := resolvePathInRepo(root, "/", cleanOriginal)
+	if err != nil {
+		return "", err
+	}
+	if _, err := os.Stat(target); errors.Is(err, os.ErrNotExist) {
+		return target, nil
+	}
+	ext := filepath.Ext(target)
+	base := strings.TrimSuffix(target, ext)
+	for index := 1; index < 1000; index++ {
+		candidate := fmt.Sprintf("%s (restored %d)%s", base, index, ext)
+		if _, err := os.Stat(candidate); errors.Is(err, os.ErrNotExist) {
+			return candidate, nil
+		}
+	}
+	return "", errors.New("could not find an available restore path")
+}
+
+func pruneEmptyDirs(start, stop string) error {
+	start = filepath.Clean(start)
+	stop = filepath.Clean(stop)
+	for start != stop && isWithinRoot(stop, start) {
+		if err := os.Remove(start); err != nil {
+			if errors.Is(err, os.ErrNotExist) {
+				return nil
+			}
+			return nil
+		}
+		start = filepath.Dir(start)
+	}
+	return nil
 }
 
 func repositoryRoot(userName, repoName string) string {

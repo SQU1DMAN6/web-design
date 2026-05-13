@@ -96,6 +96,23 @@ func IndexMain(w http.ResponseWriter, r *http.Request) {
 	viewBackend.IndexMain(w, p)
 }
 
+func RepositoryListAPI(w http.ResponseWriter, r *http.Request) {
+	SS := config.GetSessionManager()
+	userName := SS.GetString(r.Context(), "name")
+	if SS.GetBool(r.Context(), "isLoggedIn") != true || userName == "" {
+		writeJSON(w, http.StatusUnauthorized, map[string]interface{}{"success": false, "error": "login required"})
+		return
+	}
+
+	repoList, err := repository.ListUserRepositories(userName)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]interface{}{"success": false, "error": err.Error()})
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]interface{}{"success": true, "repos": repoList})
+}
+
 func IndexMainPost(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
@@ -224,9 +241,13 @@ func IndexMainBrowseRepository(w http.ResponseWriter, r *http.Request) {
 
 	repoName := chi.URLParam(r, "reponame")
 	userName := chi.URLParam(r, "user")
-	path := chi.URLParam(r, "*")
-	fmt.Println(repoName, userName, path)
-	path = normalizeBrowserPath(path)
+	requestedPath := normalizeBrowserPath(chi.URLParam(r, "*"))
+	isTrashView := repository.IsTrashBrowserPath(requestedPath)
+	listingPath := requestedPath
+	if isTrashView {
+		listingPath = repository.MapTrashBrowserPath(requestedPath)
+	}
+	fmt.Println(repoName, userName, requestedPath)
 
 	if name == userName {
 		userOwnsRepo = true
@@ -265,7 +286,7 @@ func IndexMainBrowseRepository(w http.ResponseWriter, r *http.Request) {
 			Message:  "Repository Unavailable",
 			Message2: userName,
 			Message3: repoName,
-			Path:     path,
+			Path:     requestedPath,
 		}
 		if param.Name == "" {
 			param.Name = "Guest"
@@ -282,7 +303,7 @@ func IndexMainBrowseRepository(w http.ResponseWriter, r *http.Request) {
 		Error:    make(map[string]string),
 		Message2: userName,
 		Message3: repoName,
-		Path:     path,
+		Path:     requestedPath,
 	}
 
 	if paramData.Name == "" {
@@ -290,30 +311,39 @@ func IndexMainBrowseRepository(w http.ResponseWriter, r *http.Request) {
 	}
 
 	paramData.IsViewingPublic = isPublic
+	paramData.IsTrashView = isTrashView
 
 	if userOwnsRepo == true {
-		paramData.Message = fmt.Sprintf("Browsing your repository '%s'", repoName)
+		if isTrashView {
+			paramData.Message = fmt.Sprintf("Trash for '%s'", repoName)
+		} else {
+			paramData.Message = fmt.Sprintf("Browsing your repository '%s'", repoName)
+		}
 		paramData.UserOwnsRepository = true
 	} else {
 		paramData.Message = "You are viewing this repository in read-only mode."
 		paramData.UserOwnsRepository = false
 	}
 
-	directoryListing, err := repository.GetDirectoryListing(userName, repoName, path)
+	if isTrashView && userOwnsRepo {
+		_ = repository.EnsureTrash(userName, repoName)
+	}
+
+	directoryListing, err := repository.GetDirectoryListing(userName, repoName, listingPath)
 	if err != nil {
-		paramData.Error["general"] = fmt.Sprintf("Failed to get directory listing of %s/%s%s: %s", userName, repoName, path, err)
+		paramData.Error["general"] = fmt.Sprintf("Failed to get directory listing of %s/%s%s: %s", userName, repoName, requestedPath, err)
 	}
 	if directoryListing == nil {
-		if path == "/" {
+		if requestedPath == "/" {
 			paramData.Error["general"] = "The repository is empty. If you are the owner, consider uploading files."
 		}
 	}
 
-	if path != "/" && err == nil {
+	if err == nil {
 		if directoryListing == nil {
 			directoryListing = []string{}
 		}
-		directoryListing = append([]string{".."}, directoryListing...)
+		directoryListing = decorateRepositoryListing(directoryListing, requestedPath, userOwnsRepo || repository.HasTrash(userName, repoName), isTrashView)
 	}
 	paramData.RepoList = directoryListing
 
@@ -324,7 +354,7 @@ func IndexMainBrowseRepository(w http.ResponseWriter, r *http.Request) {
 		paramData.RepoPublic = meta.Public
 	}
 
-	fmt.Printf("User %s tried to access repository %s/%s%s", name, userName, repoName, path)
+	fmt.Printf("User %s tried to access repository %s/%s%s", name, userName, repoName, requestedPath)
 	viewBackend.IndexMainBrowseRepository(w, paramData)
 }
 
@@ -764,6 +794,107 @@ func RepositoryDeleteItem(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, redirectPath, http.StatusSeeOther)
 }
 
+func RepositoryEmptyTrash(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	SS := config.GetSessionManager()
+	userName := SS.GetString(r.Context(), "name")
+	if SS.GetBool(r.Context(), "isLoggedIn") != true || userName == "" {
+		http.Redirect(w, r, "/login", http.StatusSeeOther)
+		return
+	}
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "Failed to parse trash form.", http.StatusBadRequest)
+		return
+	}
+	repoName := r.FormValue("repository")
+	repoOwner := strings.TrimSpace(r.FormValue("user"))
+	if repoOwner == "" {
+		repoOwner = userName
+	}
+	if !canModifyRepository(userName, repoOwner, repoName) {
+		http.Error(w, "You do not have permission to modify this repository", http.StatusForbidden)
+		return
+	}
+	if err := repository.EmptyTrash(repoOwner, repoName); err != nil {
+		http.Error(w, fmt.Sprintf("Failed to empty trash: %s", err), http.StatusServiceUnavailable)
+		return
+	}
+	http.Redirect(w, r, buildBrowseRoutePath(repoOwner, repoName, repository.TrashDisplayName), http.StatusSeeOther)
+}
+
+func RepositoryRestoreTrash(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	SS := config.GetSessionManager()
+	userName := SS.GetString(r.Context(), "name")
+	if SS.GetBool(r.Context(), "isLoggedIn") != true || userName == "" {
+		http.Redirect(w, r, "/login", http.StatusSeeOther)
+		return
+	}
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "Failed to parse trash restore form.", http.StatusBadRequest)
+		return
+	}
+	repoName := r.FormValue("repository")
+	repoOwner := strings.TrimSpace(r.FormValue("user"))
+	if repoOwner == "" {
+		repoOwner = userName
+	}
+	if !canModifyRepository(userName, repoOwner, repoName) {
+		http.Error(w, "You do not have permission to modify this repository", http.StatusForbidden)
+		return
+	}
+	itemNames := r.Form["itemName"]
+	workingDir := normalizeBrowserPath(r.FormValue("working-directory"))
+	trashPrefix := ""
+	if repository.IsTrashBrowserPath(workingDir) {
+		trashPrefix = strings.TrimPrefix(workingDir, "/"+repository.TrashDisplayName)
+		trashPrefix = strings.Trim(trashPrefix, "/")
+	}
+	if len(itemNames) == 0 {
+		itemName := strings.TrimSpace(r.FormValue("itemName"))
+		if itemName != "" {
+			itemNames = []string{itemName}
+		}
+	}
+	if len(itemNames) == 0 {
+		http.Error(w, "Select at least one trash item to restore.", http.StatusBadRequest)
+		return
+	}
+	for _, itemName := range itemNames {
+		if trashPrefix != "" {
+			itemName = path.Join(trashPrefix, itemName)
+		}
+		if _, err := repository.RestoreTrashItem(repoOwner, repoName, itemName); err != nil {
+			http.Error(w, fmt.Sprintf("Restore failed: %s", err), http.StatusServiceUnavailable)
+			return
+		}
+	}
+	http.Redirect(w, r, buildBrowseRoutePath(repoOwner, repoName, repository.TrashDisplayName), http.StatusSeeOther)
+}
+
+func canModifyRepository(sessionUser, repoOwner, repoName string) bool {
+	if sessionUser == "" || repoName == "" {
+		return false
+	}
+	if sessionUser == repoOwner {
+		return true
+	}
+	if meta, _ := repository.LoadRepoMeta(repoOwner, repoName); meta != nil {
+		for _, owner := range meta.Owners {
+			if owner == sessionUser {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 func normalizeBrowserPath(raw string) string {
 	if raw == "" {
 		return "/"
@@ -788,6 +919,23 @@ func buildBrowseRoutePath(userName string, repoName string, rawPath string) stri
 	}
 
 	return base + "/" + strings.Join(segments, "/")
+}
+
+func decorateRepositoryListing(entries []string, browserPath string, includeTrash bool, isTrashView bool) []string {
+	cleaned := make([]string, 0, len(entries)+1)
+	for _, entry := range entries {
+		if entry == repository.TrashInternalRoot+"/" || entry == repository.TrashDisplayName+"/" {
+			continue
+		}
+		cleaned = append(cleaned, entry)
+	}
+	if normalizeBrowserPath(browserPath) != "/" {
+		return append([]string{".."}, cleaned...)
+	}
+	if includeTrash {
+		cleaned = append([]string{repository.TrashDisplayName + "/"}, cleaned...)
+	}
+	return cleaned
 }
 
 func isValidMovePath(raw string) bool {
@@ -830,7 +978,10 @@ func RepositoryDownloadFile(w http.ResponseWriter, r *http.Request) {
 	}
 
 	repoName := r.FormValue("repository")
-	workingDir := r.FormValue("working-directory")
+	workingDir := normalizeBrowserPath(r.FormValue("working-directory"))
+	if repository.IsTrashBrowserPath(workingDir) {
+		workingDir = repository.MapTrashBrowserPath(workingDir)
+	}
 	itemNames := r.Form["itemName"]
 	if len(itemNames) == 0 {
 		itemName := strings.TrimSpace(r.FormValue("itemName"))
@@ -1029,7 +1180,10 @@ func RepositoryPreviewFile(w http.ResponseWriter, r *http.Request) {
 
 	query := r.URL.Query()
 	repoName := query.Get("repository")
-	workingDir := query.Get("working-directory")
+	workingDir := normalizeBrowserPath(query.Get("working-directory"))
+	if repository.IsTrashBrowserPath(workingDir) {
+		workingDir = repository.MapTrashBrowserPath(workingDir)
+	}
 	itemName := query.Get("itemName")
 	owner := query.Get("user")
 
