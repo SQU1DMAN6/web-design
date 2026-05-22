@@ -1,6 +1,7 @@
 package routes
 
 import (
+	"inkdrop/controller/account"
 	"inkdrop/controller/login"
 	"inkdrop/controller/register"
 	"inkdrop/controller/repository"
@@ -28,6 +29,12 @@ func RegisterRoutes(r chi.Router) {
 	r.Get("/inkdrop/login.php", login.LoginMain)
 	r.Get("/sessionconfirm", repository.SessionConfirm)
 	r.Get("/inkdrop/sessionconfirm", repository.SessionConfirm)
+	r.Get("/api/account", account.CurrentAccountAPI)
+	r.Post("/account/settings", account.UpdateAccountSettings)
+	r.Get("/api/community", account.CommunityAPI)
+	r.Get("/api/contacts", account.ContactsAPI)
+	r.Post("/contacts/request", account.RequestContact)
+	r.Post("/contacts/respond", account.RespondContact)
 	r.Get("/index.php", repository.RepositoryIndex)
 	r.Get("/inkdrop/index.php", repository.RepositoryIndex)
 	r.Get("/api/repos", repository.RepositoryListAPI)

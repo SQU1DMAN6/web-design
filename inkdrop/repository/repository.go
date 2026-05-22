@@ -5,6 +5,8 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"inkdrop/config"
+	userModel "inkdrop/model"
 	"io"
 	"io/fs"
 	"os"
@@ -38,6 +40,7 @@ var (
 	RepoMetaDir string
 	TempDir     string
 	SessionDir  string
+	UserPFPDir  string
 )
 
 func init() {
@@ -56,10 +59,14 @@ func init() {
 	RepoMetaDir = filepath.Join(RepoDir, "_meta")
 	TempDir = filepath.Join(RootDir, "tmp")
 	SessionDir = filepath.Join(RootDir, "sessions")
+	UserPFPDir = filepath.Clean(strings.TrimSpace(os.Getenv("FTR_PFP_DIR")))
+	if UserPFPDir == "" {
+		UserPFPDir = "/ftr/userpfp"
+	}
 }
 
 func EnsureStorageLayout() error {
-	for _, dir := range []string{RepoDir, RepoMetaDir, TempDir, SessionDir} {
+	for _, dir := range []string{RepoDir, RepoMetaDir, TempDir, SessionDir, UserPFPDir} {
 		if err := os.MkdirAll(dir, 0755); err != nil {
 			return err
 		}
@@ -280,9 +287,15 @@ func ListPublicRepositories() ([]map[string]string, error) {
 // listed as an owner in the repo metadata. Returns items with 'user', 'repo', 'description'.
 func ListSharedRepositories(username string) ([]map[string]string, error) {
 	var results []map[string]string
+	seen := map[string]bool{}
 	users, err := os.ReadDir(RepoDir)
 	if err != nil {
 		return nil, err
+	}
+	contactOwners, _ := userModel.ListAcceptedContactOwners(config.GetDB(), username)
+	contactOwnerSet := map[string]bool{}
+	for _, owner := range contactOwners {
+		contactOwnerSet[owner] = true
 	}
 
 	for _, u := range users {
@@ -305,10 +318,24 @@ func ListSharedRepositories(username string) ([]map[string]string, error) {
 			if strings.HasPrefix(repoName, "_") {
 				continue
 			}
+			key := userName + "/" + repoName
+			if contactOwnerSet[userName] {
+				desc := ""
+				if meta, err := LoadRepoMeta(userName, repoName); err == nil && meta != nil {
+					desc = meta.Description
+				}
+				results = append(results, map[string]string{"user": userName, "repo": repoName, "description": desc})
+				seen[key] = true
+				continue
+			}
 			if meta, err := LoadRepoMeta(userName, repoName); err == nil && meta != nil {
 				for _, o := range meta.Owners {
 					if o == username {
+						if seen[key] {
+							break
+						}
 						results = append(results, map[string]string{"user": userName, "repo": repoName, "description": meta.Description})
+						seen[key] = true
 						break
 					}
 				}

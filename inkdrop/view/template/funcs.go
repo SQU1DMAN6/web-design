@@ -17,6 +17,19 @@ var Funcs = template.FuncMap{
 		}
 		return string(data)
 	},
+	"truncate": func(s string, limit int) string {
+		if limit <= 0 {
+			return ""
+		}
+		runes := []rune(s)
+		if len(runes) <= limit {
+			return s
+		}
+		if limit <= 3 {
+			return string(runes[:limit])
+		}
+		return string(runes[:limit-3]) + "..."
+	},
 	"trimSuffix": strings.TrimSuffix,
 	"trimPrefix": strings.TrimPrefix,
 }

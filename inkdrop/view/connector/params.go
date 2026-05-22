@@ -18,6 +18,11 @@ type FrontEndParams struct {
 	IsViewingPublic           bool
 	UserOwnsRepository        bool
 	IsTrashView               bool
+	UserBio                   string
+	UserPFP                   string
+	AcceptedContacts          []string
+	PendingIncomingContacts   []map[string]interface{}
+	PendingOutgoingContacts   []map[string]interface{}
 	Error                     map[string]string
 	RepoList                  []string
 	RepoMatches               []map[string]string

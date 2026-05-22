@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"inkdrop/config"
+	userModel "inkdrop/model"
 	"inkdrop/repository"
 	viewBackend "inkdrop/view/connector"
 	"io"
@@ -48,6 +49,7 @@ func IndexMain(w http.ResponseWriter, r *http.Request) {
 		if p.Name == "" {
 			p.Name = "Guest"
 		}
+		enrichAccountParams(&p, userName)
 		viewBackend.IndexMain(w, p)
 		return
 	}
@@ -69,6 +71,7 @@ func IndexMain(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			p.Error["general"] = fmt.Sprintf("Failed to get shared repositories: %s", err)
 		}
+		enrichAccountParams(&p, userName)
 		viewBackend.IndexMain(w, p)
 		return
 	}
@@ -93,6 +96,7 @@ func IndexMain(w http.ResponseWriter, r *http.Request) {
 		p.Error["general"] = fmt.Sprintf("Failed to get repository listing: %s", err)
 	}
 
+	enrichAccountParams(&p, userName)
 	viewBackend.IndexMain(w, p)
 }
 
@@ -111,6 +115,40 @@ func RepositoryListAPI(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusOK, map[string]interface{}{"success": true, "repos": repoList})
+}
+
+func enrichAccountParams(p *viewBackend.FrontEndParams, userName string) {
+	if userName == "" || userName == "Guest" {
+		return
+	}
+	db := config.GetDB()
+	user, err := userModel.GetUserByName(userName, db)
+	if err == nil && user != nil {
+		p.UserBio = user.Bio
+		p.UserPFP = user.PFP
+	}
+	contacts, err := userModel.ListMutualContacts(db, userName)
+	if err == nil {
+		p.AcceptedContacts = contacts
+	}
+	incoming, outgoing, err := userModel.ListContactRequests(db, userName)
+	if err == nil {
+		p.PendingIncomingContacts = contactRequestParamMaps(incoming)
+		p.PendingOutgoingContacts = contactRequestParamMaps(outgoing)
+	}
+}
+
+func contactRequestParamMaps(contacts []userModel.Contact) []map[string]interface{} {
+	out := make([]map[string]interface{}, 0, len(contacts))
+	for _, contact := range contacts {
+		out = append(out, map[string]interface{}{
+			"id":        contact.ID,
+			"requester": contact.Requester,
+			"recipient": contact.Recipient,
+			"status":    contact.Status,
+		})
+	}
+	return out
 }
 
 func IndexMainPost(w http.ResponseWriter, r *http.Request) {
@@ -146,6 +184,7 @@ func IndexMainPost(w http.ResponseWriter, r *http.Request) {
 			Error:           make(map[string]string),
 		}
 		paramData.Error["general"] = "Repository name is required."
+		enrichAccountParams(&paramData, userName)
 		viewBackend.IndexMain(w, paramData)
 		return
 	}
@@ -164,6 +203,7 @@ func IndexMainPost(w http.ResponseWriter, r *http.Request) {
 
 		paramData.Error["general"] = fmt.Sprintf("Error creating repository: %s\n", err)
 
+		enrichAccountParams(&paramData, userName)
 		viewBackend.IndexMain(w, paramData)
 		return
 	}
@@ -182,6 +222,7 @@ func IndexMainPost(w http.ResponseWriter, r *http.Request) {
 
 		paramData.Error["general"] = fmt.Sprintf("Error creating repository: %s\n", err)
 
+		enrichAccountParams(&paramData, userName)
 		viewBackend.IndexMain(w, paramData)
 		return
 	}
@@ -225,6 +266,7 @@ func DeleteRepository(w http.ResponseWriter, r *http.Request) {
 
 		paramData.Error["general"] = fmt.Sprintf("Failed to delete repository %s/%s: %s", userName, repoName, err)
 		fmt.Printf("Failed to delete repository %s/%s: %s", userName, repoName, err)
+		enrichAccountParams(&paramData, userName)
 		viewBackend.IndexMain(w, paramData)
 		return
 	}
@@ -274,6 +316,9 @@ func IndexMainBrowseRepository(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	if isOwner {
+		accessAllowed = true
+	}
+	if !accessAllowed && name != "" && userModel.CanReadContactRepositories(config.GetDB(), name, userName) {
 		accessAllowed = true
 	}
 
@@ -354,6 +399,7 @@ func IndexMainBrowseRepository(w http.ResponseWriter, r *http.Request) {
 		paramData.RepoPublic = meta.Public
 	}
 
+	enrichAccountParams(&paramData, name)
 	fmt.Printf("User %s tried to access repository %s/%s%s", name, userName, repoName, requestedPath)
 	viewBackend.IndexMainBrowseRepository(w, paramData)
 }
@@ -895,6 +941,26 @@ func canModifyRepository(sessionUser, repoOwner, repoName string) bool {
 	return false
 }
 
+func canReadRepository(sessionUser, repoOwner, repoName string, isPublic bool) bool {
+	if isPublic {
+		return true
+	}
+	if sessionUser == "" || repoName == "" {
+		return false
+	}
+	if sessionUser == repoOwner {
+		return true
+	}
+	if meta, _ := repository.LoadRepoMeta(repoOwner, repoName); meta != nil {
+		for _, owner := range meta.Owners {
+			if owner == sessionUser {
+				return true
+			}
+		}
+	}
+	return userModel.CanReadContactRepositories(config.GetDB(), sessionUser, repoOwner)
+}
+
 func normalizeBrowserPath(raw string) string {
 	if raw == "" {
 		return "/"
@@ -1006,30 +1072,13 @@ func RepositoryDownloadFile(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	if !isPublic {
+	if !canReadRepository(userName, owner, repoName, isPublic) {
 		if isLoggedIn != true || userName == "" {
 			http.Redirect(w, r, "/login", http.StatusSeeOther)
 			return
 		}
-		// only owners (or listed owners) may download when not public
-		if userName != owner {
-			if meta, err := repository.LoadRepoMeta(owner, repoName); err == nil && meta != nil {
-				allowed := false
-				for _, o := range meta.Owners {
-					if o == userName {
-						allowed = true
-						break
-					}
-				}
-				if !allowed {
-					http.Error(w, "Unauthorized", http.StatusUnauthorized)
-					return
-				}
-			} else {
-				http.Error(w, "Unauthorized", http.StatusUnauthorized)
-				return
-			}
-		}
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
 	}
 
 	fmt.Printf("User %s tried to download %v at %s at %s\n", userName, itemNames, workingDir, repoName)
@@ -1200,30 +1249,13 @@ func RepositoryPreviewFile(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	if !isPublic {
+	if !canReadRepository(userName, owner, repoName, isPublic) {
 		if isLoggedIn != true || userName == "" {
 			http.Error(w, "Unauthorized", http.StatusUnauthorized)
 			return
 		}
-		// If logged in but not the repo owner, ensure the user is listed in owners
-		if userName != owner {
-			if meta, err := repository.LoadRepoMeta(owner, repoName); err == nil && meta != nil {
-				allowed := false
-				for _, o := range meta.Owners {
-					if o == userName {
-						allowed = true
-						break
-					}
-				}
-				if !allowed {
-					http.Error(w, "Unauthorized", http.StatusUnauthorized)
-					return
-				}
-			} else {
-				http.Error(w, "Unauthorized", http.StatusUnauthorized)
-				return
-			}
-		}
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
 	}
 
 	if itemName == "" {

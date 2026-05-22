@@ -6,64 +6,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <link rel="stylesheet" href="/assets/root.css" />
     <title>FtR InkDrop</title>
-    <style>
-        body {
-            background:
-                radial-gradient(circle at 12% 14%, rgba(20, 184, 166, 0.18), transparent 30%),
-                radial-gradient(circle at 88% 10%, rgba(245, 158, 11, 0.16), transparent 28%),
-                linear-gradient(135deg, #f8fbff 0%, #edf6ff 52%, #f7f3e8 100%);
-        }
-
-        .workspace-hero {
-            overflow: hidden;
-            position: relative;
-            border: 1px solid rgba(148, 163, 184, 0.24);
-            background:
-                linear-gradient(135deg, rgba(8, 47, 73, 0.96), rgba(15, 118, 110, 0.86)),
-                radial-gradient(circle at top right, rgba(250, 204, 21, 0.2), transparent 40%);
-            box-shadow: 0 28px 70px rgba(15, 23, 42, 0.18);
-        }
-
-        .workspace-hero::after {
-            content: "";
-            position: absolute;
-            width: 220px;
-            height: 220px;
-            right: -70px;
-            bottom: -90px;
-            border-radius: 999px;
-            background: radial-gradient(circle, rgba(255, 255, 255, 0.24), transparent 68%);
-        }
-
-        .repo-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
-            gap: 16px;
-        }
-
-        .repo-tile {
-            display: flex;
-            height: max-content;
-            padding: 18px;
-            border-radius: 26px;
-            border: 1px solid rgba(148, 163, 184, 0.2);
-            background:
-                linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(241, 248, 255, 0.86));
-            box-shadow: 0 18px 42px rgba(15, 23, 42, 0.08);
-            transition: transform 0.16s ease, box-shadow 0.16s ease, border-color 0.16s ease;
-        }
-
-        .repo-tile:hover {
-            transform: translateY(-4px);
-            border-color: rgba(20, 184, 166, 0.42);
-            box-shadow: 0 24px 48px rgba(15, 23, 42, 0.13);
-        }
-
-        .repo-link {
-            color: inherit;
-            text-decoration: none;
-        }
-    </style>
 </head>
 
 <body>
@@ -78,43 +20,85 @@
                 <div class="profile-menu">
                     <button type="button" class="profile-button" id="profileMenuButton" aria-haspopup="menu"
                         aria-expanded="false" aria-controls="profileMenu">
-                        {{.Name}} ▾
+                        <span class="profile-button-content">
+                            {{if .UserPFP}}<img src="{{.UserPFP}}" alt="" class="profile-chip-image" />{{end}}
+                            <span class="profile-button-name">{{.Name}}</span>
+                            <span class="profile-caret" aria-hidden="true"></span>
+                        </span>
                     </button>
                     <div id="profileMenu" class="profile-dropdown" role="menu" hidden>
                         <p class="menu-label">Signed in as</p>
                         <p class="menu-user">{{.Name}}</p>
-                        <a href="/logout" class="button-link danger small" role="menuitem">Log Out</a>
+                        <button type="button" class="button-link small" id="openAccountSettings" role="menuitem">Open Settings</button>
                     </div>
                 </div>
             </div>
         </div>
     </header>
-    <main class="page">
-        {{if not .IsViewingPublic}}
-        <section class="shell stack-lg">
-            <div class="panel dark stack workspace-hero">
-                <h1 class="intro">InkDrop Workspace</h1>
-                <p class="subtle light">Signed in as <strong>{{.Name}}</strong>. Create a repository, then open it to
-                    browse files.</p>
-                <p class="subtle light">Fast path: create repository, open it, upload files from Inker/FtR.</p>
-                <div class="row">
-                    <a href="?view=public" class="button-link">Browse Public Repositories</a>
-                    <a href="?view=shared" class="button-link">Repositories Shared With Me</a>
-                </div>
-            </div>
 
-            <div class="panel stack">
-                <h2 class="section">Create Repository</h2>
-                <p class="subtle">Use letters, numbers, underscores, and hyphens. Spaces are automatically converted to
-                    underscores.</p>
-                <form name="newrepo" method="POST" action="/" class="stack">
-                    <label for="reponame" class="field-label">Repository name</label>
-                    <input id="reponame" name="reponame" type="text" class="details" placeholder="example_repo"
-                        minlength="1" maxlength="64" pattern="[A-Za-z0-9_- ]+" required />
-                    <div class="row">
-                        <button type="submit" class="redirect">Create Repository</button>
+    <main class="page app-page">
+        <section class="app-shell">
+            <aside class="left-panel" aria-label="Workspace navigation">
+                <nav class="left-panel-tabs" aria-label="Workspace sections">
+                    <a class="left-panel-tab {{if not .IsViewingPublic}}active{{end}}" href="/">Repositories</a>
+                    <a class="left-panel-tab {{if eq .Message "Browse public repositories"}}active{{end}}" href="/?view=public">Community Repos</a>
+                    <a class="left-panel-tab {{if eq .Message "Repositories shared with you"}}active{{end}}" href="/?view=shared">Repositories Shared With Me</a>
+                    <button type="button" class="left-panel-tab" data-tab-target="communityPanel"><strong>Community</strong></button>
+                </nav>
+
+                <div class="left-panel-section">
+                    <h2>Repository List</h2>
+                    <div class="left-repo-list">
+                        {{if .RepoList}}
+                        {{$parent := .}}
+                        {{range $i, $reponame := .RepoList}}
+                        <a href="/browse/{{$parent.Name}}/{{$reponame}}" title="{{$reponame}}">{{truncate $reponame 40}}</a>
+                        {{end}}
+                        {{else if .RepoMatches}}
+                        {{range $i, $m := .RepoMatches}}
+                        <a href="/browse/{{$m.user}}/{{$m.repo}}" title="{{$m.user}}/{{$m.repo}}">{{truncate $m.repo 40}}<small>{{$m.user}}</small></a>
+                        {{end}}
+                        {{else}}
+                        <p class="subtle">No repositories to show.</p>
+                        {{end}}
                     </div>
-                </form>
+                </div>
+
+                <div class="left-panel-section">
+                    <h2>Contact Requests</h2>
+                    <div id="incomingRequests" class="compact-stack">
+                        {{if .PendingIncomingContacts}}
+                        {{range $i, $c := .PendingIncomingContacts}}
+                        <div class="contact-request" data-request-id="{{$c.id}}">
+                            <span>{{$c.requester}}</span>
+                            <div class="row">
+                                <button type="button" class="button-link small" data-contact-action="accept">Accept</button>
+                                <button type="button" class="button-link small danger" data-contact-action="decline">Decline</button>
+                            </div>
+                        </div>
+                        {{end}}
+                        {{else}}
+                        <p class="subtle">No pending requests.</p>
+                        {{end}}
+                    </div>
+                </div>
+            </aside>
+
+            <section class="content-panel">
+                <div class="workspace-strip">
+                    <div>
+                        <h1>{{if .IsViewingPublic}}{{.Message}}{{else}}InkDrop Workspace{{end}}</h1>
+                        <p>{{if .IsViewingPublic}}Browse repositories and contacts without losing your place.{{else}}Create, open, and share repositories from one focused workspace.{{end}}</p>
+                    </div>
+                    {{if not .IsViewingPublic}}
+                    <form name="newrepo" method="POST" action="/" class="inline-create-form">
+                        <input id="reponame" name="reponame" type="text" class="details" placeholder="new_repository"
+                            minlength="1" maxlength="64" pattern="[A-Za-z0-9_- ]+" required />
+                        <button type="submit" class="redirect">Create</button>
+                    </form>
+                    {{end}}
+                </div>
+
                 {{if .Error}}
                 <div class="alert">
                     {{range $key, $msg := .Error}}
@@ -122,64 +106,66 @@
                     {{end}}
                 </div>
                 {{end}}
-            </div>
 
-            <div class="panel stack">
-                <h2 class="section">Your Repositories</h2>
-                {{if .RepoList}}
-                {{$parent := .}}
-                <ul class="clean-list repo-grid">
-                    {{range $i, $reponame := .RepoList}}
-
-                    <a href="/browse/{{$parent.Name}}/{{$reponame}}" class="repo-link">
-                        <li class="repo-card repo-tile">
-                            <p class="repo-name">{{$reponame}}</p>
-                        </li>
-                    </a>
-                    {{end}}
-                </ul>
-                {{else}}
-                <div class="empty-state">
-                    <p>No repositories yet.</p>
-                    <small class="helper">Create your first repository above to start sharing files.</small>
+                <div class="panel-section" id="repoPanel">
+                    <h2 class="section">{{if .IsViewingPublic}}Repositories{{else}}Your Repositories{{end}}</h2>
+                    <div class="wide-list">
+                        {{if .RepoList}}
+                        {{$parent := .}}
+                        {{range $i, $reponame := .RepoList}}
+                        <a class="wide-list-row" href="/browse/{{$parent.Name}}/{{$reponame}}">
+                            <strong title="{{$reponame}}">{{truncate $reponame 40}}</strong>
+                            <span>{{$parent.Name}}</span>
+                        </a>
+                        {{end}}
+                        {{else if .RepoMatches}}
+                        {{range $i, $m := .RepoMatches}}
+                        <a class="wide-list-row" href="/browse/{{$m.user}}/{{$m.repo}}">
+                            <strong title="{{$m.repo}}">{{truncate $m.repo 40}}</strong>
+                            <span>{{$m.user}} {{if $m.description}}- {{$m.description}}{{end}}</span>
+                        </a>
+                        {{end}}
+                        {{else}}
+                        <div class="empty-state">
+                            <p>No repositories found.</p>
+                        </div>
+                        {{end}}
+                    </div>
                 </div>
-                {{end}}
-            </div>
+
+                <div class="panel-section" id="communityPanel" hidden>
+                    <div class="row space">
+                        <h2 class="section">Community</h2>
+                        <input type="search" class="details compact-input" id="communitySearch" placeholder="Find people" />
+                    </div>
+                    <div id="communityResults" class="wide-list"></div>
+                </div>
+            </section>
         </section>
-        {{else}}
-        <section class="shell">
-            <div class="panel dark stack">
-                <h1 class="intro">Public Browser</h1>
-                <p class="subtle light">Browse repositories that have been marked public by their owners.</p>
-                <div class="row">
-                    <a href="/" class="button-link">Back to Workspace</a>
-                </div>
-            </div>
-
-            <div class="panel stack">
-                <h2 class="section">Repositories</h2>
-                {{if .RepoMatches}}
-                {{$parent := .}}
-                <ul class="clean-list repo-grid">
-                    {{range $i, $m := .RepoMatches}}
-                    <a href="/browse/{{$m.user}}/{{$m.repo}}" class="repo-link">
-                        <li class="repo-card repo-tile">
-                            <p class="repo-name">{{$m.repo}}</p>
-                            <p class="subtle">{{$m.user}} — {{$m.description}}</p>
-                        </li>
-                    </a>
-                    {{end}}
-                </ul>
-                {{else}}
-                <div class="empty-state">
-                    <p>No public repositories found.</p>
-                    <small class="helper">Try again later or return to your workspace.</small>
-                </div>
-                {{end}}
-            </div>
-        </section>
-        {{end}}
     </main>
+
+    <dialog class="settings-modal popup account-settings-modal center" id="accountSettingsDialog">
+        <form method="post" action="/account/settings" enctype="multipart/form-data" class="stack">
+            <h2 class="section">Account Settings</h2>
+            <div class="account-settings-grid">
+                <img src="{{if .UserPFP}}{{.UserPFP}}{{else}}/assets/default.png{{end}}" alt="" class="settings-avatar" />
+                <div class="stack">
+                    <label class="field-label" for="bio">Bio</label>
+                    <textarea id="bio" name="bio" class="details account-bio" maxlength="512">{{.UserBio}}</textarea>
+                    <label class="field-label" for="profilePicture">Profile Picture</label>
+                    <input id="profilePicture" name="profile_picture" type="file" accept="image/png,image/jpeg,image/gif,image/webp" />
+                </div>
+            </div>
+            <div class="row space">
+                <a href="/logout" class="button-link danger">Log Out</a>
+                <div class="row">
+                    <button type="button" class="button-link" id="cancelAccountSettings">Cancel</button>
+                    <button type="submit" class="redirect">Save Settings</button>
+                </div>
+            </div>
+        </form>
+    </dialog>
+
     <script>
         (function () {
             var themeKey = "inkdrop-theme";
@@ -194,12 +180,8 @@
 
             function getSavedTheme() {
                 var stored = localStorage.getItem(themeKey);
-                if (stored === "dark" || stored === "light") {
-                    return stored;
-                }
-                if (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches) {
-                    return "dark";
-                }
+                if (stored === "dark" || stored === "light") return stored;
+                if (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches) return "dark";
                 return "light";
             }
 
@@ -215,14 +197,13 @@
                 });
             }
 
-            if (document.readyState === "loading") {
-                document.addEventListener("DOMContentLoaded", initTheme);
-            } else {
-                initTheme();
-            }
-
             var profileButton = document.getElementById("profileMenuButton");
             var profileMenu = document.getElementById("profileMenu");
+            var settingsDialog = document.getElementById("accountSettingsDialog");
+            var communityPanel = document.getElementById("communityPanel");
+            var repoPanel = document.getElementById("repoPanel");
+            var communitySearch = document.getElementById("communitySearch");
+            var communityResults = document.getElementById("communityResults");
 
             function closeMenu() {
                 profileMenu.hidden = true;
@@ -235,78 +216,126 @@
                 profileButton.setAttribute("aria-expanded", String(isHidden));
             });
 
+            document.getElementById("openAccountSettings").addEventListener("click", function () {
+                closeMenu();
+                settingsDialog.showModal();
+            });
+            document.getElementById("cancelAccountSettings").addEventListener("click", function () {
+                settingsDialog.close();
+            });
+
             document.addEventListener("click", function (event) {
-                if (!profileMenu.hidden && !event.target.closest(".profile-menu")) {
-                    closeMenu();
-                }
+                if (!profileMenu.hidden && !event.target.closest(".profile-menu")) closeMenu();
             });
-
             document.addEventListener("keydown", function (event) {
-                if (event.key === "Escape") {
-                    closeMenu();
-                }
+                if (event.key === "Escape") closeMenu();
             });
 
-            document.querySelectorAll("[data-dialog-target]").forEach(function (button) {
+            document.querySelectorAll("[data-tab-target='communityPanel']").forEach(function (button) {
                 button.addEventListener("click", function () {
-                    var id = button.getAttribute("data-dialog-target");
-                    var dialog = document.getElementById(id);
-                    if (dialog && typeof dialog.showModal === "function") {
-                        dialog.showModal();
-                    }
+                    openCommunity(button);
                 });
             });
 
-            document.querySelectorAll("dialog.settings-modal").forEach(function (dialog) {
-                dialog.addEventListener("click", function (event) {
-                    var rect = dialog.getBoundingClientRect();
-                    var inDialog =
-                        event.clientX >= rect.left &&
-                        event.clientX <= rect.right &&
-                        event.clientY >= rect.top &&
-                        event.clientY <= rect.bottom;
-                    if (!inDialog) {
-                        dialog.close();
-                    }
-                });
-            });
+            function openCommunity(activeButton) {
+                repoPanel.hidden = true;
+                communityPanel.hidden = false;
+                document.querySelectorAll(".left-panel-tab").forEach(function (tab) { tab.classList.remove("active"); });
+                if (activeButton) activeButton.classList.add("active");
+                loadCommunity();
+            }
 
-            function getCurrentRepoNames() {
-                return Array.from(document.querySelectorAll('.repo-card .repo-name')).map(function (node) {
-                    return node.textContent.trim();
+            function postForm(url, values) {
+                var form = new URLSearchParams(values);
+                return fetch(url, {
+                    method: "POST",
+                    credentials: "same-origin",
+                    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+                    body: form.toString()
+                }).then(function (response) { return response.json(); });
+            }
+
+            function respondToContact(id, action) {
+                postForm("/contacts/respond", { id: id, action: action }).then(function () {
+                    window.location.reload();
                 });
             }
 
-            function refreshRepoListingIfChanged() {
-                if (!document.querySelector('.repo-grid')) {
-                    return;
-                }
-                var currentNames = getCurrentRepoNames();
-                fetch('/api/repos?refresh=1', { credentials: 'same-origin' })
-                    .then(function (response) {
-                        if (!response.ok) {
-                            throw new Error('Could not refresh repo list');
-                        }
-                        return response.json();
-                    })
+            document.querySelectorAll("[data-contact-action]").forEach(function (button) {
+                button.addEventListener("click", function () {
+                    var card = button.closest("[data-request-id]");
+                    respondToContact(card.getAttribute("data-request-id"), button.getAttribute("data-contact-action"));
+                });
+            });
+
+            function loadCommunity() {
+                var query = communitySearch ? communitySearch.value : "";
+                fetch("/api/community?q=" + encodeURIComponent(query), { credentials: "same-origin" })
+                    .then(function (response) { return response.json(); })
                     .then(function (data) {
-                        if (!data.success || !Array.isArray(data.repos)) {
+                        communityResults.innerHTML = "";
+                        if (!data.success || !Array.isArray(data.users) || data.users.length === 0) {
+                            communityResults.innerHTML = '<div class="empty-state"><p>No people found.</p></div>';
                             return;
                         }
-                        var updatedNames = data.repos.map(function (repo) { return String(repo).trim(); });
-                        if (updatedNames.length !== currentNames.length || updatedNames.some(function (name, index) {
-                            return name !== currentNames[index];
-                        })) {
-                            window.location.reload();
-                        }
-                    })
-                    .catch(function () {
-                        // Ignore refresh failures; list will update naturally on user action.
+                        data.users.forEach(function (user) {
+                            var row = document.createElement("div");
+                            row.className = "wide-list-row";
+                            var status = user.status || "";
+                            var action = document.createElement("span");
+                            if (status === "pending") {
+                                action.className = "status-pill";
+                                action.textContent = "Pending";
+                            } else if (status === "accepted") {
+                                action.className = "status-pill";
+                                action.textContent = "Contact";
+                            } else {
+                                action = document.createElement("button");
+                                action.type = "button";
+                                action.className = "button-link small";
+                                action.setAttribute("data-request-contact", user.name);
+                                action.textContent = "Add Contact";
+                            }
+                            var person = document.createElement("div");
+                            person.className = "community-person";
+                            var img = document.createElement("img");
+                            img.src = user.pfp || "/assets/default.png";
+                            img.alt = "";
+                            var text = document.createElement("div");
+                            var name = document.createElement("strong");
+                            name.textContent = user.name;
+                            var bio = document.createElement("span");
+                            bio.textContent = user.bio || "";
+                            text.appendChild(name);
+                            text.appendChild(bio);
+                            person.appendChild(img);
+                            person.appendChild(text);
+                            row.appendChild(person);
+                            row.appendChild(action);
+                            communityResults.appendChild(row);
+                        });
+                        communityResults.querySelectorAll("[data-request-contact]").forEach(function (button) {
+                            button.addEventListener("click", function () {
+                                postForm("/contacts/request", { recipient: button.getAttribute("data-request-contact") }).then(loadCommunity);
+                            });
+                        });
                     });
             }
 
-            if (document.querySelector('.repo-grid')) {
-                setInterval(refreshRepoListingIfChanged, 9000);
+            if (communitySearch) {
+                communitySearch.addEventListener("input", function () {
+                    window.clearTimeout(communitySearch._timer);
+                    communitySearch._timer = window.setTimeout(loadCommunity, 180);
+                });
+            }
+            if (window.location.hash === "#community") {
+                openCommunity(document.querySelector("[data-tab-target='communityPanel']"));
+            }
+
+            if (document.readyState === "loading") {
+                document.addEventListener("DOMContentLoaded", initTheme);
+            } else {
+                initTheme();
             }
         })();
     </script>

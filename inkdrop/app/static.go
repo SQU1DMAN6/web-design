@@ -2,6 +2,7 @@ package app
 
 import (
 	"fmt"
+	"inkdrop/repository"
 	"log"
 	"net/http"
 	"os"
@@ -44,6 +45,7 @@ func RegisterStatic(r *chi.Mux) {
 
 	// Handle static files in two folders
 	r.Handle("/assets/*", http.StripPrefix("/assets/", fileServer(assetsPath)))
+	r.Handle("/pfp/*", http.StripPrefix("/pfp/", fileServer(repository.UserPFPDir)))
 
 }
 

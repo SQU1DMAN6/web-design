@@ -322,19 +322,63 @@
                         aria-expanded="false"
                         aria-controls="profileMenu"
                     >
-                        {{.Name}} ▾
+                        <span class="profile-button-content">
+                            {{if .UserPFP}}<img src="{{.UserPFP}}" alt="" class="profile-chip-image" />{{end}}
+                            <span class="profile-button-name">{{.Name}}</span>
+                            <span class="profile-caret" aria-hidden="true"></span>
+                        </span>
                     </button>
                     <div id="profileMenu" class="profile-dropdown" role="menu" hidden>
                         <p class="menu-label">Signed in as</p>
                         <p class="menu-user">{{.Name}}</p>
-                        <a href="/logout" class="button-link danger small" role="menuitem">Log Out</a>
+                        <button type="button" class="button-link small" id="openAccountSettings" role="menuitem">Open Settings</button>
                     </div>
                 </div>
             </div>
         </div>
     </header>
 
-    <main class="page">
+    <main class="page app-page">
+        <section class="app-shell">
+            <aside class="left-panel" aria-label="Repository navigation">
+                <nav class="left-panel-tabs" aria-label="Repository sections">
+                    <a class="left-panel-tab" href="/">Workspace</a>
+                    <a class="left-panel-tab active" href="/browse/{{.Message2}}/{{.Message3}}">Current Repository</a>
+                    <a class="left-panel-tab" href="/browse/{{.Message2}}/{{.Message3}}/Trash">Trash</a>
+                    <button type="button" class="left-panel-tab" id="openCommunityPanel">Community</button>
+                </nav>
+                <div class="left-panel-section">
+                    <h2>Contacts</h2>
+                    <div class="left-repo-list">
+                        {{if .AcceptedContacts}}
+                        {{range $i, $contact := .AcceptedContacts}}
+                        <span>{{$contact}}</span>
+                        {{end}}
+                        {{else}}
+                        <p class="subtle">No contacts yet.</p>
+                        {{end}}
+                    </div>
+                </div>
+                <div class="left-panel-section">
+                    <h2>Contact Requests</h2>
+                    <div id="incomingRequests" class="compact-stack">
+                        {{if .PendingIncomingContacts}}
+                        {{range $i, $c := .PendingIncomingContacts}}
+                        <div class="contact-request" data-request-id="{{$c.id}}">
+                            <span>{{$c.requester}}</span>
+                            <div class="row">
+                                <button type="button" class="button-link small" data-contact-action="accept">Accept</button>
+                                <button type="button" class="button-link small danger" data-contact-action="decline">Decline</button>
+                            </div>
+                        </div>
+                        {{end}}
+                        {{else}}
+                        <p class="subtle">No pending requests.</p>
+                        {{end}}
+                    </div>
+                </div>
+            </aside>
+            <div class="repo-workspace">
         <section class="shell stack-lg">
             <div class="panel dark stack">
                 <h1 class="intro">{{ .Title }}</h1>
@@ -391,22 +435,22 @@
                     {{if eq $entry ".."}}
                     <li class="repo-card folder parent" data-kind="parent" data-name=".." tabindex="0" title="Go up">
                         <div class="repo-icon" aria-hidden="true">↩</div>
-                        <p class="repo-name">..</p>
+                        <p class="repo-name" title="..">..</p>
                     </li>
                     {{else if eq $entry "Trash/"}}
                     <li class="repo-card folder trash-entry" data-kind="trash" data-name="Trash" tabindex="0" title="Trash">
                         <div class="repo-icon" aria-hidden="true">🗑</div>
-                        <p class="repo-name">Trash</p>
+                        <p class="repo-name" title="Trash">Trash</p>
                     </li>
                     {{else if hasSuffix $entry "/"}}
                     <li class="repo-card folder" data-kind="folder" data-name="{{trimSuffix $entry "/"}}" tabindex="0" title="{{trimSuffix $entry "/"}}">
                         <div class="repo-icon" aria-hidden="true">📁</div>
-                        <p class="repo-name">{{trimSuffix $entry "/"}}</p>
+                        <p class="repo-name" title="{{trimSuffix $entry "/"}}">{{truncate (trimSuffix $entry "/") 40}}</p>
                     </li>
                     {{else}}
                     <li class="repo-card file" data-kind="file" data-name="{{$entry}}" tabindex="0" title="{{$entry}}">
                         <div class="repo-icon" aria-hidden="true">📄</div>
-                        <p class="repo-name">{{$entry}}</p>
+                        <p class="repo-name" title="{{$entry}}">{{truncate $entry 40}}</p>
                     </li>
                     {{end}}
                     {{end}}
@@ -540,7 +584,12 @@
                                 <!-- owner tokens are rendered by JS -->
                             </div>
                             <div class="row" style="gap:8px; align-items:center;">
-                                <input type="text" id="newOwnerInput" class="details" placeholder="Type a username and press +" />
+                                <input type="text" id="newOwnerInput" class="details" placeholder="Type a contact name" list="contactOwnerSuggestions" />
+                                <datalist id="contactOwnerSuggestions">
+                                    {{range $i, $contact := .AcceptedContacts}}
+                                    <option value="{{$contact}}"></option>
+                                    {{end}}
+                                </datalist>
                                 <button type="button" id="addOwnerBtn" class="button-link small">+</button>
                             </div>
                             <input type="hidden" name="owners" id="ownersHidden" value="{{.RepoOwners}}" />
@@ -604,7 +653,42 @@
                 </form>
             </div>
         </section>
+            </div>
+        </section>
     </main>
+
+    <dialog class="settings-modal popup account-settings-modal center" id="accountSettingsDialog">
+        <form method="post" action="/account/settings" enctype="multipart/form-data" class="stack">
+            <h2 class="section">Account Settings</h2>
+            <div class="account-settings-grid">
+                <img src="{{if .UserPFP}}{{.UserPFP}}{{else}}/assets/default.png{{end}}" alt="" class="settings-avatar" />
+                <div class="stack">
+                    <label class="field-label" for="bio">Bio</label>
+                    <textarea id="bio" name="bio" class="details account-bio" maxlength="512">{{.UserBio}}</textarea>
+                    <label class="field-label" for="profilePicture">Profile Picture</label>
+                    <input id="profilePicture" name="profile_picture" type="file" accept="image/png,image/jpeg,image/gif,image/webp" />
+                </div>
+            </div>
+            <div class="row space">
+                <a href="/logout" class="button-link danger">Log Out</a>
+                <div class="row">
+                    <button type="button" class="button-link" id="cancelAccountSettings">Cancel</button>
+                    <button type="submit" class="redirect">Save Settings</button>
+                </div>
+            </div>
+        </form>
+    </dialog>
+
+    <dialog class="settings-modal popup account-settings-modal center" id="communityDialog">
+        <div class="stack">
+            <div class="row space">
+                <h2 class="section">Community</h2>
+                <button type="button" class="button-link small" id="closeCommunityDialog">Close</button>
+            </div>
+            <input type="search" class="details" id="communitySearch" placeholder="Find people" />
+            <div id="communityResults" class="wide-list"></div>
+        </div>
+    </dialog>
 
     {{template "uploadFormJS". }}
 
@@ -651,6 +735,14 @@
 
             var profileButton = document.getElementById("profileMenuButton");
             var profileMenu = document.getElementById("profileMenu");
+            var accountSettingsDialog = document.getElementById("accountSettingsDialog");
+            var openAccountSettings = document.getElementById("openAccountSettings");
+            var cancelAccountSettings = document.getElementById("cancelAccountSettings");
+            var openCommunityPanel = document.getElementById("openCommunityPanel");
+            var communityDialog = document.getElementById("communityDialog");
+            var closeCommunityDialog = document.getElementById("closeCommunityDialog");
+            var communitySearch = document.getElementById("communitySearch");
+            var communityResults = document.getElementById("communityResults");
 
             function closeProfileMenu() {
                 profileMenu.hidden = true;
@@ -662,6 +754,114 @@
                 profileMenu.hidden = !willOpen;
                 profileButton.setAttribute("aria-expanded", String(willOpen));
             });
+
+            if (openAccountSettings && accountSettingsDialog) {
+                openAccountSettings.addEventListener("click", function () {
+                    closeProfileMenu();
+                    accountSettingsDialog.showModal();
+                });
+            }
+            if (cancelAccountSettings && accountSettingsDialog) {
+                cancelAccountSettings.addEventListener("click", function () {
+                    accountSettingsDialog.close();
+                });
+            }
+            if (openCommunityPanel) {
+                openCommunityPanel.addEventListener("click", function () {
+                    communityDialog.showModal();
+                    loadCommunity();
+                });
+            }
+            if (closeCommunityDialog) {
+                closeCommunityDialog.addEventListener("click", function () {
+                    communityDialog.close();
+                });
+            }
+
+            function postForm(url, values) {
+                var form = new URLSearchParams(values);
+                return fetch(url, {
+                    method: "POST",
+                    credentials: "same-origin",
+                    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+                    body: form.toString()
+                }).then(function (response) { return response.json(); });
+            }
+
+            function respondToContact(id, action) {
+                postForm("/contacts/respond", { id: id, action: action }).then(function () {
+                    window.location.reload();
+                });
+            }
+
+            document.querySelectorAll("[data-contact-action]").forEach(function (button) {
+                button.addEventListener("click", function () {
+                    var card = button.closest("[data-request-id]");
+                    respondToContact(card.getAttribute("data-request-id"), button.getAttribute("data-contact-action"));
+                });
+            });
+
+            function loadCommunity() {
+                if (!communityResults) return;
+                var query = communitySearch ? communitySearch.value : "";
+                fetch("/api/community?q=" + encodeURIComponent(query), { credentials: "same-origin" })
+                    .then(function (response) { return response.json(); })
+                    .then(function (data) {
+                        communityResults.innerHTML = "";
+                        if (!data.success || !Array.isArray(data.users) || data.users.length === 0) {
+                            communityResults.innerHTML = '<div class="empty-state"><p>No people found.</p></div>';
+                            return;
+                        }
+                        data.users.forEach(function (user) {
+                            var row = document.createElement("div");
+                            row.className = "wide-list-row";
+                            var status = user.status || "";
+                            var action = document.createElement("span");
+                            if (status === "pending") {
+                                action.className = "status-pill";
+                                action.textContent = "Pending";
+                            } else if (status === "accepted") {
+                                action.className = "status-pill";
+                                action.textContent = "Contact";
+                            } else {
+                                action = document.createElement("button");
+                                action.type = "button";
+                                action.className = "button-link small";
+                                action.setAttribute("data-request-contact", user.name);
+                                action.textContent = "Add Contact";
+                            }
+                            var person = document.createElement("div");
+                            person.className = "community-person";
+                            var img = document.createElement("img");
+                            img.src = user.pfp || "/assets/default.png";
+                            img.alt = "";
+                            var text = document.createElement("div");
+                            var name = document.createElement("strong");
+                            name.textContent = user.name;
+                            var bio = document.createElement("span");
+                            bio.textContent = user.bio || "";
+                            text.appendChild(name);
+                            text.appendChild(bio);
+                            person.appendChild(img);
+                            person.appendChild(text);
+                            row.appendChild(person);
+                            row.appendChild(action);
+                            communityResults.appendChild(row);
+                        });
+                        communityResults.querySelectorAll("[data-request-contact]").forEach(function (button) {
+                            button.addEventListener("click", function () {
+                                postForm("/contacts/request", { recipient: button.getAttribute("data-request-contact") }).then(loadCommunity);
+                            });
+                        });
+                    });
+            }
+
+            if (communitySearch) {
+                communitySearch.addEventListener("input", function () {
+                    window.clearTimeout(communitySearch._timer);
+                    communitySearch._timer = window.setTimeout(loadCommunity, 180);
+                });
+            }
 
             document.addEventListener("click", function (event) {
                 if (!profileMenu.hidden && !event.target.closest(".profile-menu")) {

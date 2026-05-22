@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"inkdrop/config"
+	userModel "inkdrop/model"
 	repoStore "inkdrop/repository"
 	"io"
 	"net/http"
@@ -191,6 +192,9 @@ func fsAPIPermissions(r *http.Request, repoOwner string, repoName string) (strin
 					break
 				}
 			}
+		}
+		if !canRead && userModel.CanReadContactRepositories(config.GetDB(), sessionUser, repoOwner) {
+			canRead = true
 		}
 	}
 	return sessionUser, canRead, canWrite
