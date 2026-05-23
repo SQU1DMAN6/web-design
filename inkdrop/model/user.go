@@ -117,18 +117,6 @@ func CreateUser(db *bun.DB, name string, email string, password string) error {
 		return err
 	}
 
-	checkUser, err := GetUserByEmail(email, db)
-	if checkUser != nil && err == nil {
-		err = errors.New("User already exists")
-		return err
-	}
-
-	checkUser, err = GetUserByName(name, db)
-	if checkUser != nil && err == nil {
-		err = errors.New("User already exists")
-		return err
-	}
-
 	ctx := context.Background()
 	hashedPassword, _ := HashPassword(password)
 	user := &User{Name: name, Email: email, Password: hashedPassword, PFP: "/assets/default.png", Bio: ""}
@@ -201,6 +189,23 @@ func GetUserByEmail(email string, db *bun.DB) (*User, error) {
 	fmt.Printf("User: %+v\n", userModel)
 
 	return &userModel, nil
+}
+
+func CheckUserByEmail(email string, db *bun.DB) (bool, error) {
+	var userModel User
+	ctx := context.Background()
+
+	exists, err := db.NewSelect().
+		Model(&userModel).
+		Where("email = ?", email).
+		Exists(ctx)
+	if err != nil {
+		fmt.Println("Error querying user:", err)
+		return false, err
+	}
+
+	fmt.Printf("User: %+v\n", userModel)
+	return exists, nil
 }
 
 func GetUserByName(name string, db *bun.DB) (*User, error) {

@@ -28,7 +28,7 @@
                     <label for="password" class="field-label">Password</label>
                     <input id="password" class="details" type="password" name="password" required placeholder="Your password" autocomplete="current-password" />
 
-                    <button type="submit" class="redirect">Sign In</button>
+                    <button type="submit" class="redirect" id="loginBtn" style="display: block;">Sign In</button>
                 </form>
 
                 <hr class="linebreaker" />
@@ -41,6 +41,12 @@
             var savedTheme = localStorage.getItem("inkdrop-theme");
             document.documentElement.setAttribute("data-theme", savedTheme === "dark" ? "dark" : "light");
         })();
-    </script>
+
+        const loginBtn = document.getElementById("loginBtn")
+        
+        loginBtn.addEventListener("click", () => {
+            loginBtn.style.display = "none"
+        })
+        </script>
 </body>
 </html>

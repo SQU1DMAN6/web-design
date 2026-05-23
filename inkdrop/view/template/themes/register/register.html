@@ -32,7 +32,7 @@
                     <label for="password" class="field-label">Password</label>
                     <input id="password" class="details" name="password" type="password" placeholder="Create a strong password" required minlength="8" autocomplete="new-password" />
 
-                    <button type="submit" class="redirect">Create Account</button>
+                    <button type="submit" class="redirect" id="registerBtn" style="display: block;">Create Account</button>
                 </form>
 
                 <hr class="linebreaker" />
@@ -45,6 +45,11 @@
             var savedTheme = localStorage.getItem("inkdrop-theme");
             document.documentElement.setAttribute("data-theme", savedTheme === "dark" ? "dark" : "light");
         })();
+
+        // const registerBtn = document.getElementById("registerBtn")
+        // registerBtn.addEventListener("click", () => {
+        //     registerBtn.style.display = "none"
+        // })
     </script>
 </body>
 </html>

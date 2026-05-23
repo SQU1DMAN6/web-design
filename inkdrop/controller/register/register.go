@@ -1,9 +1,10 @@
 package register
 
 import (
+	"errors"
 	"fmt"
 	"inkdrop/config"
-	userModel "inkdrop/model"
+	"inkdrop/model"
 	viewBackend "inkdrop/view/connector"
 	"net/http"
 	"strings"
@@ -64,7 +65,39 @@ func RegisterMainPost(w http.ResponseWriter, r *http.Request) {
 
 	db := config.GetDB()
 
-	err = userModel.CreateUser(db, userNameCooked, userEmail, userPassword)
+	checkUser, err := model.GetUserByEmail(userEmail, db)
+	if checkUser != nil && err == nil {
+		err = errors.New("ists")
+		fmt.Println("Error:", err)
+		paramData := viewBackend.FrontEndParams{
+			Title:   "Register",
+			Message: "Register for a new FtR account",
+			Error:   make(map[string]string),
+		}
+
+		paramData.Error["general"] = fmt.Sprintf("Error registering: %s", err)
+
+		viewBackend.RegisterMain(w, paramData)
+		return
+	}
+
+	checkUser, err = model.GetUserByName(userNameCooked, db)
+	if checkUser != nil && err == nil {
+		err = errors.New("ists")
+		fmt.Println("Error:", err)
+		paramData := viewBackend.FrontEndParams{
+			Title:   "Register",
+			Message: "Register for a new FtR account",
+			Error:   make(map[string]string),
+		}
+
+		paramData.Error["general"] = fmt.Sprintf("Error registering: %s", err)
+
+		viewBackend.RegisterMain(w, paramData)
+		return
+	}
+
+	err = model.CreateUser(db, userNameCooked, userEmail, userPassword)
 	if err != nil {
 		fmt.Println("Error:", err)
 		paramData := viewBackend.FrontEndParams{
