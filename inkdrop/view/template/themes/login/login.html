@@ -40,13 +40,16 @@
         (function () {
             var savedTheme = localStorage.getItem("inkdrop-theme");
             document.documentElement.setAttribute("data-theme", savedTheme === "dark" ? "dark" : "light");
-        })();
 
-        const loginBtn = document.getElementById("loginBtn")
-        
-        loginBtn.addEventListener("click", () => {
-            loginBtn.style.display = "none"
-        })
-        </script>
+            var loginForm = document.querySelector("form[name=login]");
+            var loginBtn = document.getElementById("loginBtn");
+            if (loginForm && loginBtn) {
+                loginForm.addEventListener("submit", function () {
+                    loginBtn.textContent = "Signing in...";
+                    loginBtn.disabled = true;
+                });
+            }
+        })();
+    </script>
 </body>
 </html>

@@ -125,7 +125,7 @@ func enrichAccountParams(p *viewBackend.FrontEndParams, userName string) {
 	user, err := userModel.GetUserByName(userName, db)
 	if err == nil && user != nil {
 		p.UserBio = user.Bio
-		p.UserPFP = user.PFP
+		p.UserPFP = userModel.ResolveProfilePicture(user.PFP, user.Name)
 	}
 	contacts, err := userModel.ListMutualContacts(db, userName)
 	if err == nil {

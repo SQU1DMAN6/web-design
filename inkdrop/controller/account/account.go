@@ -266,10 +266,20 @@ func saveProfilePicture(username string, src io.Reader, originalName string, old
 }
 
 func removeOldProfilePicture(username string, oldPFP string, newTarget string) {
-	if !strings.HasPrefix(oldPFP, "/pfp/"+username+"/") {
+	oldPFP = strings.TrimSpace(oldPFP)
+	if oldPFP == "" || oldPFP == "/pfp/default.png" || oldPFP == "default.png" || oldPFP == "/default.png" {
 		return
 	}
-	oldPath := filepath.Join(repository.UserPFPDir, username, filepath.Base(oldPFP))
+
+	var oldPath string
+	if strings.HasPrefix(oldPFP, "/pfp/") {
+		oldPath = filepath.Join(repository.UserPFPDir, strings.TrimPrefix(oldPFP, "/pfp/"))
+	} else if strings.HasPrefix(oldPFP, "/ftr/userData/") || strings.HasPrefix(oldPFP, "/ftr/userpfp/") {
+		oldPath = filepath.Clean(oldPFP)
+	} else {
+		return
+	}
+
 	if filepath.Clean(oldPath) == filepath.Clean(newTarget) {
 		return
 	}
@@ -280,7 +290,7 @@ func userPayload(user userModel.User, status string) map[string]interface{} {
 	return map[string]interface{}{
 		"name":   user.Name,
 		"bio":    user.Bio,
-		"pfp":    user.PFP,
+		"pfp":    userModel.ResolveProfilePicture(user.PFP, user.Name),
 		"status": status,
 	}
 }

@@ -32,6 +32,9 @@
                     <label for="password" class="field-label">Password</label>
                     <input id="password" class="details" name="password" type="password" placeholder="Create a strong password" required minlength="8" autocomplete="new-password" />
 
+                    <label for="passwordConfirm" class="field-label">Confirm password</label>
+                    <input id="passwordConfirm" class="details" name="password_confirm" type="password" placeholder="Repeat your password" required minlength="8" autocomplete="new-password" />
+
                     <button type="submit" class="redirect" id="registerBtn" style="display: block;">Create Account</button>
                 </form>
 
@@ -44,12 +47,33 @@
         (function () {
             var savedTheme = localStorage.getItem("inkdrop-theme");
             document.documentElement.setAttribute("data-theme", savedTheme === "dark" ? "dark" : "light");
-        })();
 
-        // const registerBtn = document.getElementById("registerBtn")
-        // registerBtn.addEventListener("click", () => {
-        //     registerBtn.style.display = "none"
-        // })
+            var registerForm = document.querySelector("form[name=register]");
+            var registerBtn = document.getElementById("registerBtn");
+            var passwordInput = document.getElementById("password");
+            var passwordConfirmInput = document.getElementById("passwordConfirm");
+
+            if (registerForm && registerBtn && passwordInput && passwordConfirmInput) {
+                registerForm.addEventListener("submit", function (event) {
+                    if (passwordInput.value !== passwordConfirmInput.value) {
+                        passwordConfirmInput.setCustomValidity("Passwords do not match.");
+                        passwordConfirmInput.reportValidity();
+                        event.preventDefault();
+                        return;
+                    }
+
+                    passwordConfirmInput.setCustomValidity("");
+                    registerBtn.textContent = "Creating account...";
+                    registerBtn.disabled = true;
+                });
+
+                passwordConfirmInput.addEventListener("input", function () {
+                    if (passwordInput.value === passwordConfirmInput.value) {
+                        passwordConfirmInput.setCustomValidity("");
+                    }
+                });
+            }
+        })();
     </script>
 </body>
 </html>

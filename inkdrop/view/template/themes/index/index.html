@@ -148,7 +148,7 @@
         <form method="post" action="/account/settings" enctype="multipart/form-data" class="stack">
             <h2 class="section">Account Settings</h2>
             <div class="account-settings-grid">
-                <img src="{{if .UserPFP}}{{.UserPFP}}{{else}}/assets/default.png{{end}}" alt="" class="settings-avatar" />
+                <img src="{{if .UserPFP}}{{.UserPFP}}{{else}}/pfp/default.png{{end}}" alt="" class="settings-avatar" />
                 <div class="stack">
                     <label class="field-label" for="bio">Bio</label>
                     <textarea id="bio" name="bio" class="details account-bio" maxlength="512">{{.UserBio}}</textarea>
@@ -299,7 +299,7 @@
                             var person = document.createElement("div");
                             person.className = "community-person";
                             var img = document.createElement("img");
-                            img.src = user.pfp || "/assets/default.png";
+                            img.src = user.pfp || "/pfp/default.png";
                             img.alt = "";
                             var text = document.createElement("div");
                             var name = document.createElement("strong");

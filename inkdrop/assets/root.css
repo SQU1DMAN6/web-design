@@ -125,6 +125,10 @@ main.page.app-page {
     align-items: start;
 }
 
+.app-shell.compact {
+    grid-template-columns: minmax(180px, 220px) minmax(0, 1fr);
+}
+
 .left-panel {
     position: sticky;
     top: 86px;
@@ -140,6 +144,33 @@ main.page.app-page {
         linear-gradient(160deg, rgba(255, 255, 251, 0.96), rgba(236, 253, 245, 0.9));
     box-shadow: 0 18px 38px rgba(31, 41, 55, 0.12);
     padding: 16px;
+}
+
+.left-panel.compact {
+    max-width: 220px;
+    min-width: 180px;
+}
+
+.left-panel.compact .left-panel-tabs,
+.left-panel.compact .left-panel-section {
+    gap: 8px;
+}
+
+.left-panel.compact .left-panel-tab,
+.left-panel.compact .left-repo-list a,
+.left-panel.compact .left-repo-list span {
+    padding: 10px 10px;
+    font-size: 0.95rem;
+}
+
+.left-panel-toggle {
+    display: flex;
+    justify-content: flex-end;
+}
+
+.left-panel-toggle .button-link {
+    width: 100%;
+    justify-content: center;
 }
 
 .repo-workspace {
@@ -1328,6 +1359,21 @@ html[data-theme="dark"] textarea.details {
         position: relative;
         top: auto;
         max-height: none;
+    }
+
+    .left-panel.compact {
+        max-width: none;
+        min-width: auto;
+    }
+
+    .left-panel-toggle {
+        justify-content: flex-start;
+    }
+
+    .left-panel-tab,
+    .left-repo-list a,
+    .left-repo-list span {
+        font-size: 0.95rem;
     }
 
     .workspace-strip,

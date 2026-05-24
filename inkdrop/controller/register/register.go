@@ -1,13 +1,14 @@
 package register
 
 import (
-	"errors"
 	"fmt"
 	"inkdrop/config"
+	"inkdrop/controller/auth"
 	"inkdrop/model"
 	viewBackend "inkdrop/view/connector"
 	"net/http"
 	"strings"
+	"time"
 )
 
 func RegisterMain(w http.ResponseWriter, r *http.Request) {
@@ -34,6 +35,17 @@ func RegisterMainPost(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if allowed, message := auth.AllowAttempt(r, "register", 3, time.Minute, 2*time.Minute); !allowed {
+		paramData := viewBackend.FrontEndParams{
+			Title:   "Register",
+			Message: "Register for a new FtR account",
+			Error:   make(map[string]string),
+		}
+		paramData.Error["general"] = message
+		viewBackend.RegisterMain(w, paramData)
+		return
+	}
+
 	err := r.ParseForm()
 	if err != nil {
 		http.Error(w, fmt.Sprintf("Failed to parse form entry: %s", err), http.StatusBadRequest)
@@ -43,16 +55,29 @@ func RegisterMainPost(w http.ResponseWriter, r *http.Request) {
 	userNameRaw := strings.TrimSpace(r.FormValue("name"))
 	userEmail := strings.TrimSpace(r.FormValue("email"))
 	userPassword := strings.TrimSpace(r.FormValue("password"))
+	passwordConfirm := strings.TrimSpace(r.FormValue("password_confirm"))
 
-	if userEmail == "" || userPassword == "" || userNameRaw == "" {
+	if userEmail == "" || userPassword == "" || userNameRaw == "" || passwordConfirm == "" {
 		paramData := viewBackend.FrontEndParams{
 			Title:   "Register",
 			Message: "Register for a new FtR account",
 			Error:   make(map[string]string),
 		}
 
-		paramData.Error["general"] = "Username, email, and password are required."
+		paramData.Error["general"] = "Username, email, password, and confirmation are required."
 
+		viewBackend.RegisterMain(w, paramData)
+		return
+	}
+
+	if userPassword != passwordConfirm {
+		paramData := viewBackend.FrontEndParams{
+			Title:   "Register",
+			Message: "Register for a new FtR account",
+			Error:   make(map[string]string),
+		}
+
+		paramData.Error["general"] = "Password and confirmation do not match."
 		viewBackend.RegisterMain(w, paramData)
 		return
 	}
@@ -67,32 +92,26 @@ func RegisterMainPost(w http.ResponseWriter, r *http.Request) {
 
 	checkUser, err := model.GetUserByEmail(userEmail, db)
 	if checkUser != nil && err == nil {
-		err = errors.New("ists")
-		fmt.Println("Error:", err)
 		paramData := viewBackend.FrontEndParams{
 			Title:   "Register",
 			Message: "Register for a new FtR account",
 			Error:   make(map[string]string),
 		}
 
-		paramData.Error["general"] = fmt.Sprintf("Error registering: %s", err)
-
+		paramData.Error["general"] = "A user already exists with that email address."
 		viewBackend.RegisterMain(w, paramData)
 		return
 	}
 
 	checkUser, err = model.GetUserByName(userNameCooked, db)
 	if checkUser != nil && err == nil {
-		err = errors.New("ists")
-		fmt.Println("Error:", err)
 		paramData := viewBackend.FrontEndParams{
 			Title:   "Register",
 			Message: "Register for a new FtR account",
 			Error:   make(map[string]string),
 		}
 
-		paramData.Error["general"] = fmt.Sprintf("Error registering: %s", err)
-
+		paramData.Error["general"] = "That username is already taken."
 		viewBackend.RegisterMain(w, paramData)
 		return
 	}
@@ -112,6 +131,7 @@ func RegisterMainPost(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	auth.ClearAttempts(r, "register")
 	paramData := viewBackend.FrontEndParams{
 		Title:    "Register",
 		Message:  "Successfully registered for a new account. Please proceed to login.",

@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"path/filepath"
 	"regexp"
 	"strings"
 	"time"
@@ -66,6 +67,12 @@ func RepairDatabase(db *bun.DB) error {
 	if err := ensureColumn(sqldb, "contacts", "updated_at", "TIMESTAMP DEFAULT CURRENT_TIMESTAMP"); err != nil {
 		return err
 	}
+	if _, err := sqldb.Exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email ON users(email)`); err != nil {
+		return err
+	}
+	if _, err := sqldb.Exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_users_name ON users(name)`); err != nil {
+		return err
+	}
 	if _, err := sqldb.Exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_contacts_pair ON contacts(requester, recipient)`); err != nil {
 		return err
 	}
@@ -73,6 +80,9 @@ func RepairDatabase(db *bun.DB) error {
 		return err
 	}
 	if _, err := sqldb.Exec(`CREATE INDEX IF NOT EXISTS idx_contacts_requester_status ON contacts(requester, status)`); err != nil {
+		return err
+	}
+	if err := RepairLegacyProfilePicturePaths(db); err != nil {
 		return err
 	}
 	return nil
@@ -119,10 +129,13 @@ func CreateUser(db *bun.DB, name string, email string, password string) error {
 
 	ctx := context.Background()
 	hashedPassword, _ := HashPassword(password)
-	user := &User{Name: name, Email: email, Password: hashedPassword, PFP: "/assets/default.png", Bio: ""}
+	user := &User{Name: name, Email: email, Password: hashedPassword, PFP: "/pfp/default.png", Bio: ""}
 	query, err := db.NewInsert().Model(user).Exec(ctx)
 	if err != nil {
 		fmt.Println("Error:", err)
+		if strings.Contains(strings.ToLower(err.Error()), "unique") {
+			return errors.New("a user already exists with that email or username")
+		}
 		return err
 	}
 	fmt.Println("Database insert complete:", query)
@@ -231,10 +244,27 @@ func UpdateUserProfile(db *bun.DB, name string, bio string, pfp string) error {
 	ctx := context.Background()
 	query := db.NewUpdate().Model((*User)(nil)).Set("bio = ?", bio).Where("name = ?", name)
 	if strings.TrimSpace(pfp) != "" {
-		query = query.Set("pfp = ?", pfp)
+		query = query.Set("pfp = ?", ResolveProfilePicture(pfp, name))
 	}
 	_, err := query.Exec(ctx)
 	return err
+}
+
+func RepairLegacyProfilePicturePaths(db *bun.DB) error {
+	ctx := context.Background()
+	var users []User
+	if err := db.NewSelect().Model(&users).Column("id", "name", "pfp").Scan(ctx); err != nil {
+		return err
+	}
+	for _, user := range users {
+		resolved := ResolveProfilePicture(user.PFP, user.Name)
+		if resolved != strings.TrimSpace(user.PFP) {
+			if _, err := db.NewUpdate().Model((*User)(nil)).Set("pfp = ?", resolved).Where("id = ?", user.ID).Exec(ctx); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }
 
 func SearchUsers(db *bun.DB, currentUser string, query string, limit int) ([]User, error) {
@@ -255,6 +285,51 @@ func SearchUsers(db *bun.DB, currentUser string, query string, limit int) ([]Use
 	}
 	err := selectQuery.Scan(ctx)
 	return users, err
+}
+
+func ResolveProfilePicture(raw string, username string) string {
+	normalized := strings.TrimSpace(raw)
+	if normalized == "" || normalized == "/assets/default.png" || normalized == "default.png" || normalized == "/default.png" {
+		return "/pfp/default.png"
+	}
+	if strings.HasPrefix(normalized, "/pfp/") {
+		return normalized
+	}
+
+	if rel, err := filepath.Rel("/ftr/userData", normalized); err == nil {
+		cleanRel := filepath.Clean(rel)
+		if cleanRel != ".." && !strings.HasPrefix(cleanRel, "../") {
+			return "/pfp/" + filepath.ToSlash(cleanRel)
+		}
+	}
+
+	legacyRoot := "/ftr/userpfp"
+	if rel, err := filepath.Rel(legacyRoot, normalized); err == nil {
+		cleanRel := filepath.Clean(rel)
+		if cleanRel != ".." && !strings.HasPrefix(cleanRel, "../") {
+			return "/pfp/" + filepath.ToSlash(cleanRel)
+		}
+	}
+
+	if filepath.IsAbs(normalized) {
+		cleaned := filepath.Clean(normalized)
+		if strings.Contains(cleaned, "/"+username+"/") {
+			idx := strings.Index(cleaned, "/"+username+"/")
+			if idx != -1 {
+				rest := cleaned[idx+len("/"+username+"/"):]
+				return "/pfp/" + username + "/" + filepath.ToSlash(rest)
+			}
+		}
+		if filepath.Base(filepath.Dir(cleaned)) == username {
+			return "/pfp/" + username + "/" + filepath.ToSlash(filepath.Base(cleaned))
+		}
+		return "/pfp/default.png"
+	}
+	if username != "" {
+		cleanFile := strings.TrimLeft(normalized, "/")
+		return "/pfp/" + username + "/" + filepath.ToSlash(cleanFile)
+	}
+	return "/pfp/default.png"
 }
 
 func RequestContact(db *bun.DB, requester string, recipient string) error {

@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
@@ -59,9 +60,11 @@ func init() {
 	RepoMetaDir = filepath.Join(RepoDir, "_meta")
 	TempDir = filepath.Join(RootDir, "tmp")
 	SessionDir = filepath.Join(RootDir, "sessions")
-	UserPFPDir = filepath.Clean(strings.TrimSpace(os.Getenv("FTR_PFP_DIR")))
-	if UserPFPDir == "" {
-		UserPFPDir = "/ftr/userpfp"
+	userPFPDir := strings.TrimSpace(os.Getenv("FTR_PFP_DIR"))
+	if userPFPDir == "" {
+		UserPFPDir = "/ftr/userData"
+	} else {
+		UserPFPDir = filepath.Clean(userPFPDir)
 	}
 }
 
@@ -69,6 +72,92 @@ func EnsureStorageLayout() error {
 	for _, dir := range []string{RepoDir, RepoMetaDir, TempDir, SessionDir, UserPFPDir} {
 		if err := os.MkdirAll(dir, 0755); err != nil {
 			return err
+		}
+	}
+	return nil
+}
+
+func MigrateLegacyPFPs() error {
+	db := config.GetDB()
+	if db == nil {
+		return errors.New("database not initialized")
+	}
+	ctx := context.Background()
+	var users []userModel.User
+	if err := db.NewSelect().Model(&users).Column("id", "name", "pfp").Scan(ctx); err != nil {
+		return err
+	}
+	for _, user := range users {
+		oldPFP := strings.TrimSpace(user.PFP)
+		resolved := userModel.ResolveProfilePicture(oldPFP, user.Name)
+		if err := migrateLegacyPFPFile(oldPFP, resolved); err != nil {
+			return err
+		}
+		if resolved != oldPFP {
+			if _, err := db.NewUpdate().Model((*userModel.User)(nil)).Set("pfp = ?", resolved).Where("id = ?", user.ID).Exec(ctx); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func migrateLegacyPFPFile(oldPFP string, resolvedPFP string) error {
+	if resolvedPFP == "/pfp/default.png" {
+		return nil
+	}
+	targetRel := strings.TrimPrefix(resolvedPFP, "/pfp/")
+	targetPath := filepath.Join(UserPFPDir, filepath.FromSlash(targetRel))
+	if _, err := os.Stat(targetPath); err == nil {
+		return nil
+	}
+
+	candidates := []string{}
+	if oldPFP == "" {
+		return nil
+	}
+	if filepath.IsAbs(oldPFP) {
+		candidates = append(candidates, oldPFP)
+	}
+	if strings.HasPrefix(oldPFP, "/pfp/") {
+		rel := strings.TrimPrefix(oldPFP, "/pfp/")
+		candidates = append(candidates,
+			filepath.Join(UserPFPDir, filepath.FromSlash(rel)),
+			filepath.Join(".", filepath.FromSlash(rel)),
+		)
+	}
+	if strings.HasPrefix(oldPFP, "/ftr/userpfp/") || strings.HasPrefix(oldPFP, "/ftr/userData/") {
+		candidates = append(candidates, oldPFP)
+	}
+	if !filepath.IsAbs(oldPFP) && !strings.HasPrefix(oldPFP, "/pfp/") {
+		candidates = append(candidates,
+			filepath.Join(UserPFPDir, filepath.FromSlash(oldPFP)),
+			filepath.Join(".", filepath.FromSlash(oldPFP)),
+		)
+	}
+
+	for _, src := range candidates {
+		if src == "" {
+			continue
+		}
+		if _, err := os.Stat(src); err == nil {
+			if err := os.MkdirAll(filepath.Dir(targetPath), 0755); err != nil {
+				return err
+			}
+			in, err := os.Open(src)
+			if err != nil {
+				return err
+			}
+			defer in.Close()
+			out, err := os.Create(targetPath)
+			if err != nil {
+				return err
+			}
+			defer out.Close()
+			if _, err := io.Copy(out, in); err != nil {
+				return err
+			}
+			return nil
 		}
 	}
 	return nil

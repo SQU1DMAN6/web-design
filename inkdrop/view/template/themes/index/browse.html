@@ -347,6 +347,9 @@
                     <a class="left-panel-tab" href="/browse/{{.Message2}}/{{.Message3}}/Trash">Trash</a>
                     <button type="button" class="left-panel-tab" id="openCommunityPanel">Community</button>
                 </nav>
+                <div class="left-panel-toggle">
+                    <button type="button" class="button-link small" id="panelModeBtn" aria-pressed="true">Expand panel</button>
+                </div>
                 <div class="left-panel-section">
                     <h2>Contacts</h2>
                     <div class="left-repo-list">
@@ -661,7 +664,7 @@
         <form method="post" action="/account/settings" enctype="multipart/form-data" class="stack">
             <h2 class="section">Account Settings</h2>
             <div class="account-settings-grid">
-                <img src="{{if .UserPFP}}{{.UserPFP}}{{else}}/assets/default.png{{end}}" alt="" class="settings-avatar" />
+                <img src="{{if .UserPFP}}{{.UserPFP}}{{else}}/pfp/default.png{{end}}" alt="" class="settings-avatar" />
                 <div class="stack">
                     <label class="field-label" for="bio">Bio</label>
                     <textarea id="bio" name="bio" class="details account-bio" maxlength="512">{{.UserBio}}</textarea>
@@ -833,7 +836,7 @@
                             var person = document.createElement("div");
                             person.className = "community-person";
                             var img = document.createElement("img");
-                            img.src = user.pfp || "/assets/default.png";
+                            img.src = user.pfp || "/pfp/default.png";
                             img.alt = "";
                             var text = document.createElement("div");
                             var name = document.createElement("strong");
@@ -880,6 +883,8 @@
             var currentRepo = "{{.Message3}}";
             var isTrashView = {{if .IsTrashView}}true{{else}}false{{end}};
 
+            var appShell = document.querySelector(".app-shell");
+            var leftPanel = document.querySelector(".left-panel");
             var panel = document.getElementById("filePanel");
             var contextMenu = document.getElementById("contextMenu");
             var entryList = document.getElementById("entryList");
@@ -920,6 +925,7 @@
             var cancelSettings = document.getElementById("cancelSettings")
             var cancelDeleteSettings = document.getElementById("cancelDeleteSettings")
             var liveEditBtn = document.getElementById("liveEditBtn")
+            var panelModeBtn = document.getElementById("panelModeBtn")
             var restoreTrashBtn = document.getElementById("restoreTrashBtn")
             var emptyTrashBtn = document.getElementById("emptyTrashBtn")
             var restoreTrashTopBtn = document.getElementById("restoreTrashTopBtn")
@@ -974,6 +980,30 @@
                     .map(encodeURIComponent)
                     .join("/");
                 return base + "/" + encodedPath;
+            }
+
+            function setPanelMode(compact) {
+                if (!appShell || !leftPanel || !panelModeBtn) return;
+                if (compact) {
+                    appShell.classList.add("compact");
+                    leftPanel.classList.add("compact");
+                    panelModeBtn.textContent = "Expand panel";
+                    panelModeBtn.setAttribute("aria-pressed", "true");
+                } else {
+                    appShell.classList.remove("compact");
+                    leftPanel.classList.remove("compact");
+                    panelModeBtn.textContent = "Compact panel";
+                    panelModeBtn.setAttribute("aria-pressed", "false");
+                }
+                localStorage.setItem("inkdrop-left-panel-compact", compact ? "1" : "0");
+            }
+
+            function initializePanelMode() {
+                var stored = localStorage.getItem("inkdrop-left-panel-compact");
+                if (stored === null) {
+                    stored = "1";
+                }
+                setPanelMode(stored === "1");
             }
 
             function buildEditURL(fileName, pathValue) {
@@ -1895,6 +1925,12 @@
                     if (settingsDialog) settingsDialog.showModal();
                 });
             }
+            if (panelModeBtn) {
+                panelModeBtn.addEventListener("click", function () {
+                    var compact = !(leftPanel && leftPanel.classList.contains("compact"));
+                    setPanelMode(compact);
+                });
+            }
             if (uploadFileBtnInline) uploadFileBtnInline.addEventListener("click", openUploadDialog);
             if (renameBtn) renameBtn.addEventListener("click", openRenameDialog);
             if (deleteBtn) deleteBtn.addEventListener("click", deleteSelectedFolder);
@@ -1987,6 +2023,7 @@
             });
 
             updateNewFilePreview();
+            initializePanelMode();
 
             // Owners widget: render tokens, allow add/remove, and populate hidden owners field on submit
             (function () {

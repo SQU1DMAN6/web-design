@@ -3,10 +3,12 @@ package login
 import (
 	"fmt"
 	"inkdrop/config"
+	"inkdrop/controller/auth"
 	userModel "inkdrop/model"
 	viewBackend "inkdrop/view/connector"
 	"net/http"
 	"strings"
+	"time"
 )
 
 func LoginMain(w http.ResponseWriter, r *http.Request) {
@@ -33,6 +35,19 @@ func LoginMain(w http.ResponseWriter, r *http.Request) {
 func LoginMainPost(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	if allowed, message := auth.AllowAttempt(r, "login", 5, time.Minute, 90*time.Second); !allowed {
+		paramData := viewBackend.FrontEndParams{
+			Title:   "Login",
+			Message: "Log into an existing FtR account",
+			Error:   make(map[string]string),
+		}
+		paramData.Error["general"] = message
+		if err := viewBackend.LoginMain(w, paramData); err != nil {
+			http.Error(w, "Failed to render page", http.StatusInternalServerError)
+		}
 		return
 	}
 
@@ -82,6 +97,7 @@ func LoginMainPost(w http.ResponseWriter, r *http.Request) {
 		}
 		return
 	}
+	auth.ClearAttempts(r, "login")
 
 	fmt.Printf("\nUser: %v | ID: %v | Email: %v\n", user.Name, user.ID, user.Email)
 	SS := config.GetSessionManager()

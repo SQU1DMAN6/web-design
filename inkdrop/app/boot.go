@@ -17,6 +17,9 @@ func BootApp() {
 	if err := repository.EnsureStorageLayout(); err != nil {
 		log.Fatalf("failed to initialize InkDrop storage under %s: %v", repository.RootDir, err)
 	}
+	if err := repository.MigrateLegacyPFPs(); err != nil {
+		log.Fatalf("failed to migrate legacy profile pictures: %v", err)
+	}
 	if err := config.InitSession(); err != nil {
 		log.Fatalf("failed to initialize session storage under %s: %v", repository.SessionDir, err)
 	}
