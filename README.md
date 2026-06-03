@@ -12,16 +12,14 @@ A comprehensive ecosystem for managing, distributing, and collaboratively editin
 ## Table of Contents
 
 1. [Introduction](#introduction)
-2. [Project Overview](#project-overview)
-3. [Architecture](#architecture)
-4. [Core Features](#core-features)
-5. [File Structure](#file-structure)
-6. [Installation & Setup](#installation--setup)
-7. [Usage Examples](#usage-examples)
-8. [API Reference](#api-reference)
-9. [Technology Stack](#technology-stack)
-10. [License](#license)
-11. [Contributing & Development](#contributing--development)
+2. [Getting Started](#getting-started)
+3. [Core Use Cases & Workflows](#core-use-cases--workflows)
+4. [Feature Deep Dive](#feature-deep-dive)
+5. [Installation & Setup](#installation--setup)
+6. [Usage Examples](#usage-examples)
+7. [Advanced Topics](#advanced-topics)
+8. [Technology Stack](#technology-stack)
+9. [License](#license)
 
 ---
 
@@ -327,7 +325,7 @@ Automatically detects and builds projects in this priority order:
 8. Python (`main.py`) via PyInstaller
 9. Go (`main.go`) via go build
 10. C++ (`main.cpp`) via g++
-11. SQU1D (`main.sqd`) via squ1d++
+11. SQU1D (`main.sqd`) via squ1dcc
 
 Supported languages:
 - Go
@@ -1072,7 +1070,7 @@ ftr get company/internal-tools
 **External Tools Integration:**
 - InkDrop Server (API calls via HTTP)
 - SQAR Tool (optional compression)
-- Build Tools: Go, Python/PyInstaller, Make, g++, squ1d++
+- Build Tools: Go, Python/PyInstaller, Make, g++, squ1dcc
 
 ### Inkdrop Technologies
 
