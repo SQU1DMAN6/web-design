@@ -1,0 +1,17 @@
+{
+  "name": "inker",
+  "version": "3.2.0",
+  "description": "FtR Inker - Native Windows Desktop Client (local-folder + sync)",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "check": "node --check main.js preload.js renderer/renderer.js lib/mount-manager.js lib/api-client.js lib/sync-manager.js lib/settings.js"
+  },
+  "dependencies": {
+    "chokidar": "^3.5.3",
+    "uuid": "^9.0.0"
+  },
+  "devDependencies": {
+    "electron": "^31.0.0"
+  }
+}

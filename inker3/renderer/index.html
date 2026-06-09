@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>FtR Inker</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="window">
+    <!-- TITLE BAR -->
+    <div class="titlebar">
+        <div class="title">FtR Inker 3.2</div>
+        <div class="window-controls">
+            <button id="min-btn">─</button>
+            <button id="max-btn">□</button>
+            <button id="close-btn">✕</button>
+        </div>
+    </div>
+
+    <div class="content">
+        <!-- AUTH SCREEN -->
+        <div id="auth-screen" class="screen active">
+            <div class="auth-container">
+                <div class="auth-header">
+                    <h1>FtR Inker</h1>
+                    <p>Connect to your InkDrop account</p>
+                </div>
+
+                <form id="login-form" class="auth-form">
+                    <div class="form-group">
+                        <label>Email</label>
+                        <input type="email" id="email" placeholder="you@example.com" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Password</label>
+                        <input type="password" id="password" placeholder="••••••••" required>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary">Sign In</button>
+                    <div id="auth-error" class="error-message" style="display: none;"></div>
+                </form>
+            </div>
+
+            <div id="event-log-auth" class="event-log"></div>
+        </div>
+
+        <!-- MAIN SCREEN -->
+        <div id="main-screen" class="screen">
+            <!-- SIDEBAR -->
+            <aside class="sidebar">
+                <div class="sidebar-header">
+                    <div class="user-info">
+                        <div class="username" id="sidebar-username"></div>
+                        <div class="email" id="sidebar-email"></div>
+                    </div>
+                </div>
+
+                <nav class="sidebar-nav">
+                    <button class="nav-btn active" data-screen="repos">
+                        📁 Repositories
+                    </button>
+                    <button class="nav-btn" data-screen="search">
+                        🔍 Search
+                    </button>
+                    <button class="nav-btn" data-screen="settings">
+                        ⚙️ Settings
+                    </button>
+                </nav>
+
+                <button id="logout-btn" class="logout-btn">Logout</button>
+            </aside>
+
+            <!-- MAIN CONTENT -->
+            <main class="main">
+                <!-- REPOS SCREEN -->
+                <div id="repos-screen" class="main-screen active">
+                    <div class="screen-header">
+                        <h2>Your Repositories</h2>
+                    </div>
+
+                    <div class="mounts-list" id="mounts-list"></div>
+
+                    <div id="no-repos-message" class="empty-state">
+                        <p>No repositories mounted yet.</p>
+                        <p>Go to <strong>Search</strong> to find and mount repositories.</p>
+                    </div>
+                </div>
+
+                <!-- SEARCH SCREEN -->
+                <div id="search-screen" class="main-screen">
+                    <div class="screen-header">
+                        <h2>Search Repositories</h2>
+                        <div class="search-box">
+                            <input type="text" id="search-input" placeholder="Search for repositories...">
+                            <button id="search-btn" class="btn btn-small">Search</button>
+                        </div>
+                    </div>
+
+                    <div class="search-results" id="search-results"></div>
+
+                    <div id="no-search-message" class="empty-state" style="display: none;">
+                        <p>Try searching for a repository.</p>
+                    </div>
+                </div>
+
+                <!-- SETTINGS SCREEN -->
+                <div id="settings-screen" class="main-screen">
+                    <div class="screen-header">
+                        <h2>Settings</h2>
+                    </div>
+
+                    <div class="settings-section">
+                        <h3>Auto-Mount on Startup</h3>
+                        <div id="auto-mount-list" class="auto-mount-list"></div>
+                    </div>
+                </div>
+
+                <!-- EVENT LOG -->
+                <section class="event-section">
+                    <div class="event-section-header">
+                        Runtime Event Log
+                        <button id="clear-log-btn" class="btn btn-small">Clear</button>
+                    </div>
+                    <div id="event-log" class="event-log"></div>
+                </section>
+            </main>
+        </div>
+    </div>
+</div>
+
+<!-- CONTEXT MENU -->
+<div id="repo-menu" class="context-menu hidden">
+    <button id="menu-mount">Mount</button>
+    <button id="menu-unmount">Unmount</button>
+    <button id="menu-auto-mount">Enable auto-mount</button>
+    <hr>
+    <button id="menu-open" class="btn-primary">Open Folder</button>
+</div>
+
+<!-- MOUNT DIALOG -->
+<div id="mount-dialog" class="modal hidden">
+    <div class="modal-content">
+        <h3>Mount Repository</h3>
+        <div class="form-group">
+            <label>Repository</label>
+            <input type="text" id="mount-repo-name" readonly>
+        </div>
+        <div class="form-group">
+            <label>Mount Point</label>
+            <input type="text" id="mount-point" placeholder="C:\\Users\\...">
+        </div>
+        <div class="modal-actions">
+            <button id="mount-btn" class="btn btn-primary">Mount</button>
+            <button id="cancel-mount-btn" class="btn">Cancel</button>
+        </div>
+        <div id="mount-error" class="error-message" style="display: none;"></div>
+    </div>
+</div>
+
+<script src="renderer.js"></script>
+</body>
+</html>
