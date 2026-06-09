@@ -10,8 +10,8 @@ import (
 
 var searchCmd = &cobra.Command{
 	Use:   "search [query]",
-	Short: "Search repositories on the server",
-	Long:  "Search for repositories by name or description",
+	Short: "Search Drops on the server",
+	Long:  "Search for Drops by name or description",
 	Args:  cobra.MinimumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		query := strings.Join(args, " ")
@@ -20,7 +20,7 @@ var searchCmd = &cobra.Command{
 			return fmt.Errorf("failed to create API client: %w", err)
 		}
 
-		matches, err := client.SearchRepos(query)
+		matches, err := client.SearchDrops(query)
 		if err != nil {
 			return fmt.Errorf("search failed: %w", err)
 		}
@@ -33,12 +33,12 @@ var searchCmd = &cobra.Command{
 		fmt.Println("Matches:")
 		for _, m := range matches {
 			user := m["user"]
-			repo := m["repo"]
+			drop := m["repo"]
 			desc := m["description"]
 			if desc == "" {
 				desc = "(no description)"
 			}
-			fmt.Printf("%s/%-20s %s\n", user, repo, desc)
+			fmt.Printf("%s/%-20s %s\n", user, drop, desc)
 		}
 		return nil
 	},

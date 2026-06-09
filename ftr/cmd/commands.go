@@ -32,5 +32,6 @@ func init() {
 		remoteCmd,
 		upgradeCmd,
 		automountCmd,
+		unmountCmd,
 	)
 }
