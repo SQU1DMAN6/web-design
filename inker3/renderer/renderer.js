@@ -2,7 +2,8 @@ const authScreen = document.getElementById("auth-screen");
 const mainScreen = document.getElementById("main-screen");
 const dropsScreen = document.getElementById("drops-screen");
 const searchScreen = document.getElementById("search-screen");
-const settingsScreen = document.getElementById("settings-screen");
+const autoMountScreen = document.getElementById("auto-mount-screen");
+const logScreen = document.getElementById("log-screen");
 
 const navBtns = document.querySelectorAll(".nav-btn");
 const logoutBtn = document.getElementById("logout-btn");
@@ -19,7 +20,7 @@ function appendLog(message, screen) {
     const ts = new Date().toISOString().replace("T", " ").slice(0, 19);
     entry.textContent = ts + " " + message;
     log.prepend(entry);
-    if (log.children.length > 200) {
+    if (log.children.length > 500) {
         log.removeChild(log.lastChild);
     }
     console.log("[Inker] " + message);
@@ -38,14 +39,14 @@ const passwordInput = document.getElementById("password");
 const authError = document.getElementById("auth-error");
 
 function showLoginScreen() {
-    appendLog("Showing login screen");
+    appendLog("[UI] showLoginScreen");
     if (authScreen) authScreen.classList.add("active");
     if (mainScreen) mainScreen.classList.remove("active");
     if (emailInput) emailInput.focus();
 }
 
 function showMainScreen(user) {
-    appendLog("Showing main screen for " + (user.username || user.email));
+    appendLog("[UI] showMainScreen user=" + (user.username || user.email));
     if (authScreen) authScreen.classList.remove("active");
     if (mainScreen) mainScreen.classList.add("active");
     if (document.getElementById("sidebar-username")) {
@@ -60,22 +61,21 @@ function showMainScreen(user) {
 if (loginForm) {
     loginForm.addEventListener("submit", async function (e) {
         e.preventDefault();
+        appendLog("[UI] login form submitted");
         const email = emailInput.value.trim();
         const password = passwordInput.value;
-
         if (authError) {
             authError.style.display = "none";
             authError.textContent = "";
         }
-
         try {
-            appendLog("Attempting login for " + email, "auth");
+            appendLog("[UI] calling window.inker.login");
             const result = await window.inker.login(email, password);
-            appendLog("Login successful: " + result.username, "auth");
+            appendLog("[UI] login success: " + result.username);
             loginForm.reset();
             showMainScreen(result);
         } catch (err) {
-            appendLog("Login failed: " + err.message, "auth");
+            appendLog("[UI] login error: " + err.message);
             if (authError) {
                 authError.textContent = err.message || "Login failed";
                 authError.style.display = "block";
@@ -93,32 +93,24 @@ if (navBtns.length > 0) {
             document.querySelectorAll(".main-screen").forEach(function (s) {
                 s.classList.remove("active");
             });
-            if (screen === "drops" && dropsScreen) {
-                dropsScreen.classList.add("active");
-                appendLog("Navigated to Drops screen");
-            }
-            if (screen === "search" && searchScreen) {
-                searchScreen.classList.add("active");
-                appendLog("Navigated to Search screen");
-            }
-            if (screen === "settings" && settingsScreen) {
-                settingsScreen.classList.add("active");
-                appendLog("Navigated to Settings screen");
-            }
+            if (screen === "drops" && dropsScreen) { dropsScreen.classList.add("active"); }
+            if (screen === "search" && searchScreen) { searchScreen.classList.add("active"); }
+            if (screen === "auto-mount" && autoMountScreen) { autoMountScreen.classList.add("active"); }
+            if (screen === "log" && logScreen) { logScreen.classList.add("active"); }
         });
     });
 }
 
 if (logoutBtn) {
     logoutBtn.addEventListener("click", async function () {
+        appendLog("[UI] logout clicked");
         try {
-            appendLog("Logging out...");
             await window.inker.logout();
-            appendLog("Logout successful");
+            appendLog("[UI] logout done");
             await new Promise(function (resolve) { setTimeout(resolve, 500); });
             showLoginScreen();
         } catch (err) {
-            appendLog("Logout failed: " + err.message);
+            appendLog("[UI] logout error: " + err.message);
         }
     });
 }
@@ -126,43 +118,137 @@ if (logoutBtn) {
 const dropsList = document.getElementById("drops-list");
 const noDropsMsg = document.getElementById("no-drops-message");
 
+function formatSize(bytes) {
+    if (!bytes || bytes === 0) return "0 B";
+    var units = ["B", "KB", "MB", "GB"];
+    var i = 0;
+    var size = bytes;
+    while (size >= 1024 && i < units.length - 1) {
+        size /= 1024;
+        i++;
+    }
+    return Math.round(size * 10) / 10 + " " + units[i];
+}
+
 async function refreshDropsList() {
+    appendLog("[UI] refreshDropsList ENTER");
     try {
-        appendLog("Refreshing Drops list...");
         const mounts = await window.inker.getActiveMounts();
         const saved = await window.inker.getSavedMounts();
+        appendLog("[UI] getActiveMounts returned " + mounts.length + " mounts, saved=" + saved.length);
 
         if (dropsList) dropsList.innerHTML = "";
 
         if (mounts.length === 0) {
             if (noDropsMsg) noDropsMsg.style.display = "block";
-            appendLog("No active Drops found");
         } else {
             if (noDropsMsg) noDropsMsg.style.display = "none";
 
-            mounts.forEach(function (mount) {
-                const parts = mount.dropPath.split("/");
-                const user = parts[0];
-                const drop = parts[1];
-                if (dropsList) {
-                    const card = document.createElement("div");
-                    card.className = "drop-card";
-                    card.innerHTML =
-                        '<div class="drop-info">' +
-                            '<h3>' + user + '/' + drop + '</h3>' +
-                            '<p class="mount-path">' + mount.mountPoint + '</p>' +
-                        '</div>' +
-                        '<span class="status status-mounted">Mounted</span>' +
-                        '<button class="menu-btn" data-user="' + user + '" data-drop="' + drop + '">&#x22EE;</button>';
-                    dropsList.appendChild(card);
+            for (var i = 0; i < mounts.length; i++) {
+                var mount = mounts[i];
+                var parts = mount.dropPath.split("/");
+                var user = parts[0];
+                var drop = parts[1];
+
+                // Fetch file index for this drop
+                var index = [];
+                try {
+                    index = await window.inker.getIndex(user, drop);
+                } catch (e) {
+                    appendLog("[UI] getIndex failed for " + user + "/" + drop + ": " + e.message);
                 }
-            });
-            appendLog("Displaying " + mounts.length + " mounted Drop(s)");
+
+                // Drop card
+                var card = document.createElement("div");
+                card.className = "drop-card";
+                card.innerHTML =
+                    '<div class="drop-info">' +
+                        '<h3>' + user + '/' + drop + '</h3>' +
+                        '<p class="mount-path">' + mount.mountPoint + '</p>' +
+                        '<p class="drop-meta">' + index.length + ' item(s)</p>' +
+                    '</div>' +
+                    '<div class="drop-actions">' +
+                        '<button class="btn btn-small open-folder-btn" data-user="' + user + '" data-drop="' + drop + '">Open Folder</button>' +
+                        '<button class="menu-btn" data-user="' + user + '" data-drop="' + drop + '">&#x22EE;</button>' +
+                    '</div>';
+                dropsList.appendChild(card);
+
+                // File list for this drop
+                if (index.length > 0) {
+                    var fileList = document.createElement("div");
+                    fileList.className = "file-list";
+                    fileList.setAttribute("data-user", user);
+                    fileList.setAttribute("data-drop", drop);
+
+                    for (var j = 0; j < index.length; j++) {
+                        var entry = index[j];
+                        var isDir = entry.kind === "directory";
+                        var item = document.createElement("div");
+                        item.className = "file-item" + (isDir ? " file-dir" : " file-file");
+
+                        var icon = isDir ? "&#128193;" : "&#128196;";
+                        var sizeStr = isDir ? "" : formatSize(entry.size);
+                        var syncedClass = entry.synced ? " synced" : "";
+
+                        item.innerHTML =
+                            '<span class="file-icon">' + icon + '</span>' +
+                            '<span class="file-name">' + entry.name + '</span>' +
+                            '<span class="file-size">' + sizeStr + '</span>' +
+                            '<span class="file-status' + syncedClass + '">' + (entry.synced ? "Open" : "Cloud") + '</span>';
+
+                        if (!isDir) {
+                            item.setAttribute("data-user", user);
+                            item.setAttribute("data-drop", drop);
+                            item.setAttribute("data-path", entry.path);
+                            item.classList.add("file-downloadable");
+                        }
+
+                        fileList.appendChild(item);
+                    }
+                    dropsList.appendChild(fileList);
+                }
+            }
         }
 
-        refreshSettingsList(saved);
+        refreshAutoMountList(saved);
     } catch (err) {
-        appendLog("Failed to refresh Drops: " + err.message);
+        appendLog("[UI] refreshDropsList error: " + err.message);
+    }
+    appendLog("[UI] refreshDropsList EXIT");
+}
+
+// Handle file clicks - download and open
+document.addEventListener("click", function (e) {
+    var fileItem = e.target.closest(".file-downloadable");
+    if (fileItem) {
+        var user = fileItem.dataset.user;
+        var drop = fileItem.dataset.drop;
+        var filePath = fileItem.dataset.path;
+        appendLog("[UI] file click: " + filePath);
+        downloadAndOpen(user, drop, filePath, fileItem);
+    }
+});
+
+async function downloadAndOpen(user, drop, relPath, element) {
+    appendLog("[UI] downloading " + relPath + "...");
+    if (element) {
+        element.querySelector(".file-status").textContent = "Loading...";
+        element.querySelector(".file-status").className = "file-status";
+    }
+    try {
+        var result = await window.inker.downloadFile(user, drop, relPath);
+        appendLog("[UI] downloaded " + relPath + " -> " + result.path);
+        await window.inker.openPath(result.path);
+        if (element) {
+            element.querySelector(".file-status").textContent = "Open";
+            element.querySelector(".file-status").className = "file-status synced";
+        }
+    } catch (err) {
+        appendLog("[UI] download error: " + err.message);
+        if (element) {
+            element.querySelector(".file-status").textContent = "Error";
+            element.querySelector(".file-status").className = "file-status error";
+        }
     }
 }
 
@@ -176,123 +262,78 @@ document.addEventListener("click", function (e) {
             user: e.target.dataset.user,
             drop: e.target.dataset.drop
         };
-
         const rect = e.target.getBoundingClientRect();
         if (contextMenu) {
             contextMenu.classList.remove("hidden");
-            contextMenu.style.left = Math.max(10, rect.left) + "px";
+            contextMenu.style.left = Math.max(10, rect.left - 150) + "px";
             contextMenu.style.top = Math.max(10, rect.bottom + 6) + "px";
         }
-        appendLog("Opened context menu for " + activeContextMenu.user + "/" + activeContextMenu.drop);
     } else if (!contextMenu || !contextMenu.contains(e.target)) {
         if (contextMenu) contextMenu.classList.add("hidden");
     }
 });
 
-const menuMount = document.getElementById("menu-mount");
-if (menuMount) {
-    menuMount.addEventListener("click", function () {
+const menuAddAuto = document.getElementById("menu-add-automount");
+if (menuAddAuto) {
+    menuAddAuto.addEventListener("click", async function () {
         if (!activeContextMenu) return;
-        const dialog = document.getElementById("mount-dialog");
-        if (dialog) {
-            document.getElementById("mount-drop-name").value =
-                activeContextMenu.user + "/" + activeContextMenu.drop;
-            document.getElementById("mount-point").value =
-                "C:\\Users\\" + (process.env.USERNAME || "user") + "\\FtR\\" +
-                activeContextMenu.user + "\\" + activeContextMenu.drop;
-            dialog.classList.remove("hidden");
+        appendLog("[UI] menu-add-automount for " + activeContextMenu.user + "/" + activeContextMenu.drop);
+        try {
+            await window.inker.setAutoMount(activeContextMenu.user, activeContextMenu.drop, true);
+            appendLog("[UI] auto-add enabled");
             if (contextMenu) contextMenu.classList.add("hidden");
-            appendLog("Mount dialog opened for " + activeContextMenu.user + "/" + activeContextMenu.drop);
-        }
-    });
-}
-
-const cancelMount = document.getElementById("cancel-mount-btn");
-if (cancelMount) {
-    cancelMount.addEventListener("click", function () {
-        const dialog = document.getElementById("mount-dialog");
-        if (dialog) dialog.classList.add("hidden");
-        appendLog("Mount dialog cancelled");
-    });
-}
-
-const doMount = document.getElementById("mount-btn");
-if (doMount) {
-    doMount.addEventListener("click", async function () {
-        if (!activeContextMenu) return;
-        const mountPoint = document.getElementById("mount-point").value;
-        const mountError = document.getElementById("mount-error");
-        if (mountError) mountError.style.display = "none";
-
-        try {
-            appendLog("Mounting " + activeContextMenu.user + "/" + activeContextMenu.drop + " at " + mountPoint);
-            await window.inker.mountDrop(activeContextMenu.user, activeContextMenu.drop, mountPoint);
-            appendLog("Mount successful: " + activeContextMenu.user + "/" + activeContextMenu.drop);
-            const dialog = document.getElementById("mount-dialog");
-            if (dialog) dialog.classList.add("hidden");
-            await new Promise(function (r) { setTimeout(r, 500); });
-            refreshDropsList();
+            const saved = await window.inker.getSavedMounts();
+            refreshAutoMountList(saved);
         } catch (err) {
-            appendLog("Mount failed: " + err.message);
-            if (mountError) {
-                mountError.textContent = err.message;
-                mountError.style.display = "block";
-            }
+            appendLog("[UI] auto-add error: " + err.message);
         }
     });
 }
 
-const doUnmount = document.getElementById("menu-unmount");
-if (doUnmount) {
-    doUnmount.addEventListener("click", async function () {
+const menuRemove = document.getElementById("menu-remove");
+if (menuRemove) {
+    menuRemove.addEventListener("click", async function () {
         if (!activeContextMenu) return;
+        appendLog("[UI] menu-remove for " + activeContextMenu.user + "/" + activeContextMenu.drop);
         try {
-            appendLog("Unmounting " + activeContextMenu.user + "/" + activeContextMenu.drop);
             await window.inker.unmountDrop(activeContextMenu.user, activeContextMenu.drop);
-            appendLog("Unmount successful: " + activeContextMenu.user + "/" + activeContextMenu.drop);
+            appendLog("[UI] remove done");
             if (contextMenu) contextMenu.classList.add("hidden");
             refreshDropsList();
         } catch (err) {
-            appendLog("Unmount failed: " + err.message);
+            appendLog("[UI] remove error: " + err.message);
         }
     });
 }
 
-const doOpen = document.getElementById("menu-open");
-if (doOpen) {
-    doOpen.addEventListener("click", async function () {
+const menuOpen = document.getElementById("menu-open");
+if (menuOpen) {
+    menuOpen.addEventListener("click", async function () {
         if (!activeContextMenu) return;
+        appendLog("[UI] menu-open for " + activeContextMenu.user + "/" + activeContextMenu.drop);
         try {
             const mounts = await window.inker.getActiveMounts();
             const mount = mounts.find(function (m) {
                 return m.dropPath === activeContextMenu.user + "/" + activeContextMenu.drop;
             });
             if (mount) {
+                appendLog("[UI] opening folder: " + mount.mountPoint);
                 await window.inker.openPath(mount.mountPoint);
-                appendLog("Opening folder: " + mount.mountPoint);
             }
             if (contextMenu) contextMenu.classList.add("hidden");
         } catch (err) {
-            appendLog("Failed to open folder: " + err.message);
+            appendLog("[UI] open error: " + err.message);
         }
     });
 }
 
-const autoMountBtn = document.getElementById("menu-auto-mount");
-if (autoMountBtn) {
-    autoMountBtn.addEventListener("click", async function () {
-        if (!activeContextMenu) return;
-        try {
-            await window.inker.setAutoMount(activeContextMenu.user, activeContextMenu.drop, true);
-            appendLog("Auto-mount enabled for " + activeContextMenu.user + "/" + activeContextMenu.drop);
-            if (contextMenu) contextMenu.classList.add("hidden");
-            const saved = await window.inker.getSavedMounts();
-            refreshSettingsList(saved);
-        } catch (err) {
-            appendLog("Failed to set auto-mount: " + err.message);
-        }
-    });
-}
+document.addEventListener("click", function (e) {
+    const openBtn = e.target.closest(".open-folder-btn");
+    if (openBtn) {
+        activeContextMenu = { user: openBtn.dataset.user, drop: openBtn.dataset.drop };
+        if (menuOpen) menuOpen.click();
+    }
+});
 
 const searchInput = document.getElementById("search-input");
 const searchBtn = document.getElementById("search-btn");
@@ -303,58 +344,85 @@ if (searchBtn && searchInput) {
     searchBtn.addEventListener("click", async function () {
         const query = searchInput.value.trim();
         if (!query) return;
-
+        appendLog("[UI] search for: " + query);
         try {
-            appendLog("Searching Drops for: " + query);
             const results = await window.inker.searchDrops(query);
-            appendLog("Search returned " + results.length + " result(s)");
-
+            appendLog("[UI] search returned " + results.length + " result(s)");
             if (searchResults) searchResults.innerHTML = "";
             if (noSearchMsg) noSearchMsg.style.display = results.length === 0 ? "block" : "none";
-
             results.forEach(function (drop) {
                 if (searchResults) {
                     const card = document.createElement("div");
                     card.className = "search-result-card";
                     card.innerHTML =
-                        '<h4>' + (drop.user || "user") + '/' + (drop.name || "drop") + '</h4>' +
+                        '<h4>' + (drop.user || "?") + '/' + (drop.name || "?") + '</h4>' +
                         '<p>' + (drop.description || "No description") + '</p>' +
-                        '<button class="btn btn-small" data-user="' + drop.user + '" data-drop="' + drop.name + '">Mount</button>';
+                        '<button class="btn btn-small btn-primary add-from-search" data-user="' + drop.user + '" data-drop="' + drop.name + '">Add</button>';
                     searchResults.appendChild(card);
                 }
             });
         } catch (err) {
-            appendLog("Search failed: " + err.message);
+            appendLog("[UI] search error: " + err.message);
         }
     });
-
     searchInput.addEventListener("keypress", function (e) {
         if (e.key === "Enter") searchBtn.click();
     });
 }
 
 document.addEventListener("click", function (e) {
-    if (e.target.closest && e.target.closest(".search-result-card")) {
-        const btn = e.target.closest("button");
-        if (btn && btn.dataset.user) {
-            activeContextMenu = { user: btn.dataset.user, drop: btn.dataset.drop };
-            if (menuMount) menuMount.click();
-        }
+    const addBtn = e.target.closest(".add-from-search");
+    if (addBtn) {
+        const user = addBtn.dataset.user;
+        const drop = addBtn.dataset.drop;
+        appendLog("[UI] add-from-search clicked: " + user + "/" + drop);
+        addDrop(user, drop);
     }
 });
 
-function refreshSettingsList(mounts) {
+const addByPathInput = document.getElementById("add-by-path-input");
+const addByPathBtn = document.getElementById("add-by-path-btn");
+
+async function addDrop(user, drop) {
+    appendLog("[UI] addDrop ENTER: " + user + "/" + drop);
+    try {
+        appendLog("[UI] addDrop calling window.inker.mountDrop");
+        const result = await window.inker.mountDrop(user, drop, null);
+        appendLog("[UI] addDrop success, result: " + JSON.stringify(result));
+        await refreshDropsList();
+    } catch (err) {
+        appendLog("[UI] addDrop error: " + err.message);
+    }
+    appendLog("[UI] addDrop EXIT");
+}
+
+if (addByPathBtn && addByPathInput) {
+    addByPathBtn.addEventListener("click", async function () {
+        var path = addByPathInput.value.trim();
+        if (!path) return;
+        var parts = path.split("/");
+        if (parts.length !== 2 || !parts[0] || !parts[1]) {
+            appendLog("[UI] invalid drop path: " + path);
+            return;
+        }
+        appendLog("[UI] add-by-path: " + parts[0] + "/" + parts[1]);
+        addDrop(parts[0], parts[1]);
+    });
+    addByPathInput.addEventListener("keypress", function (e) {
+        if (e.key === "Enter") addByPathBtn.click();
+    });
+}
+
+function refreshAutoMountList(mounts) {
+    appendLog("[UI] refreshAutoMountList ENTER");
     const autoMountList = document.getElementById("auto-mount-list");
     if (!autoMountList) return;
-
     autoMountList.innerHTML = "";
-
     const autoMounts = mounts.filter(function (m) { return m.auto_mount; });
     if (autoMounts.length === 0) {
-        autoMountList.innerHTML = '<p class="empty-state">No auto-mount Drops configured.</p>';
+        autoMountList.innerHTML = '<p class="empty-state">No Drops set for auto add.</p>';
         return;
     }
-
     autoMounts.forEach(function (mount) {
         const item = document.createElement("div");
         item.className = "auto-mount-item";
@@ -363,7 +431,6 @@ function refreshSettingsList(mounts) {
             '<button class="btn btn-small" data-drop-path="' + mount.drop_path + '">Disable</button>';
         autoMountList.appendChild(item);
     });
-
     document.querySelectorAll(".auto-mount-item button").forEach(function (btn) {
         btn.addEventListener("click", async function () {
             const dropPath = btn.dataset.dropPath;
@@ -371,47 +438,14 @@ function refreshSettingsList(mounts) {
             try {
                 await window.inker.setAutoMount(parts[0], parts[1], false);
                 const saved = await window.inker.getSavedMounts();
-                refreshSettingsList(saved);
-                appendLog("Auto-mount disabled for " + dropPath);
+                refreshAutoMountList(saved);
+                appendLog("[UI] auto-add disabled for " + dropPath);
             } catch (err) {
-                appendLog("Failed to disable auto-mount: " + err.message);
+                appendLog("[UI] auto-add disable error: " + err.message);
             }
         });
     });
-}
-
-const mountByPathInput = document.getElementById("mount-by-path-input");
-const mountByPathBtn = document.getElementById("mount-by-path-btn");
-
-if (mountByPathBtn && mountByPathInput) {
-    mountByPathBtn.addEventListener("click", async function () {
-        var path = mountByPathInput.value.trim();
-        if (!path) return;
-        var parts = path.split("/");
-        if (parts.length !== 2 || !parts[0] || !parts[1]) {
-            appendLog("Invalid Drop path: " + path + " (must be user/repo)");
-            return;
-        }
-        var user = parts[0];
-        var drop = parts[1];
-        try {
-            appendLog("Verifying Drop " + user + "/" + drop + "...");
-            var exists = await window.inker.verifyDrop(user, drop);
-            if (exists) {
-                appendLog("Drop " + user + "/" + drop + " exists, opening mount dialog");
-                activeContextMenu = { user: user, drop: drop };
-                if (menuMount) menuMount.click();
-            } else {
-                appendLog("Drop " + user + "/" + drop + " does not exist or is not accessible");
-            }
-        } catch (err) {
-            appendLog("Failed to verify Drop: " + err.message);
-        }
-    });
-
-    mountByPathInput.addEventListener("keypress", function (e) {
-        if (e.key === "Enter") mountByPathBtn.click();
-    });
+    appendLog("[UI] refreshAutoMountList EXIT");
 }
 
 const minBtn = document.getElementById("min-btn");
@@ -427,13 +461,12 @@ if (window.inker) {
     window.inker.onLog(function (message) {
         appendLog(message);
     });
-
     window.inker.onReady(async function () {
-        appendLog("Application ready");
+        appendLog("[UI] onReady");
         const user = await window.inker.getCurrentUser();
         if (user) {
             showMainScreen(user);
-            appendLog("Session restored for " + user.username);
+            appendLog("[UI] session restored for " + user.username);
         } else {
             showLoginScreen();
         }
@@ -444,7 +477,7 @@ if (window.inker) {
     window.inker.getCurrentUser().then(function (user) {
         if (user) {
             showMainScreen(user);
-            appendLog("Session loaded for " + user.username);
+            appendLog("[UI] session loaded for " + user.username);
         } else {
             showLoginScreen();
         }

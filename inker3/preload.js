@@ -18,6 +18,11 @@ contextBridge.exposeInMainWorld("inker", {
     getSavedMounts: function () { return ipcRenderer.invoke("inker:get-saved-mounts"); },
     setAutoMount: function (user, drop, enabled) { return ipcRenderer.invoke("inker:set-auto-mount", user, drop, enabled); },
 
+    getIndex: function (user, drop) { return ipcRenderer.invoke("inker:get-index", user, drop); },
+    downloadFile: function (user, drop, relPath) { return ipcRenderer.invoke("inker:download-file", user, drop, relPath); },
+    uploadFile: function (user, drop, relPath) { return ipcRenderer.invoke("inker:upload-file", user, drop, relPath); },
+    evictFiles: function (user, drop) { return ipcRenderer.invoke("inker:evict-files", user, drop); },
+
     openPath: function (localPath) { return ipcRenderer.invoke("inker:open-path", localPath); },
 
     setAutoStart: function (enabled) { return ipcRenderer.invoke("inker:set-autostart", enabled); },
