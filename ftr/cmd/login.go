@@ -15,7 +15,7 @@ import (
 var loginCmd = &cobra.Command{
 	Use:   "login",
 	Short: "Log in to your account",
-	Long: `Log in to your account to access remote repositories.
+	Long: `Log in to your account to access remote Drops.
 Required for uploading packages with 'up' command.`,
 	Args: cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {

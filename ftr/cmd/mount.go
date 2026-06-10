@@ -83,17 +83,17 @@ type remoteChange struct {
 
 var mountCmd = &cobra.Command{
 	Use:   "mount <user>/<repo> [mountpoint]",
-	Short: "Mount a remote FtR repository as a network directory",
-	Long: `Mount a remote FtR repository into a local mount point using FUSE.
+	Short: "Mount a remote FtR Drop as a network directory",
+	Long: `Mount a remote FtR Drop into a local mount point using FUSE.
 Files are presented as placeholders and contents are downloaded only when opened.
-Writes are uploaded back to the remote repository when file handles are closed.
+Writes are uploaded back to the remote Drop when file handles are closed.
 `,
 	Args: cobra.RangeArgs(1, 2),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		repoPath := args[0]
 		parts := strings.Split(repoPath, "/")
 		if len(parts) != 2 {
-			return fmt.Errorf("repository path must be in format user/repo")
+			return fmt.Errorf("Drop path must be in format user/repo")
 		}
 		user, repo := parts[0], parts[1]
 
@@ -135,7 +135,7 @@ Writes are uploaded back to the remote repository when file handles are closed.
 
 		fileList, err := client.FSListRepo(user, repo)
 		if err != nil {
-			return fmt.Errorf("failed to list remote repository: %w", err)
+			return fmt.Errorf("failed to list remote Drop: %w", err)
 		}
 
 		rfs, err := NewRemoteFS(client, user, repo, fileList)
@@ -1053,7 +1053,7 @@ var mountReadOnly bool
 var mountRefreshInterval time.Duration
 
 func init() {
-	mountCmd.Flags().BoolVar(&mountReadOnly, "readonly", false, "Mount repository read-only")
-	mountCmd.Flags().DurationVar(&mountRefreshInterval, "refresh-interval", 500*time.Millisecond, "How often the mounted repository checks for remote changes")
+	mountCmd.Flags().BoolVar(&mountReadOnly, "readonly", false, "Mount Drop read-only")
+	mountCmd.Flags().DurationVar(&mountRefreshInterval, "refresh-interval", 500*time.Millisecond, "How often the mounted Drop checks for remote changes")
 	rootCmd.AddCommand(mountCmd)
 }

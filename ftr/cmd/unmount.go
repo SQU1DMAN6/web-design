@@ -10,7 +10,7 @@ import (
 
 var unmountCmd = &cobra.Command{
 	Use:   "unmount <mountpoint>",
-	Short: "Unmount a mounted FtR repository",
+	Short: "Unmount a mounted FtR Drop",
 	Long:  "Unmount a local mount point created by the FtR mount command.",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {

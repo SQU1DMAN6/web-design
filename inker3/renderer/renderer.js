@@ -1,62 +1,64 @@
-// Production-grade Inker renderer with full functionality
-
-// Screen Navigation
 const authScreen = document.getElementById("auth-screen");
 const mainScreen = document.getElementById("main-screen");
-const reposScreen = document.getElementById("repos-screen");
+const dropsScreen = document.getElementById("drops-screen");
 const searchScreen = document.getElementById("search-screen");
 const settingsScreen = document.getElementById("settings-screen");
 
 const navBtns = document.querySelectorAll(".nav-btn");
 const logoutBtn = document.getElementById("logout-btn");
 
-// Event Logging
 const eventLog = document.getElementById("event-log");
 const eventLogAuth = document.getElementById("event-log-auth");
 const clearLogBtn = document.getElementById("clear-log-btn");
 
-function appendLog(message, screen = "main") {
+function appendLog(message, screen) {
     const log = screen === "auth" ? eventLogAuth : eventLog;
     if (!log) return;
     const entry = document.createElement("div");
     entry.className = "log-entry";
-    entry.textContent = `${new Date().toLocaleTimeString()} — ${message}`;
+    const ts = new Date().toISOString().replace("T", " ").slice(0, 19);
+    entry.textContent = ts + " " + message;
     log.prepend(entry);
-    if (log.children.length > 100) {
+    if (log.children.length > 200) {
         log.removeChild(log.lastChild);
     }
-    console.log(`[Inker] ${message}`);
+    console.log("[Inker] " + message);
 }
 
 if (clearLogBtn) {
-    clearLogBtn.addEventListener("click", () => {
+    clearLogBtn.addEventListener("click", function () {
         eventLog.innerHTML = "";
         appendLog("Log cleared");
     });
 }
 
-// Auth Screen Functions
 const loginForm = document.getElementById("login-form");
 const emailInput = document.getElementById("email");
 const passwordInput = document.getElementById("password");
 const authError = document.getElementById("auth-error");
 
-async function showLoginScreen() {
+function showLoginScreen() {
+    appendLog("Showing login screen");
     if (authScreen) authScreen.classList.add("active");
     if (mainScreen) mainScreen.classList.remove("active");
     if (emailInput) emailInput.focus();
 }
 
-async function showMainScreen(user) {
+function showMainScreen(user) {
+    appendLog("Showing main screen for " + (user.username || user.email));
     if (authScreen) authScreen.classList.remove("active");
     if (mainScreen) mainScreen.classList.add("active");
-    if (document.getElementById("sidebar-username")) document.getElementById("sidebar-username").textContent = user.username || user.email;
-    if (document.getElementById("sidebar-email")) document.getElementById("sidebar-email").textContent = user.email;
-    refreshReposList();
+    if (document.getElementById("sidebar-username")) {
+        document.getElementById("sidebar-username").textContent = user.username || user.email;
+    }
+    if (document.getElementById("sidebar-email")) {
+        document.getElementById("sidebar-email").textContent = user.email;
+    }
+    refreshDropsList();
 }
 
 if (loginForm) {
-    loginForm.addEventListener("submit", async (e) => {
+    loginForm.addEventListener("submit", async function (e) {
         e.preventDefault();
         const email = emailInput.value.trim();
         const password = passwordInput.value;
@@ -67,13 +69,13 @@ if (loginForm) {
         }
 
         try {
-            appendLog(`Attempting login for ${email}`, "auth");
+            appendLog("Attempting login for " + email, "auth");
             const result = await window.inker.login(email, password);
-            appendLog(`✓ Logged in as ${result.username}`, "auth");
+            appendLog("Login successful: " + result.username, "auth");
             loginForm.reset();
             showMainScreen(result);
         } catch (err) {
-            appendLog(`✗ Login failed: ${err.message}`, "auth");
+            appendLog("Login failed: " + err.message, "auth");
             if (authError) {
                 authError.textContent = err.message || "Login failed";
                 authError.style.display = "block";
@@ -82,95 +84,106 @@ if (loginForm) {
     });
 }
 
-// Screen Navigation
 if (navBtns.length > 0) {
-    navBtns.forEach(btn => {
-        btn.addEventListener("click", () => {
-            navBtns.forEach(b => b.classList.remove("active"));
+    navBtns.forEach(function (btn) {
+        btn.addEventListener("click", function () {
+            navBtns.forEach(function (b) { b.classList.remove("active"); });
             btn.classList.add("active");
-
             const screen = btn.dataset.screen;
-            document.querySelectorAll(".main-screen").forEach(s => s.classList.remove("active"));
-
-            if (screen === "repos" && reposScreen) reposScreen.classList.add("active");
-            if (screen === "search" && searchScreen) searchScreen.classList.add("active");
-            if (screen === "settings" && settingsScreen) settingsScreen.classList.add("active");
+            document.querySelectorAll(".main-screen").forEach(function (s) {
+                s.classList.remove("active");
+            });
+            if (screen === "drops" && dropsScreen) {
+                dropsScreen.classList.add("active");
+                appendLog("Navigated to Drops screen");
+            }
+            if (screen === "search" && searchScreen) {
+                searchScreen.classList.add("active");
+                appendLog("Navigated to Search screen");
+            }
+            if (screen === "settings" && settingsScreen) {
+                settingsScreen.classList.add("active");
+                appendLog("Navigated to Settings screen");
+            }
         });
     });
 }
 
-// Logout
 if (logoutBtn) {
-    logoutBtn.addEventListener("click", async () => {
+    logoutBtn.addEventListener("click", async function () {
         try {
+            appendLog("Logging out...");
             await window.inker.logout();
-            appendLog("✓ Logged out");
-            await new Promise(resolve => setTimeout(resolve, 500));
+            appendLog("Logout successful");
+            await new Promise(function (resolve) { setTimeout(resolve, 500); });
             showLoginScreen();
         } catch (err) {
-            appendLog(`✗ Logout failed: ${err.message}`);
+            appendLog("Logout failed: " + err.message);
         }
     });
 }
 
-// Repos Management
-const mountsList = document.getElementById("mounts-list");
-const noReposMsg = document.getElementById("no-repos-message");
+const dropsList = document.getElementById("drops-list");
+const noDropsMsg = document.getElementById("no-drops-message");
 
-async function refreshReposList() {
+async function refreshDropsList() {
     try {
+        appendLog("Refreshing Drops list...");
         const mounts = await window.inker.getActiveMounts();
         const saved = await window.inker.getSavedMounts();
 
-        if (mountsList) mountsList.innerHTML = "";
+        if (dropsList) dropsList.innerHTML = "";
 
         if (mounts.length === 0) {
-            if (noReposMsg) noReposMsg.style.display = "block";
+            if (noDropsMsg) noDropsMsg.style.display = "block";
+            appendLog("No active Drops found");
         } else {
-            if (noReposMsg) noReposMsg.style.display = "none";
+            if (noDropsMsg) noDropsMsg.style.display = "none";
 
-            mounts.forEach(mount => {
-                const [user, repo] = mount.repoPath.split("/");
-                if (mountsList) {
+            mounts.forEach(function (mount) {
+                const parts = mount.dropPath.split("/");
+                const user = parts[0];
+                const drop = parts[1];
+                if (dropsList) {
                     const card = document.createElement("div");
-                    card.className = "repo-card";
-                    card.innerHTML = `
-                        <div class="repo-info">
-                            <h3>${user}/${repo}</h3>
-                            <p class="mount-path">${mount.mountPoint}</p>
-                        </div>
-                        <span class="status online">Mounted</span>
-                        <button class="menu-btn" data-user="${user}" data-repo="${repo}">⋮</button>
-                    `;
-                    mountsList.appendChild(card);
+                    card.className = "drop-card";
+                    card.innerHTML =
+                        '<div class="drop-info">' +
+                            '<h3>' + user + '/' + drop + '</h3>' +
+                            '<p class="mount-path">' + mount.mountPoint + '</p>' +
+                        '</div>' +
+                        '<span class="status status-mounted">Mounted</span>' +
+                        '<button class="menu-btn" data-user="' + user + '" data-drop="' + drop + '">&#x22EE;</button>';
+                    dropsList.appendChild(card);
                 }
             });
+            appendLog("Displaying " + mounts.length + " mounted Drop(s)");
         }
 
         refreshSettingsList(saved);
     } catch (err) {
-        appendLog(`✗ Failed to refresh repos: ${err.message}`);
+        appendLog("Failed to refresh Drops: " + err.message);
     }
 }
 
-// Context Menu
-const contextMenu = document.getElementById("repo-menu");
+const contextMenu = document.getElementById("drop-menu");
 let activeContextMenu = null;
 
-document.addEventListener("click", (e) => {
+document.addEventListener("click", function (e) {
     if (e.target.classList.contains("menu-btn")) {
         e.stopPropagation();
         activeContextMenu = {
             user: e.target.dataset.user,
-            repo: e.target.dataset.repo
+            drop: e.target.dataset.drop
         };
 
         const rect = e.target.getBoundingClientRect();
         if (contextMenu) {
             contextMenu.classList.remove("hidden");
-            contextMenu.style.left = `${Math.max(10, rect.left)}px`;
-            contextMenu.style.top = `${Math.max(10, rect.bottom + 6)}px`;
+            contextMenu.style.left = Math.max(10, rect.left) + "px";
+            contextMenu.style.top = Math.max(10, rect.bottom + 6) + "px";
         }
+        appendLog("Opened context menu for " + activeContextMenu.user + "/" + activeContextMenu.drop);
     } else if (!contextMenu || !contextMenu.contains(e.target)) {
         if (contextMenu) contextMenu.classList.add("hidden");
     }
@@ -178,44 +191,49 @@ document.addEventListener("click", (e) => {
 
 const menuMount = document.getElementById("menu-mount");
 if (menuMount) {
-    menuMount.addEventListener("click", async () => {
+    menuMount.addEventListener("click", function () {
         if (!activeContextMenu) return;
         const dialog = document.getElementById("mount-dialog");
         if (dialog) {
-            document.getElementById("mount-repo-name").value = `${activeContextMenu.user}/${activeContextMenu.repo}`;
-            document.getElementById("mount-point").value = `C:\\Users\\${process.env.USERNAME || 'user'}\\FtR\\${activeContextMenu.user}\\${activeContextMenu.repo}`;
+            document.getElementById("mount-drop-name").value =
+                activeContextMenu.user + "/" + activeContextMenu.drop;
+            document.getElementById("mount-point").value =
+                "C:\\Users\\" + (process.env.USERNAME || "user") + "\\FtR\\" +
+                activeContextMenu.user + "\\" + activeContextMenu.drop;
             dialog.classList.remove("hidden");
             if (contextMenu) contextMenu.classList.add("hidden");
+            appendLog("Mount dialog opened for " + activeContextMenu.user + "/" + activeContextMenu.drop);
         }
     });
 }
 
 const cancelMount = document.getElementById("cancel-mount-btn");
 if (cancelMount) {
-    cancelMount.addEventListener("click", () => {
+    cancelMount.addEventListener("click", function () {
         const dialog = document.getElementById("mount-dialog");
         if (dialog) dialog.classList.add("hidden");
+        appendLog("Mount dialog cancelled");
     });
 }
 
 const doMount = document.getElementById("mount-btn");
 if (doMount) {
-    doMount.addEventListener("click", async () => {
+    doMount.addEventListener("click", async function () {
         if (!activeContextMenu) return;
         const mountPoint = document.getElementById("mount-point").value;
         const mountError = document.getElementById("mount-error");
         if (mountError) mountError.style.display = "none";
 
         try {
-            appendLog(`Mounting ${activeContextMenu.user}/${activeContextMenu.repo} at ${mountPoint}`);
-            await window.inker.mountRepository(activeContextMenu.user, activeContextMenu.repo, mountPoint);
-            appendLog(`✓ Mounted ${activeContextMenu.user}/${activeContextMenu.repo}`);
+            appendLog("Mounting " + activeContextMenu.user + "/" + activeContextMenu.drop + " at " + mountPoint);
+            await window.inker.mountDrop(activeContextMenu.user, activeContextMenu.drop, mountPoint);
+            appendLog("Mount successful: " + activeContextMenu.user + "/" + activeContextMenu.drop);
             const dialog = document.getElementById("mount-dialog");
             if (dialog) dialog.classList.add("hidden");
-            await new Promise(r => setTimeout(r, 500));
-            refreshReposList();
+            await new Promise(function (r) { setTimeout(r, 500); });
+            refreshDropsList();
         } catch (err) {
-            appendLog(`✗ Mount failed: ${err.message}`);
+            appendLog("Mount failed: " + err.message);
             if (mountError) {
                 mountError.textContent = err.message;
                 mountError.style.display = "block";
@@ -226,178 +244,211 @@ if (doMount) {
 
 const doUnmount = document.getElementById("menu-unmount");
 if (doUnmount) {
-    doUnmount.addEventListener("click", async () => {
+    doUnmount.addEventListener("click", async function () {
         if (!activeContextMenu) return;
         try {
-            appendLog(`Unmounting ${activeContextMenu.user}/${activeContextMenu.repo}`);
-            await window.inker.unmountRepository(activeContextMenu.user, activeContextMenu.repo);
-            appendLog(`✓ Unmounted ${activeContextMenu.user}/${activeContextMenu.repo}`);
+            appendLog("Unmounting " + activeContextMenu.user + "/" + activeContextMenu.drop);
+            await window.inker.unmountDrop(activeContextMenu.user, activeContextMenu.drop);
+            appendLog("Unmount successful: " + activeContextMenu.user + "/" + activeContextMenu.drop);
             if (contextMenu) contextMenu.classList.add("hidden");
-            refreshReposList();
+            refreshDropsList();
         } catch (err) {
-            appendLog(`✗ Unmount failed: ${err.message}`);
+            appendLog("Unmount failed: " + err.message);
         }
     });
 }
 
 const doOpen = document.getElementById("menu-open");
 if (doOpen) {
-    doOpen.addEventListener("click", async () => {
+    doOpen.addEventListener("click", async function () {
         if (!activeContextMenu) return;
         try {
             const mounts = await window.inker.getActiveMounts();
-            const mount = mounts.find(m => m.repoPath === `${activeContextMenu.user}/${activeContextMenu.repo}`);
+            const mount = mounts.find(function (m) {
+                return m.dropPath === activeContextMenu.user + "/" + activeContextMenu.drop;
+            });
             if (mount) {
                 await window.inker.openPath(mount.mountPoint);
-                appendLog(`Opening ${mount.mountPoint}`);
+                appendLog("Opening folder: " + mount.mountPoint);
             }
             if (contextMenu) contextMenu.classList.add("hidden");
         } catch (err) {
-            appendLog(`✗ Failed to open folder: ${err.message}`);
+            appendLog("Failed to open folder: " + err.message);
         }
     });
 }
 
 const autoMountBtn = document.getElementById("menu-auto-mount");
 if (autoMountBtn) {
-    autoMountBtn.addEventListener("click", async () => {
+    autoMountBtn.addEventListener("click", async function () {
         if (!activeContextMenu) return;
         try {
-            await window.inker.setAutoMount(activeContextMenu.user, activeContextMenu.repo, true);
-            appendLog(`✓ Auto-mount enabled for ${activeContextMenu.user}/${activeContextMenu.repo}`);
+            await window.inker.setAutoMount(activeContextMenu.user, activeContextMenu.drop, true);
+            appendLog("Auto-mount enabled for " + activeContextMenu.user + "/" + activeContextMenu.drop);
             if (contextMenu) contextMenu.classList.add("hidden");
             const saved = await window.inker.getSavedMounts();
             refreshSettingsList(saved);
         } catch (err) {
-            appendLog(`✗ Failed to set auto-mount: ${err.message}`);
+            appendLog("Failed to set auto-mount: " + err.message);
         }
     });
 }
 
-// Search
 const searchInput = document.getElementById("search-input");
 const searchBtn = document.getElementById("search-btn");
 const searchResults = document.getElementById("search-results");
 const noSearchMsg = document.getElementById("no-search-message");
 
 if (searchBtn && searchInput) {
-    searchBtn.addEventListener("click", async () => {
+    searchBtn.addEventListener("click", async function () {
         const query = searchInput.value.trim();
         if (!query) return;
 
         try {
-            appendLog(`Searching for "${query}"`);
-            const results = await window.inker.searchRepositories(query);
-            appendLog(`Found ${results.length} repositories`);
+            appendLog("Searching Drops for: " + query);
+            const results = await window.inker.searchDrops(query);
+            appendLog("Search returned " + results.length + " result(s)");
 
             if (searchResults) searchResults.innerHTML = "";
             if (noSearchMsg) noSearchMsg.style.display = results.length === 0 ? "block" : "none";
 
-            results.forEach(repo => {
+            results.forEach(function (drop) {
                 if (searchResults) {
                     const card = document.createElement("div");
                     card.className = "search-result-card";
-                    card.innerHTML = `
-                        <h4>${repo.user || "user"}/${repo.name || "repo"}</h4>
-                        <p>${repo.description || "No description"}</p>
-                        <button class="btn btn-small" data-user="${repo.user}" data-repo="${repo.name}">Mount</button>
-                    `;
+                    card.innerHTML =
+                        '<h4>' + (drop.user || "user") + '/' + (drop.name || "drop") + '</h4>' +
+                        '<p>' + (drop.description || "No description") + '</p>' +
+                        '<button class="btn btn-small" data-user="' + drop.user + '" data-drop="' + drop.name + '">Mount</button>';
                     searchResults.appendChild(card);
                 }
             });
-
-            document.querySelectorAll(".search-result-card button").forEach(btn => {
-                btn.addEventListener("click", () => {
-                    activeContextMenu = { user: btn.dataset.user, repo: btn.dataset.repo };
-                    if (menuMount) menuMount.click();
-                });
-            });
         } catch (err) {
-            appendLog(`✗ Search failed: ${err.message}`);
+            appendLog("Search failed: " + err.message);
         }
     });
 
-    searchInput.addEventListener("keypress", (e) => {
+    searchInput.addEventListener("keypress", function (e) {
         if (e.key === "Enter") searchBtn.click();
     });
 }
 
-// Settings - Auto-mount
+document.addEventListener("click", function (e) {
+    if (e.target.closest && e.target.closest(".search-result-card")) {
+        const btn = e.target.closest("button");
+        if (btn && btn.dataset.user) {
+            activeContextMenu = { user: btn.dataset.user, drop: btn.dataset.drop };
+            if (menuMount) menuMount.click();
+        }
+    }
+});
+
 function refreshSettingsList(mounts) {
     const autoMountList = document.getElementById("auto-mount-list");
     if (!autoMountList) return;
 
     autoMountList.innerHTML = "";
 
-    const autoMounts = mounts.filter(m => m.auto_mount);
+    const autoMounts = mounts.filter(function (m) { return m.auto_mount; });
     if (autoMounts.length === 0) {
-        autoMountList.innerHTML = "<p class='empty'>No auto-mount repositories configured.</p>";
+        autoMountList.innerHTML = '<p class="empty-state">No auto-mount Drops configured.</p>';
         return;
     }
 
-    autoMounts.forEach(mount => {
+    autoMounts.forEach(function (mount) {
         const item = document.createElement("div");
         item.className = "auto-mount-item";
-        item.innerHTML = `
-            <span>${mount.repo_path} → ${mount.mount_point}</span>
-            <button class="btn btn-small" data-repo-path="${mount.repo_path}">Disable</button>
-        `;
+        item.innerHTML =
+            '<span>' + mount.drop_path + ' &#x2192; ' + mount.mount_point + '</span>' +
+            '<button class="btn btn-small" data-drop-path="' + mount.drop_path + '">Disable</button>';
         autoMountList.appendChild(item);
     });
 
-    document.querySelectorAll(".auto-mount-item button").forEach(btn => {
-        btn.addEventListener("click", async () => {
-            const repoPath = btn.dataset.repoPath;
-            const [user, repo] = repoPath.split("/");
+    document.querySelectorAll(".auto-mount-item button").forEach(function (btn) {
+        btn.addEventListener("click", async function () {
+            const dropPath = btn.dataset.dropPath;
+            const parts = dropPath.split("/");
             try {
-                await window.inker.setAutoMount(user, repo, false);
+                await window.inker.setAutoMount(parts[0], parts[1], false);
                 const saved = await window.inker.getSavedMounts();
                 refreshSettingsList(saved);
-                appendLog(`✓ Auto-mount disabled for ${repoPath}`);
+                appendLog("Auto-mount disabled for " + dropPath);
             } catch (err) {
-                appendLog(`✗ Failed to disable auto-mount: ${err.message}`);
+                appendLog("Failed to disable auto-mount: " + err.message);
             }
         });
     });
 }
 
-// Window Controls
+const mountByPathInput = document.getElementById("mount-by-path-input");
+const mountByPathBtn = document.getElementById("mount-by-path-btn");
+
+if (mountByPathBtn && mountByPathInput) {
+    mountByPathBtn.addEventListener("click", async function () {
+        var path = mountByPathInput.value.trim();
+        if (!path) return;
+        var parts = path.split("/");
+        if (parts.length !== 2 || !parts[0] || !parts[1]) {
+            appendLog("Invalid Drop path: " + path + " (must be user/repo)");
+            return;
+        }
+        var user = parts[0];
+        var drop = parts[1];
+        try {
+            appendLog("Verifying Drop " + user + "/" + drop + "...");
+            var exists = await window.inker.verifyDrop(user, drop);
+            if (exists) {
+                appendLog("Drop " + user + "/" + drop + " exists, opening mount dialog");
+                activeContextMenu = { user: user, drop: drop };
+                if (menuMount) menuMount.click();
+            } else {
+                appendLog("Drop " + user + "/" + drop + " does not exist or is not accessible");
+            }
+        } catch (err) {
+            appendLog("Failed to verify Drop: " + err.message);
+        }
+    });
+
+    mountByPathInput.addEventListener("keypress", function (e) {
+        if (e.key === "Enter") mountByPathBtn.click();
+    });
+}
+
 const minBtn = document.getElementById("min-btn");
-if (minBtn) minBtn.addEventListener("click", () => window.inker.minimize());
+if (minBtn) minBtn.addEventListener("click", function () { window.inker.minimize(); });
 
 const maxBtn = document.getElementById("max-btn");
-if (maxBtn) maxBtn.addEventListener("click", () => window.inker.maximize());
+if (maxBtn) maxBtn.addEventListener("click", function () { window.inker.maximize(); });
 
 const closeBtn = document.getElementById("close-btn");
-if (closeBtn) closeBtn.addEventListener("click", () => window.inker.close());
+if (closeBtn) closeBtn.addEventListener("click", function () { window.inker.close(); });
 
-// Logging
 if (window.inker) {
-    window.inker.onLog((message) => {
+    window.inker.onLog(function (message) {
         appendLog(message);
     });
 
-    window.inker.onReady(async () => {
+    window.inker.onReady(async function () {
+        appendLog("Application ready");
         const user = await window.inker.getCurrentUser();
         if (user) {
             showMainScreen(user);
-            appendLog(`Session restored for ${user.username}`);
+            appendLog("Session restored for " + user.username);
         } else {
             showLoginScreen();
         }
     });
 }
 
-// Initial check
 if (window.inker) {
-    window.inker.getCurrentUser().then(user => {
+    window.inker.getCurrentUser().then(function (user) {
         if (user) {
             showMainScreen(user);
-            appendLog(`Session loaded for ${user.username}`);
+            appendLog("Session loaded for " + user.username);
         } else {
             showLoginScreen();
         }
-    }).catch(() => {
+    }).catch(function () {
         showLoginScreen();
     });
 }

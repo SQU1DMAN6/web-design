@@ -20,7 +20,7 @@ import (
 
 func init() {
 	getCmd.Flags().Bool("no-unzip", false, "Skip extraction and installation")
-	getCmd.Flags().BoolP("ask", "A", false, "Prompt to select which file to download from repository")
+	getCmd.Flags().BoolP("ask", "A", false, "Prompt to select which file to download from Drop")
 }
 
 func normArch(a string) string {
@@ -71,8 +71,8 @@ func extractSqar(sqarPath, destDir string) error {
 
 var getCmd = &cobra.Command{
 	Use:   "get [user/repo]...",
-	Short: "Download and install a repository",
-	Long: `Download and install a repository package from the server.
+	Short: "Download and install a Drop",
+	Long: `Download and install a Drop package from the server.
 The package will be downloaded as an FSDL file, extracted, and built if possible.
 
 Example: ftr get user/myapp`,
@@ -106,7 +106,7 @@ Example: ftr get user/myapp`,
 
 			parts := strings.Split(rp, "/")
 			if len(parts) != 2 {
-				lastErr = fmt.Errorf("invalid repository path '%s'. Must be in format user/repo or user/repo@version", repoPath)
+				lastErr = fmt.Errorf("invalid Drop path '%s'. Must be in format user/repo or user/repo@version", repoPath)
 				fmt.Fprintln(os.Stderr, lastErr)
 				continue
 			}
@@ -125,7 +125,7 @@ Example: ftr get user/myapp`,
 			fmt.Printf("Fetching repo: %s\n", repoPath)
 
 			// Try to fetch repository description to show to the user
-			if matches, err := client.SearchRepos(repoName); err == nil {
+			if matches, err := client.SearchDrops(repoName); err == nil {
 				for _, m := range matches {
 					if m["user"] == parts[0] && m["repo"] == repoName {
 						desc := m["description"]
@@ -150,14 +150,14 @@ Example: ftr get user/myapp`,
 			// If -A flag used, let user pick a file from repository listing
 			var chosenFile string
 			if askFlag {
-				files, err := client.ListRepoFiles(user, repoName)
+				files, err := client.ListDropFiles(user, repoName)
 				if err != nil {
-					lastErr = fmt.Errorf("failed to list repo files for %s: %w", repoPath, err)
+					lastErr = fmt.Errorf("failed to list Drop files for %s: %w", repoPath, err)
 					fmt.Fprintln(os.Stderr, lastErr)
 					continue
 				}
 				if len(files) == 0 {
-					lastErr = fmt.Errorf("no files available in repository %s", repoPath)
+					lastErr = fmt.Errorf("no files available in Drop %s", repoPath)
 					fmt.Fprintln(os.Stderr, lastErr)
 					continue
 				}
@@ -238,7 +238,7 @@ Example: ftr get user/myapp`,
 					candidates = append(candidates, fmt.Sprintf("%s-%s-all-all.fsdl", repoName, version))
 					candidates = append(candidates, fmt.Sprintf("%s.fsdl", repoName))
 				} else {
-					files, err := client.ListRepoFiles(user, repoName)
+					files, err := client.ListDropFiles(user, repoName)
 					if err == nil {
 						var sqarMatches []string
 						var fsdlMatches []string

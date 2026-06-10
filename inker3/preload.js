@@ -1,28 +1,30 @@
 const { contextBridge, ipcRenderer } = require("electron");
 
 contextBridge.exposeInMainWorld("inker", {
-    minimize: () => ipcRenderer.send("window:minimize"),
-    maximize: () => ipcRenderer.send("window:maximize"),
-    close: () => ipcRenderer.send("window:close"),
+    minimize: function () { ipcRenderer.send("window:minimize"); },
+    maximize: function () { ipcRenderer.send("window:maximize"); },
+    close: function () { ipcRenderer.send("window:close"); },
 
-    login: (email, password) => ipcRenderer.invoke("inker:login", email, password),
-    logout: () => ipcRenderer.invoke("inker:logout"),
-    getCurrentUser: () => ipcRenderer.invoke("inker:get-current-user"),
+    login: function (email, password) { return ipcRenderer.invoke("inker:login", email, password); },
+    logout: function () { return ipcRenderer.invoke("inker:logout"); },
+    getCurrentUser: function () { return ipcRenderer.invoke("inker:get-current-user"); },
 
-    searchRepositories: (query) => ipcRenderer.invoke("inker:search-repos", query),
-    listRepositories: () => ipcRenderer.invoke("inker:list-repos"),
+    searchDrops: function (query) { return ipcRenderer.invoke("inker:search-drops", query); },
+    listDrops: function () { return ipcRenderer.invoke("inker:list-drops"); },
 
-    mountRepository: (user, repo, mountPoint) => ipcRenderer.invoke("inker:mount-repo", user, repo, mountPoint),
-    unmountRepository: (user, repo) => ipcRenderer.invoke("inker:unmount-repo", user, repo),
-    getActiveMounts: () => ipcRenderer.invoke("inker:get-mounts"),
-    getSavedMounts: () => ipcRenderer.invoke("inker:get-saved-mounts"),
-    setAutoMount: (user, repo, enabled) => ipcRenderer.invoke("inker:set-auto-mount", user, repo, enabled),
+    mountDrop: function (user, drop, mountPoint) { return ipcRenderer.invoke("inker:mount-drop", user, drop, mountPoint); },
+    unmountDrop: function (user, drop) { return ipcRenderer.invoke("inker:unmount-drop", user, drop); },
+    getActiveMounts: function () { return ipcRenderer.invoke("inker:get-mounts"); },
+    getSavedMounts: function () { return ipcRenderer.invoke("inker:get-saved-mounts"); },
+    setAutoMount: function (user, drop, enabled) { return ipcRenderer.invoke("inker:set-auto-mount", user, drop, enabled); },
 
-    openPath: (localPath) => ipcRenderer.invoke("inker:open-path", localPath),
+    openPath: function (localPath) { return ipcRenderer.invoke("inker:open-path", localPath); },
 
-    setAutoStart: (enabled) => ipcRenderer.invoke("inker:set-autostart", enabled),
-    getAutoStart: () => ipcRenderer.invoke("inker:get-autostart"),
+    setAutoStart: function (enabled) { return ipcRenderer.invoke("inker:set-autostart", enabled); },
+    getAutoStart: function () { return ipcRenderer.invoke("inker:get-autostart"); },
 
-    onLog: (callback) => ipcRenderer.on("inker:log", (event, message) => callback(message)),
-    onReady: (callback) => ipcRenderer.on("inker:ready", () => callback())
+    onLog: function (callback) { ipcRenderer.on("inker:log", function (event, message) { callback(message); }); },
+    verifyDrop: function (user, drop) { return ipcRenderer.invoke("inker:verify-drop", user, drop); },
+
+    onReady: function (callback) { ipcRenderer.on("inker:ready", function () { callback(); }); }
 });

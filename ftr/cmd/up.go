@@ -19,8 +19,8 @@ func init() {
 
 var upCmd = &cobra.Command{
 	Use:   "up [file] [user/repo]",
-	Short: "Upload a file to a repository",
-	Long: `Upload a file to a repository on the InkDrop server.
+	Short: "Upload a file to a Drop",
+	Long: `Upload a file to a Drop on the InkDrop server.
 
 Example: ftr up myfile.txt user/repo`,
 	Args: cobra.MinimumNArgs(2),
@@ -47,7 +47,7 @@ Example: ftr up myfile.txt user/repo`,
 
 		parts := strings.Split(repoPath, "/")
 		if len(parts) != 2 {
-			return fmt.Errorf("repository path must be in format user/repo")
+			return fmt.Errorf("Drop path must be in format user/repo")
 		}
 
 		// Parallel upload with a small concurrency limit

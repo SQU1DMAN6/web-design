@@ -12,8 +12,8 @@ import (
 
 var queryCmd = &cobra.Command{
 	Use:   "query <user>/<repo>",
-	Short: "List files in a remote repository",
-	Long:  `Lists all files in a remote repository, showing their path, size, and modification time.`,
+	Short: "List files in a remote Drop",
+	Long:  `Lists all files in a remote Drop, showing their path, size, and modification time.`,
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		repoPath := args[0]

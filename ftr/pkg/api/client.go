@@ -34,8 +34,8 @@ func init() {
 	}
 }
 
-func RepoURL() string {
-	return BaseURL + "/repos"
+func DropURL() string {
+	return BaseURL + "/drops"
 }
 
 func makeURL(resource string) string {
@@ -422,7 +422,7 @@ func (c *Client) Login(email, password string) error {
 	return nil
 }
 
-func (c *Client) CreateRepo(user, repoName string) error {
+func (c *Client) CreateDrop(user, repoName string) error {
 	if c.sessionID == "" {
 		return fmt.Errorf("not logged in")
 	}
@@ -607,8 +607,8 @@ func (c *Client) UploadFile(repoPath string, fileName string, reader io.Reader, 
 			}
 
 			// Attempt to create repository via API when authorized
-			if err := c.CreateRepo(user, repoName); err != nil {
-				return fmt.Errorf("repository does not exist and failed to create: %w", err)
+			if err := c.CreateDrop(user, repoName); err != nil {
+				return fmt.Errorf("Drop does not exist and failed to create: %w", err)
 			}
 
 			// Re-run repo existence check
@@ -932,8 +932,8 @@ func (c *Client) GetFileMeta(user, repo, fileName string) (map[string]string, er
 	return out, nil
 }
 
-// SearchRepos queries the server search API and returns a list of matches.
-func (c *Client) SearchRepos(query string) ([]map[string]string, error) {
+// SearchDrops queries the server search API and returns a list of matches.
+func (c *Client) SearchDrops(query string) ([]map[string]string, error) {
 	searchURL := inkdropURL(fmt.Sprintf("/index.php?search=%s&api=1", url.QueryEscape(query)))
 	req, err := http.NewRequest("GET", searchURL, nil)
 	if err != nil {
@@ -1002,8 +1002,8 @@ func (c *Client) SearchRepos(query string) ([]map[string]string, error) {
 	return out, nil
 }
 
-// ListRepoFiles returns a recursive list of files in a repository via the API
-func (c *Client) ListRepoFiles(user, repo string) ([]map[string]interface{}, error) {
+// ListDropFiles returns a recursive list of files in a Drop via the API
+func (c *Client) ListDropFiles(user, repo string) ([]map[string]interface{}, error) {
 	listURL := inkdropURL(fmt.Sprintf("/repo.php?name=%s&user=%s&list=1&api=1", url.QueryEscape(repo), url.QueryEscape(user)))
 	req, err := http.NewRequest("GET", listURL, nil)
 	if err != nil {

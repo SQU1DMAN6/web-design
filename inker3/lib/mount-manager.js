@@ -2,70 +2,51 @@ const fs = require("fs");
 const path = require("path");
 const { EventEmitter } = require("events");
 
-/**
- * MountManager (v3 - No-FUSE)
- *
- * Each "mount" is just a real local directory under (typically) %USERPROFILE%/FtR/<user>/<repo>.
- * The directory is created on mount, and SyncManager (chokidar) handles bidirectional
- * sync between local and remote. This is the same model OneDrive / Google Drive for Desktop
- * use on Windows, and it works without any kernel-level driver.
- */
 class MountManager extends EventEmitter {
     constructor(apiClient) {
         super();
         this.apiClient = apiClient;
-        this.activeMounts = new Map(); // repoPath -> { user, repo, mountPoint }
+        this.activeMounts = new Map();
     }
 
-    /**
-     * Mount a repository. Ensures the local directory exists, registers it,
-     * pre-populates with the current remote file list (downloading files into
-     * the folder), and emits 'mounted' for SyncManager to attach to.
-     */
-    async mount(user, repo, mountPoint) {
-        const repoPath = `${user}/${repo}`;
+    async mount(user, drop, mountPoint) {
+        var dropPath = user + "/" + drop;
 
-        if (this.activeMounts.has(repoPath)) {
-            throw new Error(`${repoPath} is already mounted`);
+        if (this.activeMounts.has(dropPath)) {
+            throw new Error(dropPath + " is already mounted");
         }
 
-        // Make sure the local folder exists.
         fs.mkdirSync(mountPoint, { recursive: true });
+        this.activeMounts.set(dropPath, { user: user, drop: drop, mountPoint: mountPoint });
 
-        // Register the mount immediately so subsequent calls are consistent.
-        this.activeMounts.set(repoPath, { user, repo, mountPoint });
+        console.log("[MountManager] Mounted " + dropPath + " at " + mountPoint);
 
-        // Pre-populate the local folder from the remote in the background.
-        // We do not block the mount on this - the user can start working
-        // locally while the initial sync happens.
-        this._initialPull(user, repo, mountPoint).catch((err) => {
-            console.error(`Initial pull failed for ${repoPath}: ${err.message}`);
+        this._initialPull(user, drop, mountPoint).catch(function (err) {
+            console.error("[MountManager] Initial pull failed for " + dropPath + ": " + err.message);
         });
 
-        this.emit("mounted", { repoPath, mountPoint });
-        return { repoPath, mountPoint };
+        this.emit("mounted", { dropPath: dropPath, mountPoint: mountPoint });
+        return { dropPath: dropPath, mountPoint: mountPoint };
     }
 
-    /**
-     * Download the remote file list and write any files that are missing locally.
-     * Existing local files are left alone (local changes win on the first sync cycle).
-     */
-    async _initialPull(user, repo, mountPoint) {
-        let entries = [];
+    async _initialPull(user, drop, mountPoint) {
+        var entries = [];
         try {
-            entries = await this.apiClient.getFileList(user, repo);
+            entries = await this.apiClient.getFileList(user, drop);
         } catch (err) {
-            console.error(`getFileList failed for ${user}/${repo}: ${err.message}`);
+            console.error("[MountManager] getFileList failed for " + user + "/" + drop + ": " + err.message);
             return;
         }
 
-        for (const entry of entries) {
-            const relPath = entry.path || entry.name;
+        console.log("[MountManager] Initial pull: " + entries.length + " entries for " + user + "/" + drop);
+
+        for (var i = 0; i < entries.length; i++) {
+            var entry = entries[i];
+            var relPath = entry.path || entry.name;
             if (!relPath) continue;
 
-            // entry.kind: 'file' | 'directory' (be permissive)
-            const isDir = entry.kind === "directory" || entry.type === "dir" || relPath.endsWith("/");
-            const localPath = path.join(mountPoint, relPath);
+            var isDir = entry.kind === "directory" || entry.type === "dir" || relPath.endsWith("/");
+            var localPath = path.join(mountPoint, relPath);
 
             if (isDir) {
                 fs.mkdirSync(localPath, { recursive: true });
@@ -75,40 +56,43 @@ class MountManager extends EventEmitter {
             if (fs.existsSync(localPath)) continue;
 
             try {
-                const stream = await this.apiClient.downloadFile(user, repo, relPath);
-                await new Promise((resolve, reject) => {
-                    const out = fs.createWriteStream(localPath);
+                var stream = await this.apiClient.downloadFile(user, drop, relPath);
+                await new Promise(function (resolve, reject) {
+                    var out = fs.createWriteStream(localPath);
                     stream.on("error", reject);
                     out.on("error", reject);
                     out.on("finish", resolve);
                     stream.pipe(out);
                 });
+                console.log("[MountManager] Downloaded " + relPath);
             } catch (err) {
-                console.error(`Initial download failed for ${relPath}: ${err.message}`);
+                console.error("[MountManager] Download failed for " + relPath + ": " + err.message);
             }
         }
     }
 
-    async unmount(repoPath) {
-        if (!this.activeMounts.has(repoPath)) {
-            throw new Error(`${repoPath} is not mounted`);
+    async unmount(dropPath) {
+        if (!this.activeMounts.has(dropPath)) {
+            throw new Error(dropPath + " is not mounted");
         }
 
-        const { mountPoint } = this.activeMounts.get(repoPath);
-        this.activeMounts.delete(repoPath);
-        this.emit("unmounted", { repoPath, mountPoint });
-        return { repoPath, mountPoint };
+        var mountPoint = this.activeMounts.get(dropPath).mountPoint;
+        this.activeMounts.delete(dropPath);
+        console.log("[MountManager] Unmounted " + dropPath);
+        this.emit("unmounted", { dropPath: dropPath, mountPoint: mountPoint });
+        return { dropPath: dropPath, mountPoint: mountPoint };
     }
 
     getActiveMounts() {
-        return Array.from(this.activeMounts.entries()).map(([repoPath, state]) => ({
-            repoPath,
-            mountPoint: state.mountPoint
-        }));
+        var result = [];
+        this.activeMounts.forEach(function (state, dropPath) {
+            result.push({ dropPath: dropPath, mountPoint: state.mountPoint });
+        });
+        return result;
     }
 
-    isMounted(repoPath) {
-        return this.activeMounts.has(repoPath);
+    isMounted(dropPath) {
+        return this.activeMounts.has(dropPath);
     }
 
     closeAll() {

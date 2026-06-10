@@ -15,23 +15,23 @@ import (
 
 var automountCmd = &cobra.Command{
 	Use:   "automount <user>/<repo> [mountpoint]",
-	Short: "Manage systemd services for mounting repositories",
-	Long: `Manage systemd services for automatically mounting repositories on the remote InkDrop machine to the local client.
+	Short: "Manage systemd services for mounting Drops",
+	Long: `Manage systemd services for automatically mounting Drops on the remote InkDrop machine to the local client.
 Files are presented as placeholders and contents are downloaded only when opened.
-Writes are uploaded back to the remote repository when file handles are closed.
+Writes are uploaded back to the remote Drop when file handles are closed.
 `,
 }
 
 var automountinstallCmd = &cobra.Command{
 	Use:   "install <user>/<repo> [mountpoint]",
 	Short: "Install an FtR mount service to /etc/systemd/system",
-	Long:  `Create and install an FtR systemd service to /etc/systemd/system to mount a specific remote repository on the InkDrop machine to the local client.`,
+	Long:  `Create and install an FtR systemd service to /etc/systemd/system to mount a specific remote Drop on the InkDrop machine to the local client.`,
 	Args:  cobra.RangeArgs(1, 2),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		repoPath := args[0]
 		parts := strings.Split(repoPath, "/")
 		if len(parts) != 2 {
-			return fmt.Errorf("repository must be in the format user/repo")
+			return fmt.Errorf("Drop must be in the format user/repo")
 		}
 		repoOwner, repo := parts[0], parts[1]
 
@@ -129,15 +129,15 @@ var automountinstallCmd = &cobra.Command{
 
 var automountenableCmd = &cobra.Command{
 	Use:   "enable <user>/<repo>",
-	Short: "Enable a systemd service to mount a repository",
-	Long: `Enable a systemd service to mount a repository on boot, and mount the the repository immediately.
-	The repository's mount point is the mount point specified by the systemd service file installed under ~/.config/systemd/user`,
+	Short: "Enable a systemd service to mount a Drop",
+	Long: `Enable a systemd service to mount a Drop on boot, and mount the Drop immediately.
+	The Drop's mount point is the mount point specified by the systemd service file installed under ~/.config/systemd/user`,
 	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		repoPath := args[0]
 		parts := strings.Split(repoPath, "/")
 		if len(parts) != 2 {
-			return fmt.Errorf("repository path must be in the format user/repo")
+			return fmt.Errorf("Drop path must be in the format user/repo")
 		}
 
 		user, repo := parts[0], parts[1]
@@ -157,14 +157,14 @@ var automountenableCmd = &cobra.Command{
 
 var automountdisableCmd = &cobra.Command{
 	Use:   "disable <user>/<repo>",
-	Short: "Unmount a repository and disable its respective systemd service",
-	Long:  "Immediately unmount a repository and disable its respective systemd service so it does not mount the repository again on boot.",
+	Short: "Unmount a Drop and disable its respective systemd service",
+	Long:  "Immediately unmount a Drop and disable its respective systemd service so it does not mount the Drop again on boot.",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		repoPath := args[0]
 		parts := strings.Split(repoPath, "/")
 		if len(parts) != 2 {
-			return fmt.Errorf("repository path must be in the form user/repo")
+			return fmt.Errorf("Drop path must be in the form user/repo")
 		}
 		user, repo := parts[0], parts[1]
 		serviceName := fmt.Sprintf("ftrmount-%s-%s.service", user, repo)
@@ -188,14 +188,14 @@ var automountdisableCmd = &cobra.Command{
 
 var automountuninstallCmd = &cobra.Command{
 	Use:   "uninstall <user>/<repo>",
-	Short: "Uninstall the systemd service file of a remote repository",
-	Long:  "Uninstall the systemd service file of a remote repository",
+	Short: "Uninstall the systemd service file of a remote Drop",
+	Long:  "Uninstall the systemd service file of a remote Drop",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		repoPath := args[0]
 		parts := strings.Split(repoPath, "/")
 		if len(parts) != 2 {
-			return fmt.Errorf("repository path must be in the format user/repo")
+			return fmt.Errorf("Drop path must be in the format user/repo")
 		}
 
 		user, repo := parts[0], parts[1]

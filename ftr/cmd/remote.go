@@ -12,14 +12,14 @@ import (
 
 var remoteCmd = &cobra.Command{
 	Use:   "remote",
-	Short: "Manage remote repositories",
-	Long:  `Perform actions on remote repositories by interacting with the InkDrop server.`,
+	Short: "Manage remote Drops",
+	Long:  `Perform actions on remote Drops by interacting with the InkDrop server.`,
 }
 
 var remoteRemoveCmd = &cobra.Command{
 	Use:   "delete <user>/<repo>/<file> [<user>/<repo>/<file>...]",
-	Short: "Remove one or more files from a remote repository",
-	Long: `Permanently removes one or more files from a remote repository on the InkDrop server. This action requires you to be logged in and to be the owner of the repository.
+	Short: "Remove one or more files from a remote Drop",
+	Long: `Permanently removes one or more files from a remote Drop on the InkDrop server. This action requires you to be logged in and to be the owner of the Drop.
 
 Examples:
   ftr remote delete user/repo/file.txt
@@ -161,8 +161,8 @@ var remoteMkdirCmd = &cobra.Command{
 
 var remoteDownCmd = &cobra.Command{
 	Use:   "down <user>/<repo>/<file-path> [<user>/<repo>/<file-path>...]",
-	Short: "Download one or more files from a remote repository",
-	Long: `Downloads specific files from a remote repository to the current directory.
+	Short: "Download one or more files from a remote Drop",
+	Long: `Downloads specific files from a remote Drop to the current directory.
 
 Examples:
   ftr remote down user/repo/file.txt

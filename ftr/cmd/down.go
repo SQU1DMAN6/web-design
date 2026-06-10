@@ -21,14 +21,14 @@ func init() {
 
 var downCmd = &cobra.Command{
 	Use:   "down [user/repo]",
-	Short: "Download all files from a repository into the FtR home dir",
+	Short: "Download all files from a Drop into the FtR home dir",
 	Long:  "Recursively download every file in the repo into ~/FtR or the directory provided with -D",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		repoPath := args[0]
 		parts := strings.Split(repoPath, "/")
 		if len(parts) != 2 {
-			return fmt.Errorf("invalid repository path. Must be in format user/repo")
+			return fmt.Errorf("invalid Drop path. Must be in format user/repo")
 		}
 		user := parts[0]
 		repo := parts[1]
@@ -55,9 +55,9 @@ var downCmd = &cobra.Command{
 		}
 
 		fmt.Printf("Listing files in %s/%s...\n", user, repo)
-		files, err := client.ListRepoFiles(user, repo)
+		files, err := client.ListDropFiles(user, repo)
 		if err != nil {
-			return fmt.Errorf("failed to list repo files: %w", err)
+			return fmt.Errorf("failed to list Drop files: %w", err)
 		}
 
 		if len(files) == 0 {
