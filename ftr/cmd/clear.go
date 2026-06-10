@@ -2,7 +2,7 @@ package cmd
 
 import (
 	"fmt"
-	"os/exec"
+	"os"
 
 	"github.com/spf13/cobra"
 )
@@ -14,7 +14,7 @@ var clearCmd = &cobra.Command{
 	Args:  cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		fmt.Println("Cleaning temporary files...")
-		if err := exec.Command("sudo", "rm", "-rf", "/tmp/fsdl").Run(); err != nil {
+		if err := os.RemoveAll("/tmp/fsdl"); err != nil {
 			return fmt.Errorf("failed to clean temporary directory: %w", err)
 		}
 		fmt.Println("Cleaning complete")

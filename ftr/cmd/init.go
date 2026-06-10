@@ -18,7 +18,7 @@ var initCmd = &cobra.Command{
 		if err != nil {
 			return fmt.Errorf("failed to determine home directory: %w", err)
 		}
-		dir := filepath.Join(home, "FtRSync")
+		dir := filepath.Join(home, "FtR")
 		if _, err := os.Stat(dir); os.IsNotExist(err) {
 			if err := os.MkdirAll(dir, 0755); err != nil {
 				return fmt.Errorf("failed to create %s: %w", dir, err)

@@ -7,9 +7,11 @@ import (
 	"io"
 	"os"
 	"os/signal"
+	"os/user"
 	"path"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"syscall"
@@ -33,6 +35,8 @@ type RemoteFS struct {
 	mu              sync.Mutex
 	refreshMu       sync.Mutex
 	server          *fs.Server
+	defaultUid      uint32
+	defaultGid      uint32
 }
 
 type RemoteDir struct {
@@ -40,6 +44,9 @@ type RemoteDir struct {
 	path    string
 	entries map[string]fs.Node
 	mu      sync.Mutex
+	mode    os.FileMode
+	uid     uint32
+	gid     uint32
 }
 
 type RemoteFile struct {
@@ -48,6 +55,9 @@ type RemoteFile struct {
 	size  uint64
 	mtime time.Time
 	hash  string
+	mode  os.FileMode
+	uid   uint32
+	gid   uint32
 }
 
 type RemoteFileHandle struct {
@@ -178,17 +188,35 @@ Writes are uploaded back to the remote Drop when file handles are closed.
 	},
 }
 
+func currentUserIds() (uint32, uint32) {
+	uid := uint32(0)
+	gid := uint32(0)
+	current, err := user.Current()
+	if err == nil {
+		if parsed, err := strconv.ParseUint(current.Uid, 10, 32); err == nil {
+			uid = uint32(parsed)
+		}
+		if parsed, err := strconv.ParseUint(current.Gid, 10, 32); err == nil {
+			gid = uint32(parsed)
+		}
+	}
+	return uid, gid
+}
+
 func NewRemoteFS(client *api.Client, user, repo string, fileList []api.RepoEntry) (*RemoteFS, error) {
 	refreshInterval := mountRefreshInterval
 	if refreshInterval <= 0 {
 		refreshInterval = 500 * time.Millisecond
 	}
+	defaultUid, defaultGid := currentUserIds()
 	rfs := &RemoteFS{
 		client:          client,
 		user:            user,
 		repo:            repo,
 		refreshInterval: refreshInterval,
 		readOnly:        mountReadOnly,
+		defaultUid:      defaultUid,
+		defaultGid:      defaultGid,
 	}
 
 	rfs.root = buildRemoteTree(rfs, fileList)
@@ -412,6 +440,9 @@ func (rfs *RemoteFS) ensureParentDir(remotePath string, changes *[]remoteChange)
 				fsys:    rfs,
 				path:    dirPath,
 				entries: make(map[string]fs.Node),
+				mode:    os.ModeDir | 0755,
+				uid:     rfs.defaultUid,
+				gid:     rfs.defaultGid,
 			}
 			parent.entries[part] = dir
 			parent.mu.Unlock()
@@ -460,10 +491,14 @@ func (rfs *RemoteFS) findDir(remotePath string) *RemoteDir {
 
 func (rfs *RemoteFS) newNodeFromState(entry remoteEntryState) fs.Node {
 	if entry.kind == "dir" {
+		mode := os.ModeDir | 0755
 		return &RemoteDir{
 			fsys:    rfs,
 			path:    entry.path,
 			entries: make(map[string]fs.Node),
+			mode:    mode,
+			uid:     rfs.defaultUid,
+			gid:     rfs.defaultGid,
 		}
 	}
 	return &RemoteFile{
@@ -472,6 +507,9 @@ func (rfs *RemoteFS) newNodeFromState(entry remoteEntryState) fs.Node {
 		size:  uint64(max(entry.size, 0)),
 		mtime: remoteEntryModTime(entry.modified),
 		hash:  entry.hash,
+		mode:  0644,
+		uid:   rfs.defaultUid,
+		gid:   rfs.defaultGid,
 	}
 }
 
@@ -533,6 +571,9 @@ func buildRemoteTree(rfs *RemoteFS, fileList []api.RepoEntry) *RemoteDir {
 		fsys:    rfs,
 		path:    "",
 		entries: make(map[string]fs.Node),
+		mode:    os.ModeDir | 0755,
+		uid:     rfs.defaultUid,
+		gid:     rfs.defaultGid,
 	}
 
 	for _, entry := range fileList {
@@ -560,6 +601,9 @@ func buildRemoteTree(rfs *RemoteFS, fileList []api.RepoEntry) *RemoteDir {
 							fsys:    rfs,
 							path:    path.Join(current.path, part),
 							entries: make(map[string]fs.Node),
+							mode:    os.ModeDir | 0755,
+							uid:     rfs.defaultUid,
+							gid:     rfs.defaultGid,
 						}
 					}
 					continue
@@ -570,6 +614,9 @@ func buildRemoteTree(rfs *RemoteFS, fileList []api.RepoEntry) *RemoteDir {
 					size:  size,
 					mtime: mtime,
 					hash:  hash,
+					mode:  0644,
+					uid:   rfs.defaultUid,
+					gid:   rfs.defaultGid,
 				}
 				continue
 			}
@@ -579,6 +626,9 @@ func buildRemoteTree(rfs *RemoteFS, fileList []api.RepoEntry) *RemoteDir {
 					fsys:    rfs,
 					path:    path.Join(current.path, part),
 					entries: make(map[string]fs.Node),
+					mode:    os.ModeDir | 0755,
+					uid:     rfs.defaultUid,
+					gid:     rfs.defaultGid,
 				}
 				current.entries[part] = dir
 				node = dir
@@ -679,11 +729,17 @@ func (d *RemoteDir) Getattr(ctx context.Context, req *fuse.GetattrRequest, resp 
 }
 
 func (d *RemoteDir) Attr(ctx context.Context, a *fuse.Attr) error {
-	if d.fsys.readOnly {
-		a.Mode = os.ModeDir | 0555
-	} else {
-		a.Mode = os.ModeDir | 0755
+	mode := d.mode
+	if mode == 0 {
+		if d.fsys.readOnly {
+			mode = os.ModeDir | 0555
+		} else {
+			mode = os.ModeDir | 0755
+		}
 	}
+	a.Mode = mode
+	a.Uid = d.uid
+	a.Gid = d.gid
 	return nil
 }
 
@@ -736,6 +792,9 @@ func (d *RemoteDir) Create(ctx context.Context, req *fuse.CreateRequest, resp *f
 	file := &RemoteFile{
 		fsys: d.fsys,
 		path: filePath,
+		mode: 0644,
+		uid:  d.fsys.defaultUid,
+		gid:  d.fsys.defaultGid,
 	}
 	d.entries[req.Name] = file
 	d.mu.Unlock()
@@ -801,6 +860,9 @@ func (d *RemoteDir) Mkdir(ctx context.Context, req *fuse.MkdirRequest) (fs.Node,
 		fsys:    d.fsys,
 		path:    dirPath,
 		entries: make(map[string]fs.Node),
+		mode:    os.ModeDir | 0755,
+		uid:     d.fsys.defaultUid,
+		gid:     d.fsys.defaultGid,
 	}
 	d.mu.Lock()
 	d.entries[req.Name] = dir
@@ -870,13 +932,19 @@ func updateRemoteNodePath(node fs.Node, oldPath string, newPath string) {
 }
 
 func (f *RemoteFile) Attr(ctx context.Context, a *fuse.Attr) error {
-	if f.fsys.readOnly {
-		a.Mode = 0444
-	} else {
-		a.Mode = 0644
+	mode := f.mode
+	if mode == 0 {
+		if f.fsys.readOnly {
+			mode = 0444
+		} else {
+			mode = 0644
+		}
 	}
+	a.Mode = mode
 	a.Size = f.size
 	a.Mtime = f.mtime
+	a.Uid = f.uid
+	a.Gid = f.gid
 	return nil
 }
 
@@ -892,6 +960,10 @@ func (f *RemoteFile) Setattr(ctx context.Context, req *fuse.SetattrRequest, resp
 	if f.fsys.readOnly {
 		return fuse.Errno(syscall.EROFS)
 	}
+
+	changed := false
+
+	// Handle size changes (truncate)
 	if req.Valid.Size() {
 		tempFile, err := os.CreateTemp("", "ftr-mount-setattr-*")
 		if err != nil {
@@ -917,8 +989,30 @@ func (f *RemoteFile) Setattr(ctx context.Context, req *fuse.SetattrRequest, resp
 		if err := f.uploadFrom(tempFile, int64(req.Size)); err != nil {
 			return err
 		}
+		changed = true
 	}
-	return f.Attr(ctx, &resp.Attr)
+
+	// Handle mode changes (e.g., chmod, chmod +x)
+	if req.Valid.Mode() {
+		f.mode = req.Mode
+		changed = true
+	}
+
+	// Handle uid/gid changes (chown)
+	if req.Valid.Uid() {
+		f.uid = req.Uid
+		changed = true
+	}
+	if req.Valid.Gid() {
+		f.gid = req.Gid
+		changed = true
+	}
+
+	if err := f.Attr(ctx, &resp.Attr); err != nil {
+		return err
+	}
+	_ = changed // metadata changes are tracked locally; future enhancement could sync to server
+	return nil
 }
 
 func (f *RemoteFile) Open(ctx context.Context, req *fuse.OpenRequest, resp *fuse.OpenResponse) (fs.Handle, error) {
