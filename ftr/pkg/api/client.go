@@ -1002,6 +1002,12 @@ func (c *Client) SearchDrops(query string) ([]map[string]string, error) {
 	return out, nil
 }
 
+// ListRepoFiles returns a recursive list of files in a repository via the API.
+// This is an alias for ListDropFiles.
+func (c *Client) ListRepoFiles(user, repo string) ([]map[string]interface{}, error) {
+	return c.ListDropFiles(user, repo)
+}
+
 // ListDropFiles returns a recursive list of files in a Drop via the API
 func (c *Client) ListDropFiles(user, repo string) ([]map[string]interface{}, error) {
 	listURL := inkdropURL(fmt.Sprintf("/repo.php?name=%s&user=%s&list=1&api=1", url.QueryEscape(repo), url.QueryEscape(user)))

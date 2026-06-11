@@ -67,7 +67,7 @@ var automountinstallCmd = &cobra.Command{
 				return fmt.Errorf("mount point %s is not accessible: %w", mountPoint, err)
 			}
 		} else if !info.IsDir() {
-			return fmt.Errorf("mount point %s is a directory", mountPoint)
+			return fmt.Errorf("mount point %s is not a directory", mountPoint)
 		}
 
 		currentUser, err := user.Current()
@@ -77,6 +77,14 @@ var automountinstallCmd = &cobra.Command{
 
 		var currentUserName string = currentUser.Username
 		fmt.Printf("Will install systemd service as user %s\n", currentUserName)
+
+		// Enable linger for this user so systemd user services run even when not logged in
+		lingerCmd := exec.Command("loginctl", "enable-linger", currentUserName)
+		if lingerOut, lingerErr := lingerCmd.CombinedOutput(); lingerErr != nil {
+			fmt.Fprintf(os.Stderr, "Warning: failed to enable linger for user %s: %v\nOutput: %s\n", currentUserName, lingerErr, string(lingerOut))
+		} else {
+			fmt.Printf("Linger enabled for user %s (services run on boot)\n", currentUserName)
+		}
 
 		execStart := fmt.Sprintf(
 			"/usr/local/bin/ftr mount %s/%s %s",
