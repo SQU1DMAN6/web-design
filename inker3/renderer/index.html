@@ -18,6 +18,7 @@
     </div>
 
     <div class="content">
+        <!-- Login Screen -->
         <div id="auth-screen" class="screen active">
             <div class="auth-container">
                 <div class="auth-header">
@@ -34,73 +35,93 @@
                         <label>Password</label>
                         <input type="password" id="password" placeholder="Password" required>
                     </div>
-                    <button type="submit" class="btn btn-primary">Sign In</button>
+                    <button type="submit" class="btn btn-primary btn-full">Sign In</button>
+                    <p class="auth-link">Don't have an account? <a href="#" id="register-link">Register</a></p>
                     <div id="auth-error" class="error-message" style="display: none;"></div>
                 </form>
             </div>
             <div id="event-log-auth" class="event-log"></div>
         </div>
 
+        <!-- Main Screen -->
         <div id="main-screen" class="screen">
             <aside class="sidebar">
                 <div class="sidebar-header">
-                    <div class="user-info">
+                    <div class="user-info" id="user-info">
                         <div class="username" id="sidebar-username"></div>
                         <div class="email" id="sidebar-email"></div>
+                    </div>
+                    <div class="user-actions">
+                        <button id="logout-btn" class="btn btn-small btn-danger">Logout</button>
                     </div>
                 </div>
 
                 <nav class="sidebar-nav">
-                    <button class="nav-btn active" data-screen="drops">Drops</button>
-                    <button class="nav-btn" data-screen="search">Search</button>
-                    <button class="nav-btn" data-screen="auto-mount">Auto Add</button>
-                    <button class="nav-btn" data-screen="log">Log</button>
+                    <button class="nav-btn active" data-screen="drops">
+                        <span class="nav-badge">+</span> Mounted Drops
+                    </button>
+                    <button class="nav-btn" data-screen="auto-mount">
+                        <span class="nav-badge">~</span> Auto-Add
+                    </button>
+                    <button class="nav-btn" data-screen="search">
+                        <span class="nav-badge">S</span> Search & Add
+                    </button>
+                    <button class="nav-btn" data-screen="log">
+                        <span class="nav-badge">L</span> Log
+                    </button>
                 </nav>
-
-                <button id="logout-btn" class="logout-btn">Logout</button>
             </aside>
 
             <main class="main">
+                <!-- Drops Panel -->
                 <div id="drops-screen" class="main-screen active">
                     <div class="screen-header">
-                        <h2>Your Drops</h2>
+                        <h2>Mounted Drops</h2>
                     </div>
-                    <div class="drops-list" id="drops-list"></div>
+                    <div id="drops-list" class="panel-list"></div>
                     <div id="no-drops-message" class="empty-state">
-                        <p>No Drops added yet.</p>
-                        <p>Search for Drops or type a Drop name below.</p>
-                    </div>
-                    <div class="search-box" style="margin-top: 12px;">
-                        <input type="text" id="add-by-path-input" placeholder="user/dropname" style="flex: 1;">
-                        <button id="add-by-path-btn" class="btn btn-primary btn-small">Add Drop</button>
+                        <p>No Drops mounted yet.</p>
+                        <p>Search for Drops or add one using the Search & Add panel.</p>
                     </div>
                 </div>
 
-                <div id="search-screen" class="main-screen">
-                    <div class="screen-header">
-                        <h2>Search Drops</h2>
-                        <div class="search-box">
-                            <input type="text" id="search-input" placeholder="Search for Drops...">
-                            <button id="search-btn" class="btn btn-small">Search</button>
-                        </div>
-                    </div>
-                    <div class="search-results" id="search-results"></div>
-                    <div id="no-search-message" class="empty-state" style="display: none;">
-                        <p>No results found.</p>
-                        <p>You can also add a Drop directly by typing the name in the Drops screen.</p>
-                    </div>
-                </div>
-
+                <!-- Auto-Mount Panel -->
                 <div id="auto-mount-screen" class="main-screen">
                     <div class="screen-header">
-                        <h2>Auto Add</h2>
+                        <h2>Auto-Add Drops</h2>
+                        <p class="screen-desc">Drops listed here will be mounted automatically when Inker starts.</p>
                     </div>
-                    <div class="settings-section">
-                        <p style="color: var(--muted); font-size: 12px; margin-bottom: 12px;">Drops listed here will be added automatically when Inker starts.</p>
-                        <div id="auto-mount-list" class="auto-mount-list"></div>
+                    <div id="auto-mount-list" class="panel-list"></div>
+                    <div id="no-auto-mount-message" class="empty-state">
+                        <p>No Drops set for auto-add.</p>
+                        <p>Enable auto-add from a mounted Drop's menu.</p>
                     </div>
                 </div>
 
+                <!-- Search Panel -->
+                <div id="search-screen" class="main-screen">
+                    <div class="screen-header">
+                        <h2>Search & Add Drops</h2>
+                    </div>
+                    <div class="search-section">
+                        <div class="search-box">
+                            <input type="text" id="search-input" placeholder="Search for Drops by name..." class="search-input">
+                            <button id="search-btn" class="btn btn-primary">Search</button>
+                        </div>
+                        <p class="search-hint">You can also add a Drop directly: enter <strong>user/dropname</strong> below</p>
+                        <div class="search-box" style="margin-top: 8px;">
+                            <input type="text" id="add-by-path-input" placeholder="user/dropname" class="search-input">
+                            <button id="add-by-path-btn" class="btn">Add</button>
+                        </div>
+                    </div>
+                    <div id="search-status" class="status-message" style="display: none;"></div>
+                    <div id="search-results" class="panel-list"></div>
+                    <div id="no-search-message" class="empty-state" style="display: none;">
+                        <p>No results found.</p>
+                    </div>
+                </div>
+
+                <!-- Log Panel -->
                 <div id="log-screen" class="main-screen">
                     <div class="screen-header">
                         <h2>Runtime Log</h2>
@@ -113,11 +134,13 @@
     </div>
 </div>
 
+<!-- Context Menu -->
 <div id="drop-menu" class="context-menu hidden">
-    <button id="menu-open" class="btn-primary">Open Folder</button>
-    <button id="menu-add-automount">Auto Add</button>
+    <button id="menu-open" class="menu-item">Open Folder</button>
+    <button id="menu-add-automount" class="menu-item">Enable Auto-Add</button>
+    <button id="menu-remove-automount" class="menu-item">Disable Auto-Add</button>
     <hr>
-    <button id="menu-remove">Remove</button>
+    <button id="menu-remove" class="menu-item menu-danger">Remove</button>
 </div>
 
 <script src="renderer.js"></script>

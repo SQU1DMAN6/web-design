@@ -1,0 +1,19 @@
+appId: com.ftr.inker
+productName: FtR Inker
+directories:
+  output: dist
+files:
+  - "main.js"
+  - "preload.js"
+  - "renderer/**/*"
+  - "lib/**/*"
+  - "icon.png"
+win:
+  target:
+    - target: msi
+      arch:
+        - x64
+  icon: icon.png
+  publisherName: FtR
+msi:
+  artifactName: FtR-Inker-${version}-x64.msi

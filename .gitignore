@@ -3,3 +3,4 @@ fileshare_OLD/connect.php
 *.DS_Store*
 inkdrop/database.db
 *node_modules*/
+*dist*/

@@ -12,77 +12,19 @@ let win;
 let mountManager;
 let syncManager;
 let appReady = false;
-let isCLI = false;
 
 const gotTheLock = app.requestSingleInstanceLock();
 if (!gotTheLock) {
     app.quit();
 }
 
-async function cliMount(user, drop) {
-    isCLI = true;
-    var mountPoint = path.join(os.homedir(), "FtR", user, drop);
-    console.log("[Inker CLI] Adding " + user + "/" + drop + " at " + mountPoint);
-
-    try {
-        var auth = await settings.getAuth();
-        if (auth) {
-            apiClient.setSession(auth.email, auth.username, auth.session_id);
-        } else {
-            console.error("[Inker CLI] Not logged in. Please log in first.");
-            app.quit();
-            return;
-        }
-
-        var exists = await apiClient.verifyDrop(user, drop);
-        if (!exists) {
-            console.error("[Inker CLI] Drop " + user + "/" + drop + " does not exist.");
-            app.quit();
-            return;
-        }
-
-        mountManager = new MountManager(apiClient);
-        syncManager = new SyncManager(apiClient);
-
-        mountManager.on("mounted", function (data) {
-            console.log("[Inker CLI] Added " + data.dropPath + " at " + data.mountPoint);
-            syncManager.startSync(data.dropPath, data.mountPoint);
-            console.log("[Inker CLI] Syncing " + data.dropPath + "...");
-        });
-
-        await mountManager.mount(user, drop, mountPoint);
-        await settings.addMount(user, drop, mountPoint);
-
-        console.log("[Inker CLI] Opening " + mountPoint);
-        await shell.openPath(mountPoint);
-
-        console.log("[Inker CLI] " + user + "/" + drop + " is ready. Closing in 3 seconds...");
-        setTimeout(function () {
-            mountManager.closeAll();
-            syncManager.stopAllSync();
-            settings.close();
-            app.quit();
-        }, 3000);
-    } catch (err) {
-        console.error("[Inker CLI] Error: " + err.message);
-        app.quit();
+// Register inker:// protocol handler
+if (process.defaultApp) {
+    if (process.argv.length >= 2) {
+        app.setAsDefaultProtocolClient("inker", process.execPath, [path.resolve(process.argv[1])]);
     }
-}
-
-var args = process.argv.slice(1);
-if (args.length > 1 && args[1] === "mount") {
-    if (args.length > 2) {
-        var parts = args[2].split("/");
-        if (parts.length === 2 && parts[0] && parts[1]) {
-            app.whenReady().then(function () {
-                cliMount(parts[0], parts[1]);
-            });
-            return;
-        }
-    }
-    console.error("Usage: inker mount user/dropname");
-    app.quit();
-    return;
+} else {
+    app.setAsDefaultProtocolClient("inker");
 }
 
 function createWindow() {
@@ -94,6 +36,7 @@ function createWindow() {
         frame: false,
         transparent: true,
         backgroundColor: "#00000000",
+        icon: path.join(__dirname, "icon.ico"),
         webPreferences: {
             preload: path.join(__dirname, "preload.js"),
             contextIsolation: true,
@@ -109,6 +52,55 @@ function logToRenderer(message) {
     console.log("[INKER] " + ts + " " + message);
     if (win.webContents) {
         try { win.webContents.send("inker:log", message); } catch (e) { /* ignore */ }
+    }
+}
+
+// Handle inker:// protocol URLs
+function handleInkerUrl(url) {
+    logToRenderer("Protocol URL: " + url);
+    // Format: inker://user/drop/encoded-path
+    var parsed = url.replace("inker://", "").split("/");
+    if (parsed.length >= 3) {
+        var user = decodeURIComponent(parsed[0]);
+        var drop = decodeURIComponent(parsed[1]);
+        var filePath = parsed.slice(2).map(function(p) { return decodeURIComponent(p); }).join("/");
+        logToRenderer("Opening remote file: " + user + "/" + drop + "/" + filePath);
+        openRemoteFileAndLaunch(user, drop, filePath);
+    }
+}
+
+// Handle second instance (protocol URL from Explorer)
+app.on("second-instance", function (event, argv) {
+    if (win) {
+        if (win.isMinimized()) win.restore();
+        win.focus();
+    }
+    // Check for inker:// protocol URL
+    for (var ai = 0; ai < argv.length; ai++) {
+        if (typeof argv[ai] === "string" && argv[ai].startsWith("inker://")) {
+            handleInkerUrl(argv[ai]);
+            break;
+        }
+    }
+});
+
+// Handle open-url on macOS
+app.on("open-url", function (event, url) {
+    event.preventDefault();
+    handleInkerUrl(url);
+});
+
+async function openRemoteFileAndLaunch(user, drop, filePath) {
+    try {
+        if (!mountManager) {
+            logToRenderer("Cannot open file: mount manager not ready");
+            return;
+        }
+        var localPath = await mountManager.openRemoteFile(user, drop, filePath);
+        logToRenderer("Opening downloaded file: " + localPath);
+        await shell.openPath(localPath);
+    } catch (err) {
+        logToRenderer("Failed to open remote file: " + err.message);
     }
 }
 
@@ -136,53 +128,92 @@ async function initializeApp() {
             logToRenderer("[sync error] " + data.dropPath + "/" + data.file + ": " + data.error);
         });
 
+        // Check for saved session
         var auth = await settings.getAuth();
         if (auth) {
             apiClient.setSession(auth.email, auth.username, auth.session_id);
-            logToRenderer("Loaded session for " + auth.username);
+            logToRenderer("Saved session found for " + auth.username);
 
-            // Enable auto-start on first run
-            try {
-                if (!app.getLoginItemSettings().openAtLogin) {
-                    app.setLoginItemSettings({ openAtLogin: true, openAsHidden: true, path: process.execPath });
-                    logToRenderer("Auto-start enabled");
+            var sessionResult = await apiClient.sessionConfirm();
+            if (sessionResult.valid) {
+                logToRenderer("Session confirmed: " + sessionResult.username);
+                if (sessionResult.username && sessionResult.username !== auth.username) {
+                    await settings.saveAuth(auth.email, sessionResult.username, apiClient.sessionId);
                 }
-            } catch (e) {
-                logToRenderer("Auto-start check: " + e.message);
-            }
 
-            var mounts = await settings.getMounts();
-            logToRenderer("Found " + mounts.length + " saved mount(s)");
-            for (var mi = 0; mi < mounts.length; mi++) {
-                var mount = mounts[mi];
-                if (mount.auto_mount) {
-                    try {
-                        logToRenderer("Auto-adding " + mount.drop_path + " at " + mount.mount_point);
-                        await mountManager.mount(mount.user, mount.drop, mount.mount_point);
-                    } catch (err) {
-                        logToRenderer("Failed to auto-add " + mount.drop_path + ": " + err.message);
+                try {
+                    if (!app.getLoginItemSettings().openAtLogin) {
+                        app.setLoginItemSettings({ openAtLogin: true, openAsHidden: true, path: process.execPath });
+                        logToRenderer("Auto-start enabled");
+                    }
+                } catch (e) {
+                    logToRenderer("Auto-start check: " + e.message);
+                }
+
+                var mounts = await settings.getMounts();
+                logToRenderer("Found " + mounts.length + " saved mount(s)");
+                for (var mi = 0; mi < mounts.length; mi++) {
+                    var mount = mounts[mi];
+                    if (mount.auto_mount) {
+                        try {
+                            logToRenderer("Auto-adding " + mount.drop_path + " at " + mount.mount_point);
+                            await mountManager.mount(mount.user, mount.drop, mount.mount_point);
+                        } catch (err) {
+                            logToRenderer("Failed to auto-add " + mount.drop_path + ": " + err.message);
+                        }
                     }
                 }
+
+                appReady = true;
+                if (win && !win.isDestroyed()) win.webContents.send("inker:ready", {
+                    valid: true,
+                    email: sessionResult.email || auth.email,
+                    username: sessionResult.username || auth.username
+                });
+            } else {
+                logToRenderer("Session expired on server");
+                await settings.clearAuth();
+                appReady = true;
+                if (win && !win.isDestroyed()) win.webContents.send("inker:ready", { valid: false });
             }
         } else {
             logToRenderer("No saved session found");
+            appReady = true;
+            if (win && !win.isDestroyed()) win.webContents.send("inker:ready", { valid: false });
         }
 
-        appReady = true;
-        if (win && !win.isDestroyed()) win.webContents.send("inker:ready");
+        // Handle any inker:// protocol URL from argv (e.g. if launched from Explorer)
+        for (var ai = 0; ai < process.argv.length; ai++) {
+            if (typeof process.argv[ai] === "string" && process.argv[ai].startsWith("inker://")) {
+                setTimeout(function(url) { handleInkerUrl(url); }, 1000, process.argv[ai]);
+                break;
+            }
+        }
+
         logToRenderer("Application initialized successfully");
     } catch (err) {
         logToRenderer("Initialization error: " + err.message);
+        appReady = true;
+        if (win && !win.isDestroyed()) win.webContents.send("inker:ready", { valid: false });
     }
 }
+
+// ====== IPC Handlers ======
 
 ipcMain.handle("inker:login", async function (event, email, password) {
     try {
         logToRenderer("Attempting login for " + email);
         var result = await apiClient.login(email, password);
         await settings.saveAuth(email, result.username, apiClient.sessionId);
-        logToRenderer("Login successful: " + result.username);
-        return { success: true, username: result.username, email: email };
+
+        var sessionResult = await apiClient.sessionConfirm();
+        if (sessionResult.valid) {
+            logToRenderer("Login confirmed: " + result.username);
+            return { success: true, username: result.username, email: email };
+        } else {
+            logToRenderer("Login succeeded but session not confirmed");
+            return { success: true, username: result.username, email: email };
+        }
     } catch (err) {
         logToRenderer("Login failed: " + err.message);
         throw err;
@@ -192,8 +223,8 @@ ipcMain.handle("inker:login", async function (event, email, password) {
 ipcMain.handle("inker:logout", async function () {
     try {
         logToRenderer("Logging out...");
-        mountManager.closeAll();
-        syncManager.stopAllSync();
+        if (mountManager) mountManager.closeAll();
+        if (syncManager) syncManager.stopAllSync();
         await settings.clearAuth();
         apiClient.sessionId = null;
         apiClient.email = null;
@@ -206,10 +237,17 @@ ipcMain.handle("inker:logout", async function () {
     }
 });
 
-ipcMain.handle("inker:get-current-user", async function () {
+ipcMain.handle("inker:get-session", async function () {
     var auth = await settings.getAuth();
-    if (auth) {
-        return { email: auth.email, username: auth.username };
+    if (auth && apiClient.sessionId) {
+        var result = await apiClient.sessionConfirm();
+        if (result.valid) {
+            return { email: result.email || auth.email, username: result.username || auth.username };
+        } else {
+            await settings.clearAuth();
+            apiClient.sessionId = null;
+            return null;
+        }
     }
     return null;
 });
@@ -226,27 +264,30 @@ ipcMain.handle("inker:search-drops", async function (event, query) {
     }
 });
 
-ipcMain.handle("inker:list-drops", async function () {
+ipcMain.handle("inker:get-file-index", async function (event, user, drop) {
     try {
-        logToRenderer("Listing all Drops...");
-        var results = await apiClient.listDrops();
-        logToRenderer("Found " + results.length + " Drop(s)");
-        return results;
+        if (!mountManager) return [];
+        var index = mountManager.getIndex(user + "/" + drop);
+        if (!index) return [];
+        // Return files (not directories) for the file browser
+        return index.filter(function(e) { return e.kind !== "directory"; });
     } catch (err) {
-        logToRenderer("List Drops failed: " + err.message);
-        throw err;
+        logToRenderer("Get file index error: " + err.message);
+        return [];
     }
 });
 
-ipcMain.handle("inker:verify-drop", async function (event, user, drop) {
+ipcMain.handle("inker:open-file", async function (event, user, drop, filePath) {
     try {
-        logToRenderer("Checking " + user + "/" + drop + "...");
-        var result = await apiClient.verifyDrop(user, drop);
-        logToRenderer(user + "/" + drop + ": " + (result ? "exists" : "not found"));
-        return result;
+        logToRenderer("Opening file: " + user + "/" + drop + "/" + filePath);
+        var localPath = await mountManager.openRemoteFile(user, drop, filePath);
+        logToRenderer("Downloaded to cache: " + localPath);
+        var result = await shell.openPath(localPath);
+        logToRenderer("Shell open result: " + result);
+        return { path: localPath, openResult: result };
     } catch (err) {
-        logToRenderer("Check failed: " + err.message);
-        return false;
+        logToRenderer("Open file error: " + err.message);
+        throw err;
     }
 });
 
@@ -259,11 +300,11 @@ ipcMain.handle("inker:mount-drop", async function (event, user, drop, mountPoint
         fs.mkdirSync(mountPoint, { recursive: true });
         logToRenderer("Adding " + user + "/" + drop + " at " + mountPoint);
 
-        var existingPath = user + "/" + drop;
-        if (mountManager.isMounted(existingPath)) {
+        var dropPath = user + "/" + drop;
+        if (mountManager.isMounted(dropPath)) {
             logToRenderer(user + "/" + drop + " already added, reloading...");
-            await mountManager.unmount(existingPath);
-            syncManager.stopSync(existingPath);
+            await mountManager.unmount(dropPath);
+            syncManager.stopSync(dropPath);
         }
 
         var result = await mountManager.mount(user, drop, mountPoint);
@@ -290,14 +331,12 @@ ipcMain.handle("inker:unmount-drop", async function (event, user, drop) {
         syncManager.stopSync(dropPath);
         await settings.removeMount(dropPath);
 
-        // Clean up files on disk
         if (state && state.mountPoint) {
             var mp = state.mountPoint;
             logToRenderer("Cleaning up files at " + mp);
             if (fs.existsSync(mp)) {
                 fs.rmSync(mp, { recursive: true, force: true });
                 logToRenderer("Deleted " + mp);
-                // Remove empty parent directories up the chain
                 var dirs = mp.split(path.sep);
                 for (var i = dirs.length - 1; i >= 2; i--) {
                     var parent = dirs.slice(0, i).join(path.sep);
@@ -324,8 +363,7 @@ ipcMain.handle("inker:unmount-drop", async function (event, user, drop) {
 
 ipcMain.handle("inker:get-mounts", async function () {
     try {
-        var mounts = mountManager.getActiveMounts();
-        return mounts;
+        return mountManager ? mountManager.getActiveMounts() : [];
     } catch (err) {
         logToRenderer("Get mounts error: " + err.message);
         throw err;
@@ -364,6 +402,17 @@ ipcMain.handle("inker:open-path", async function (event, localPath) {
     }
 });
 
+ipcMain.handle("inker:open-external", async function (event, url) {
+    try {
+        logToRenderer("Opening external: " + url);
+        await shell.openExternal(url);
+        return { success: true };
+    } catch (err) {
+        logToRenderer("Open external failed: " + err.message);
+        throw err;
+    }
+});
+
 ipcMain.on("window:minimize", function () {
     if (win) win.minimize();
 });
@@ -378,53 +427,8 @@ ipcMain.on("window:maximize", function () {
     }
 });
 
-ipcMain.handle("inker:get-index", function (event, user, drop) {
-    var dropPath = user + "/" + drop;
-    var index = mountManager.getIndex(dropPath);
-    if (!index) return [];
-    return index;
-});
-
-ipcMain.handle("inker:download-file", async function (event, user, drop, relPath) {
-    logToRenderer("Downloading " + user + "/" + drop + "/" + relPath);
-    var state = mountManager.getMount(user + "/" + drop);
-    if (!state) throw new Error("Drop not added");
-    var localPath = await mountManager._downloadFile(user, drop, relPath, state.mountPoint);
-    mountManager.updateFileAccess(user + "/" + drop, relPath);
-    logToRenderer("Downloaded " + relPath + " -> " + localPath);
-    return { path: localPath };
-});
-
-ipcMain.handle("inker:upload-file", async function (event, user, drop, relPath) {
-    logToRenderer("Uploading " + user + "/" + drop + "/" + relPath);
-    var state = mountManager.getMount(user + "/" + drop);
-    if (!state) throw new Error("Drop not added");
-    await mountManager._uploadFile(user, drop, relPath, state.mountPoint);
-    logToRenderer("Uploaded " + relPath);
-    return { success: true };
-});
-
-ipcMain.handle("inker:evict-files", async function (event, user, drop) {
-    var state = mountManager.getMount(user + "/" + drop);
-    if (!state) return { evicted: 0 };
-    var index = state.index;
-    var cutoff = Date.now() - (15 * 60 * 1000);
-    var evicted = 0;
-    for (var i = 0; i < index.length; i++) {
-        var entry = index[i];
-        if (entry.kind === "directory") continue;
-        if (!entry.synced) continue;
-        if (entry.lastAccess > 0 && entry.lastAccess < cutoff) {
-            var localPath = path.join(state.mountPoint, entry.path);
-            if (fs.existsSync(localPath)) {
-                try { fs.unlinkSync(localPath); evicted++; } catch (e) {}
-            }
-            entry.synced = false;
-            entry.lastAccess = 0;
-        }
-    }
-    logToRenderer("Evicted " + evicted + " files from " + user + "/" + drop);
-    return { evicted: evicted };
+ipcMain.on("window:close", function () {
+    if (win) win.close();
 });
 
 app.whenReady().then(function () {

@@ -1,8 +1,16 @@
 run:
 	npm start
 
+build:
+	npx electron-packager . "FtR Inker" --platform=win32 --arch=x64 --out=dist --icon=icon.png --overwrite --no-prune
+
 msi:
 	cd BUILD && build_msi.bat
 
 check:
-	node -e "var f=['main.js','preload.js','renderer/renderer.js','lib/mount-manager.js','lib/api-client.js','lib/sync-manager.js','lib/settings.js'],p='c:\\Users\\THA0065\\FtR-Project\\ftr-project\\inker3\\';f.forEach(function(fn){try{require('child_process').execSync('node --check '+p+fn,{stdio:'pipe'});console.log('PASS: '+fn)}catch(e){console.log('FAIL: '+fn+' - '+e.message)}})"
+	node --check main.js && node --check preload.js && node --check renderer/renderer.js && node --check lib/api-client.js && node --check lib/sync-manager.js && node --check lib/settings.js && node --check lib/mount-manager.js
+
+clean:
+	if exist dist rmdir /s /q dist
+
+.PHONY: run build msi check clean
