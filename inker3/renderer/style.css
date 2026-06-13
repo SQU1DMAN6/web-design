@@ -317,6 +317,28 @@ body {
     color: white;
 }
 
+/* ====== Sidebar Footer / Cache ====== */
+.sidebar-footer {
+    padding: 12px 16px;
+    border-top: 1px solid var(--border);
+    margin-top: auto;
+}
+
+.cache-section {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+.cache-info {
+    font-size: 10px;
+    color: var(--muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
 /* ====== Main Content ====== */
 .main {
     flex: 1;
@@ -679,6 +701,14 @@ body {
     background: var(--accent-soft);
 }
 
+.file-browser .file-icon {
+    font-size: 14px;
+    width: 22px;
+    text-align: center;
+    flex-shrink: 0;
+    line-height: 1;
+}
+
 .file-browser .file-name {
     flex: 1;
     font-family: 'SF Mono', 'Cascadia Code', monospace;
@@ -693,6 +723,7 @@ body {
     color: var(--muted);
     width: 60px;
     text-align: right;
+    flex-shrink: 0;
 }
 
 .no-files {

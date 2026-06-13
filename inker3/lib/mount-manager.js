@@ -10,6 +10,15 @@ class MountManager extends EventEmitter {
         this.activeMounts = new Map();
     }
 
+    _shouldInclude(relPath) {
+        var parts = relPath.split("/");
+        for (var pi = 0; pi < parts.length; pi++) {
+            if (parts[pi].startsWith(".")) return false;
+        }
+        if (relPath.endsWith(".url") || relPath.endsWith(".lnk") || relPath.endsWith(".ftr_index.json")) return false;
+        return true;
+    }
+
     async mount(user, drop, mountPoint) {
         var dropPath = user + "/" + drop;
         console.log("[MountManager] mount ENTER: " + dropPath + " -> " + mountPoint);
@@ -35,8 +44,7 @@ class MountManager extends EventEmitter {
             var entry = entries[i];
             var relPath = entry.path || entry.name;
             if (!relPath) continue;
-
-            // Skip hidden/trash entries (any component starting with .)
+            // Skip hidden/dotfiles in the index, but NOT .url files (those are local only)
             var nameParts = relPath.split("/");
             var skip = false;
             for (var pi = 0; pi < nameParts.length; pi++) {
@@ -54,11 +62,10 @@ class MountManager extends EventEmitter {
                 var localDir = path.join(mountPoint, relPath);
                 fs.mkdirSync(localDir, { recursive: true });
             } else {
+                // Create .url shortcut file (Windows Internet Shortcut)
+                // These are LOCAL ONLY — never synced to remote (sync-manager filters .url)
                 var parentDir = path.join(mountPoint, path.dirname(relPath));
                 fs.mkdirSync(parentDir, { recursive: true });
-
-                // Create .url shortcut file (Windows Internet Shortcut format)
-                // Format: [InternetShortcut]\r\nURL=inker://user/drop/encoded-path
                 var encodedPath = nameParts.map(function(p) { return encodeURIComponent(p); }).join("/");
                 var inkerUrl = "inker://" + user + "/" + drop + "/" + encodedPath;
                 var shortcutPath = path.join(mountPoint, relPath + ".url");
@@ -96,13 +103,12 @@ class MountManager extends EventEmitter {
             remoteEntries: entries
         });
 
-        console.log("[MountManager] " + dropPath + " added with " + indexEntries.length + " entries (" + (entries.length - indexEntries.length) + " hidden skipped)");
+        console.log("[MountManager] " + dropPath + " added with " + indexEntries.length + " entries (" + (entries.length - indexEntries.length) + " filtered)");
         this.emit("mounted", { dropPath: dropPath, mountPoint: mountPoint });
         return { dropPath: dropPath, mountPoint: mountPoint };
     }
 
     async openRemoteFile(user, drop, relPath) {
-        // Download a file and return the local cached path
         console.log("[MountManager] openRemoteFile: " + user + "/" + drop + "/" + relPath);
 
         var cacheDir = path.join(os.homedir(), ".inker", "cache", user, drop);
@@ -124,33 +130,47 @@ class MountManager extends EventEmitter {
         return localPath;
     }
 
-    async _downloadFile(user, drop, relPath, mountPoint) {
-        console.log("[MountManager] _downloadFile: " + relPath);
-        var localPath = path.join(mountPoint, relPath);
-        var localDir = path.dirname(localPath);
-        fs.mkdirSync(localDir, { recursive: true });
+    async openCachedFile(user, drop, relPath) {
+        var cacheDir = path.join(os.homedir(), ".inker", "cache", user, drop);
+        var fileName = relPath.split("/").pop();
+        var localPath = path.join(cacheDir, fileName);
 
-        var stream = await this.apiClient.downloadFile(user, drop, relPath);
-        return new Promise(function (resolve, reject) {
-            var out = fs.createWriteStream(localPath);
-            stream.on("error", reject);
-            out.on("error", reject);
-            out.on("finish", function () {
-                console.log("[MountManager] _downloadFile saved: " + relPath);
-                resolve(localPath);
-            });
-            stream.pipe(out);
-        });
+        if (fs.existsSync(localPath)) {
+            console.log("[MountManager] Cache hit: " + localPath);
+            return localPath;
+        }
+        return await this.openRemoteFile(user, drop, relPath);
     }
 
-    async _uploadFile(user, drop, relPath, mountPoint) {
-        console.log("[MountManager] _uploadFile: " + relPath);
-        var localPath = path.join(mountPoint, relPath);
-        if (!fs.existsSync(localPath)) return;
+    getCacheSize() {
+        var cacheRoot = path.join(os.homedir(), ".inker", "cache");
+        if (!fs.existsSync(cacheRoot)) return 0;
+        var total = 0;
+        try {
+            this._walkSize(cacheRoot, function(size) { total += size; });
+        } catch (e) {}
+        return total;
+    }
 
-        var content = fs.readFileSync(localPath);
-        await this.apiClient.uploadFile(user, drop, relPath, content);
-        console.log("[MountManager] _uploadFile uploaded: " + relPath);
+    _walkSize(dir, callback) {
+        var entries = fs.readdirSync(dir, { withFileTypes: true });
+        for (var i = 0; i < entries.length; i++) {
+            var e = entries[i];
+            var full = path.join(dir, e.name);
+            if (e.isDirectory()) {
+                this._walkSize(full, callback);
+            } else if (e.isFile()) {
+                try { callback(fs.statSync(full).size); } catch (ex) {}
+            }
+        }
+    }
+
+    clearCache() {
+        var cacheRoot = path.join(os.homedir(), ".inker", "cache");
+        if (fs.existsSync(cacheRoot)) {
+            fs.rmSync(cacheRoot, { recursive: true, force: true });
+            fs.mkdirSync(cacheRoot, { recursive: true });
+        }
     }
 
     async unmount(dropPath) {

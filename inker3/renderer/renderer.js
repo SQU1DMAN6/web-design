@@ -48,9 +48,14 @@ const menuAddAuto = document.getElementById("menu-add-automount");
 const menuRemoveAuto = document.getElementById("menu-remove-automount");
 const menuRemove = document.getElementById("menu-remove");
 
+// ====== Cache ======
+const cacheInfo = document.getElementById("cache-info");
+const clearCacheBtn = document.getElementById("clear-cache-btn");
+
 // ====== State ======
 var activeContextDrop = null;
 var authData = null;
+var sessionCheckDone = false;
 
 // ====== Log Helper ======
 function appendLog(message) {
@@ -68,10 +73,42 @@ function appendLog(message) {
     console.log("[Inker] " + message);
 }
 
+// ====== File Icon Helper ======
+function getFileIcon(filename) {
+    if (!filename) return "\uD83D\uDCC4";
+    var ext = filename.split(".").pop().toLowerCase();
+    var icons = {
+        "mp3":"\uD83C\uDFB5","wav":"\uD83C\uDFB5","flac":"\uD83C\uDFB5","ogg":"\uD83C\uDFB5","aac":"\uD83C\uDFB5","m4a":"\uD83C\uDFB5",
+        "mp4":"\uD83C\uDFAC","avi":"\uD83C\uDFAC","mkv":"\uD83C\uDFAC","mov":"\uD83C\uDFAC","webm":"\uD83C\uDFAC",
+        "jpg":"\uD83D\uDDBC","jpeg":"\uD83D\uDDBC","png":"\uD83D\uDDBC","gif":"\uD83D\uDDBC","bmp":"\uD83D\uDDBC","webp":"\uD83D\uDDBC","svg":"\uD83D\uDDBC",
+        "pdf":"\uD83D\uDCC4","doc":"\uD83D\uDCDD","docx":"\uD83D\uDCDD","xls":"\uD83D\uDCCA","xlsx":"\uD83D\uDCCA","ppt":"\uD83D\uDCC8","pptx":"\uD83D\uDCC8",
+        "zip":"\uD83D\uDCE6","rar":"\uD83D\uDCE6","7z":"\uD83D\uDCE6","tar":"\uD83D\uDCE6","gz":"\uD83D\uDCE6",
+        "txt":"\uD83D\uDCDD","md":"\uD83D\uDCDD","json":"\uD83D\uDCCB","xml":"\uD83D\uDCCB",
+        "exe":"\u2699","msi":"\u2699","dll":"\u2699",
+        "js":"\uD83D\uDCD8","ts":"\uD83D\uDCD8","py":"\uD83D\uDCD8","go":"\uD83D\uDCD8","c":"\uD83D\uDCD8","cpp":"\uD83D\uDCD8","java":"\uD83D\uDCD8",
+        "html":"\uD83C\uDF10","css":"\uD83C\uDFA8","scss":"\uD83C\uDFA8","less":"\uD83C\uDFA8",
+        "folder":"\uD83D\uDCC1","directory":"\uD83D\uDCC1"
+    };
+    return icons[ext] || "\uD83D\uDCC4";
+}
+
+function formatSize(bytes) {
+    if (!bytes || bytes === 0) return "0 B";
+    var units = ["B", "KB", "MB", "GB"];
+    var i = 0;
+    var size = bytes;
+    while (size >= 1024 && i < units.length - 1) {
+        size /= 1024;
+        i++;
+    }
+    return Math.round(size * 10) / 10 + " " + units[i];
+}
+
 // ====== Screen Transitions ======
 function showLoginScreen() {
     authScreen.classList.add("active");
     mainScreen.classList.remove("active");
+    sessionCheckDone = true;
     if (emailInput) emailInput.focus();
 }
 
@@ -79,10 +116,12 @@ function showMainScreen(user) {
     authData = user;
     authScreen.classList.remove("active");
     mainScreen.classList.add("active");
+    sessionCheckDone = true;
     document.getElementById("sidebar-username").textContent = user.username || user.email;
     document.getElementById("sidebar-email").textContent = user.email;
     refreshDropsList();
     refreshAutoMountList();
+    refreshCacheInfo();
 }
 
 // ====== Navigation ======
@@ -109,10 +148,7 @@ if (loginForm) {
         e.preventDefault();
         var email = emailInput.value.trim();
         var password = passwordInput.value;
-        if (authError) {
-            authError.style.display = "none";
-            authError.textContent = "";
-        }
+        if (authError) { authError.style.display = "none"; authError.textContent = ""; }
         try {
             appendLog("Logging in as " + email + "...");
             var result = await window.inker.login(email, password);
@@ -121,10 +157,7 @@ if (loginForm) {
             showMainScreen(result);
         } catch (err) {
             appendLog("Login error: " + err.message);
-            if (authError) {
-                authError.textContent = err.message || "Login failed";
-                authError.style.display = "block";
-            }
+            if (authError) { authError.textContent = err.message || "Login failed"; authError.style.display = "block"; }
         }
     });
 }
@@ -145,13 +178,38 @@ if (logoutBtn) {
             appendLog("Logged out");
             authData = null;
             showLoginScreen();
+        } catch (err) { appendLog("Logout error: " + err.message); }
+    });
+}
+
+// ====== Cache Info ======
+async function refreshCacheInfo() {
+    if (!cacheInfo) return;
+    try {
+        var info = await window.inker.getCacheInfo();
+        if (info && info.size > 0) {
+            cacheInfo.textContent = "Cached files: " + formatSize(info.size);
+        } else {
+            cacheInfo.textContent = "No cached files";
+        }
+    } catch (e) {
+        cacheInfo.textContent = "Cache: unknown";
+    }
+}
+
+if (clearCacheBtn) {
+    clearCacheBtn.addEventListener("click", async function () {
+        try {
+            await window.inker.clearCache();
+            appendLog("Cache cleared");
+            refreshCacheInfo();
         } catch (err) {
-            appendLog("Logout error: " + err.message);
+            appendLog("Clear cache error: " + err.message);
         }
     });
 }
 
-// ====== Drops List (with file browser) ======
+// ====== Drops List (no file browser — just mount cards) ======
 async function refreshDropsList() {
     try {
         var mounts = await window.inker.getActiveMounts();
@@ -167,7 +225,6 @@ async function refreshDropsList() {
             var section = document.createElement("div");
             section.className = "mount-section";
 
-            // Drop header card
             var card = document.createElement("div");
             card.className = "drop-card";
             card.innerHTML =
@@ -180,109 +237,49 @@ async function refreshDropsList() {
                     '<button class="btn btn-small menu-btn" data-user="' + user + '" data-drop="' + drop + '">...</button>' +
                 '</div>';
             section.appendChild(card);
-
-            // File list for this drop
-            var fileArea = document.createElement("div");
-            fileArea.className = "file-list-area";
-            fileArea.id = "files-" + user + "-" + drop;
-
-            var fileHeader = document.createElement("div");
-            fileHeader.className = "file-list-header";
-            fileHeader.innerHTML =
-                '<span>Files</span>' +
-                '<button class="btn btn-small btn-load-files" data-user="' + user + '" data-drop="' + drop + '">Load</button>';
-            fileArea.appendChild(fileHeader);
-
-            var fileContainer = document.createElement("div");
-            fileContainer.className = "file-browser hidden";
-            fileContainer.id = "file-browser-" + user + "-" + drop;
-            fileArea.appendChild(fileContainer);
-
-            section.appendChild(fileArea);
             dropsList.appendChild(section);
         }
-
-        // Bind load file buttons
-        document.querySelectorAll(".btn-load-files").forEach(function (btn) {
-            btn.addEventListener("click", async function () {
-                var u = btn.dataset.user;
-                var d = btn.dataset.drop;
-                var container = document.getElementById("file-browser-" + u + "-" + d);
-                if (!container) return;
-
-                btn.textContent = "Loading...";
-                btn.disabled = true;
-
-                try {
-                    var files = await window.inker.getFileIndex(u, d);
-                    if (!files || files.length === 0) {
-                        container.innerHTML = '<p class="no-files">No files available</p>';
-                    } else {
-                        container.innerHTML = "";
-                        for (var fi = 0; fi < files.length; fi++) {
-                            var f = files[fi];
-                            var fileItem = document.createElement("div");
-                            fileItem.className = "file-item";
-                            var sizeStr = formatSize(f.size);
-                            fileItem.innerHTML =
-                                '<span class="file-name">' + escapeHtml(f.name) + '</span>' +
-                                '<span class="file-size">' + sizeStr + '</span>' +
-                                '<button class="btn btn-small btn-primary btn-download" data-user="' + u + '" data-drop="' + d + '" data-path="' + f.path + '">Download & Open</button>';
-                            container.appendChild(fileItem);
-                        }
-                    }
-                    container.classList.remove("hidden");
-                    btn.textContent = "Refresh";
-                    btn.disabled = false;
-                } catch (err) {
-                    appendLog("Load files error: " + err.message);
-                    btn.textContent = "Load";
-                    btn.disabled = false;
-                }
-            });
-        });
-
-        // Bind download buttons (delegated)
-        document.querySelectorAll(".btn-download").forEach(function (btn) {
-            btn.addEventListener("click", async function () {
-                var u = btn.dataset.user;
-                var d = btn.dataset.drop;
-                var fp = btn.dataset.path;
-                btn.textContent = "Downloading...";
-                btn.disabled = true;
-                try {
-                    appendLog("Opening " + u + "/" + d + "/" + fp + "...");
-                    var result = await window.inker.openFile(u, d, fp);
-                    appendLog("Opened: " + result.path);
-                    btn.textContent = "Opened";
-                    btn.className = "btn btn-small btn-added";
-                } catch (err) {
-                    appendLog("Download error: " + err.message);
-                    btn.textContent = "Retry";
-                    btn.disabled = false;
-                }
-            });
-        });
     } catch (err) {
         appendLog("refreshDropsList error: " + err.message);
     }
 }
 
-function formatSize(bytes) {
-    if (!bytes || bytes === 0) return "0 B";
-    var units = ["B", "KB", "MB", "GB"];
-    var i = 0;
-    var size = bytes;
-    while (size >= 1024 && i < units.length - 1) {
-        size /= 1024;
-        i++;
-    }
-    return Math.round(size * 10) / 10 + " " + units[i];
-}
-
 function escapeHtml(str) {
     if (!str) return "";
-    return String(str).replace(/&/g, String.fromCharCode(38,97,109,112,59)).replace(/</g, String.fromCharCode(38,108,116,59)).replace(/>/g, String.fromCharCode(38,103,116,59)).replace(/"/g, String.fromCharCode(38,113,117,111,116,59));
+    return String(str).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+
+// ====== Auto-Mount List ======
+async function refreshAutoMountList() {
+    try {
+        var saved = await window.inker.getSavedMounts();
+        if (autoMountList) autoMountList.innerHTML = "";
+        var autoMounts = saved.filter(function (m) { return m.auto_mount; });
+        if (noAutoMountMsg) noAutoMountMsg.style.display = autoMounts.length === 0 ? "block" : "none";
+
+        for (var i = 0; i < autoMounts.length; i++) {
+            var m = autoMounts[i];
+            var item = document.createElement("div");
+            item.className = "auto-mount-item";
+            item.innerHTML =
+                '<span class="auto-mount-path">' + m.drop_path + '</span>' +
+                '<button class="btn btn-small btn-ghost disable-auto-btn" data-drop-path="' + m.drop_path + '">Disable</button>';
+            autoMountList.appendChild(item);
+        }
+
+        document.querySelectorAll(".disable-auto-btn").forEach(function (btn) {
+            btn.addEventListener("click", async function () {
+                var dropPath = btn.dataset.dropPath;
+                var parts = dropPath.split("/");
+                try {
+                    await window.inker.setAutoMount(parts[0], parts[1], false);
+                    refreshAutoMountList();
+                    refreshDropsList();
+                    appendLog("Auto-add disabled for " + dropPath);
+                } catch (err) { appendLog("Disable auto-add error: " + err.message); }
+            });
+        });
+    } catch (err) { appendLog("refreshAutoMountList error: " + err.message); }
 }
 
 // ====== Context Menu ======
@@ -343,16 +340,11 @@ async function openDropFolder() {
             appendLog("Opening folder: " + mount.mountPoint);
             await window.inker.openPath(mount.mountPoint);
         }
-    } catch (err) {
-        appendLog("Open folder error: " + err.message);
-    }
+    } catch (err) { appendLog("Open folder error: " + err.message); }
     if (dropMenu) dropMenu.classList.add("hidden");
 }
 
-if (menuOpen) {
-    menuOpen.addEventListener("click", openDropFolder);
-}
-
+if (menuOpen) { menuOpen.addEventListener("click", openDropFolder); }
 if (menuAddAuto) {
     menuAddAuto.addEventListener("click", async function () {
         if (!activeContextDrop) return;
@@ -361,12 +353,9 @@ if (menuAddAuto) {
             appendLog("Auto-add enabled for " + activeContextDrop.user + "/" + activeContextDrop.drop);
             if (dropMenu) dropMenu.classList.add("hidden");
             refreshAutoMountList();
-        } catch (err) {
-            appendLog("Auto-add error: " + err.message);
-        }
+        } catch (err) { appendLog("Auto-add error: " + err.message); }
     });
 }
-
 if (menuRemoveAuto) {
     menuRemoveAuto.addEventListener("click", async function () {
         if (!activeContextDrop) return;
@@ -375,12 +364,9 @@ if (menuRemoveAuto) {
             appendLog("Auto-add disabled for " + activeContextDrop.user + "/" + activeContextDrop.drop);
             if (dropMenu) dropMenu.classList.add("hidden");
             refreshAutoMountList();
-        } catch (err) {
-            appendLog("Auto-add disable error: " + err.message);
-        }
+        } catch (err) { appendLog("Auto-add disable error: " + err.message); }
     });
 }
-
 if (menuRemove) {
     menuRemove.addEventListener("click", async function () {
         if (!activeContextDrop) return;
@@ -391,9 +377,7 @@ if (menuRemove) {
             if (dropMenu) dropMenu.classList.add("hidden");
             refreshDropsList();
             refreshAutoMountList();
-        } catch (err) {
-            appendLog("Remove error: " + err.message);
-        }
+        } catch (err) { appendLog("Remove error: " + err.message); }
     });
 }
 
@@ -471,10 +455,7 @@ async function addDrop(user, drop, button) {
         refreshAutoMountList();
     } catch (err) {
         appendLog("Add error: " + err.message);
-        if (button) {
-            button.textContent = "Add";
-            button.disabled = false;
-        }
+        if (button) { button.textContent = "Add"; button.disabled = false; }
     }
 }
 
@@ -516,6 +497,7 @@ if (clearLogBtn) {
 }
 
 // ====== App Initialization ======
+// We ONLY use onReady — no fallback getSession() race condition
 if (window.inker) {
     window.inker.onLog(function (message) {
         appendLog(message);
@@ -529,21 +511,12 @@ if (window.inker) {
             showLoginScreen();
         }
     });
-}
 
-// Fallback: check session directly
-if (window.inker) {
-    (async function () {
-        try {
-            var session = await window.inker.getSession();
-            if (session) {
-                showMainScreen(session);
-                appendLog("Session restored for " + session.username);
-            } else {
-                showLoginScreen();
-            }
-        } catch (e) {
+    // Safety timeout: if onReady doesn't fire within 15s, show login
+    setTimeout(function () {
+        if (!sessionCheckDone) {
+            appendLog("[App] Session check timeout — showing login");
             showLoginScreen();
         }
-    })();
+    }, 15000);
 }
