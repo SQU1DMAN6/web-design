@@ -1,5 +1,6 @@
 const fs = require("fs");
 const path = require("path");
+const os = require("os");
 const { EventEmitter } = require("events");
 
 class SyncManager extends EventEmitter {
@@ -43,9 +44,11 @@ class SyncManager extends EventEmitter {
             drop: drop,
             dropPath: dropPath,
             mountPoint: mountPoint,
+            cacheDir: path.join(os.homedir(), ".inker", "cache", user, drop),
             running: true,
             remoteTimer: null,
             watcher: null,
+            cacheWatcher: null,
             lastRemoteCheck: 0,
             knownFiles: new Map(),
             debounceTimers: new Map()
@@ -64,10 +67,36 @@ class SyncManager extends EventEmitter {
                 state.watcher = fs.watch(mountPoint, { recursive: true }, function(eventType, filename) {
                     self._onLocalChange(s, eventType, filename);
                 });
-                console.log("[SyncManager] fs.watch started for " + mountPoint);
+                console.log("[SyncManager] fs.watch started for mount " + mountPoint);
             }
         } catch (err) {
-            console.log("[SyncManager] fs.watch failed: " + err.message);
+            console.log("[SyncManager] fs.watch on mount failed: " + err.message);
+        }
+
+        // Also watch the cache directory so edits to cached files are synced back
+        try {
+            fs.mkdirSync(state.cacheDir, { recursive: true });
+            var self = this;
+            var s = state;
+            state.cacheWatcher = fs.watch(state.cacheDir, { recursive: true }, function(eventType, filename) {
+                if (!s.running || !filename) return;
+                // When a cached file changes, upload it to the remote
+                var relPath = filename.replace(/\\/g, "/");
+                // Skip hidden files
+                if (relPath.startsWith(".")) return;
+                // Debounce
+                if (s.debounceTimers.has("cache:" + relPath)) {
+                    clearTimeout(s.debounceTimers.get("cache:" + relPath));
+                }
+                var timer = setTimeout(function() {
+                    s.debounceTimers.delete("cache:" + relPath);
+                    self._processCacheChange(s, relPath);
+                }, 500);
+                s.debounceTimers.set("cache:" + relPath, timer);
+            });
+            console.log("[SyncManager] fs.watch started for cache " + state.cacheDir);
+        } catch (err) {
+            console.log("[SyncManager] fs.watch on cache failed: " + err.message);
         }
 
         setTimeout((function(self, s) {
@@ -246,6 +275,44 @@ class SyncManager extends EventEmitter {
         }
     }
 
+    _processCacheChange(state, filename) {
+        if (!state.running) return;
+        var fullPath = path.join(state.cacheDir, filename);
+        try {
+            if (!fs.existsSync(fullPath)) return;
+            var stat = fs.statSync(fullPath);
+            if (!stat.isFile() || stat.size === 0) return;
+
+            // Determine the remote path: cached file names match remote file names
+            var relPath = filename;
+
+            console.log("[SyncManager] Cache change detected, uploading: " + relPath);
+
+            // Read cached file content and upload to remote
+            var fileStream = fs.createReadStream(fullPath);
+            var self = this;
+            var s = state;
+            this.apiClient.uploadFile(state.user, state.drop, relPath, fileStream, stat.size)
+            .then(function(result) {
+                self.emit("file-synced", { dropPath: s.dropPath, file: relPath, type: "upload-cache" });
+                console.log("[SyncManager] Cache upload complete: " + relPath);
+                // Update knownFiles so the mount point .url shortcut stays in sync
+                s.knownFiles.set(relPath, {
+                    mtime: new Date().toISOString(),
+                    size: stat.size,
+                    kind: "file",
+                    synced: true
+                });
+                self._saveIndex(s);
+            })
+            .catch(function(err) {
+                self.emit("sync-error", { dropPath: s.dropPath, file: relPath, error: err.message });
+            });
+        } catch (err) {
+            this.emit("sync-error", { dropPath: state.dropPath, file: filename, error: err.message });
+        }
+    }
+
     async _syncRemote(state) {
         if (!state.running) return;
         try {
@@ -369,6 +436,9 @@ class SyncManager extends EventEmitter {
             if (state.remoteTimer) clearInterval(state.remoteTimer);
             if (state.watcher) {
                 try { state.watcher.close(); } catch (e) {}
+            }
+            if (state.cacheWatcher) {
+                try { state.cacheWatcher.close(); } catch (e) {}
             }
             state.debounceTimers.forEach(function(t) { clearTimeout(t); });
             state.debounceTimers.clear();
