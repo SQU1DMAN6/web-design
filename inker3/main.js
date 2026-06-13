@@ -18,6 +18,15 @@ if (!gotTheLock) {
     app.quit();
 }
 
+// Register inker:// protocol handler
+if (process.defaultApp) {
+    if (process.argv.length >= 2) {
+        app.setAsDefaultProtocolClient("inker", process.execPath, [path.resolve(process.argv[1])]);
+    }
+} else {
+    app.setAsDefaultProtocolClient("inker");
+}
+
 function createWindow() {
     win = new BrowserWindow({
         width: 1000,
@@ -27,21 +36,71 @@ function createWindow() {
         frame: false,
         transparent: true,
         backgroundColor: "#00000000",
+        icon: path.join(__dirname, "icon.ico"),
         webPreferences: {
             preload: path.join(__dirname, "preload.js"),
             contextIsolation: true,
             nodeIntegration: false
         }
     });
-
     win.loadFile("renderer/index.html");
 }
 
 function logToRenderer(message) {
-    const ts = new Date().toISOString().replace("T", " ").slice(0, 19);
+    if (!win || win.isDestroyed()) return;
+    var ts = new Date().toISOString().replace("T", " ").slice(0, 19);
     console.log("[INKER] " + ts + " " + message);
-    if (win && win.webContents) {
-        win.webContents.send("inker:log", message);
+    if (win.webContents) {
+        try { win.webContents.send("inker:log", message); } catch (e) { /* ignore */ }
+    }
+}
+
+// Handle inker:// protocol URLs
+function handleInkerUrl(url) {
+    logToRenderer("Protocol URL: " + url);
+    // Format: inker://user/drop/encoded-path
+    var parsed = url.replace("inker://", "").split("/");
+    if (parsed.length >= 3) {
+        var user = decodeURIComponent(parsed[0]);
+        var drop = decodeURIComponent(parsed[1]);
+        var filePath = parsed.slice(2).map(function(p) { return decodeURIComponent(p); }).join("/");
+        logToRenderer("Opening remote file: " + user + "/" + drop + "/" + filePath);
+        openRemoteFileAndLaunch(user, drop, filePath);
+    }
+}
+
+// Handle second instance (protocol URL from Explorer)
+app.on("second-instance", function (event, argv) {
+    if (win) {
+        if (win.isMinimized()) win.restore();
+        win.focus();
+    }
+    // Check for inker:// protocol URL
+    for (var ai = 0; ai < argv.length; ai++) {
+        if (typeof argv[ai] === "string" && argv[ai].startsWith("inker://")) {
+            handleInkerUrl(argv[ai]);
+            break;
+        }
+    }
+});
+
+// Handle open-url on macOS
+app.on("open-url", function (event, url) {
+    event.preventDefault();
+    handleInkerUrl(url);
+});
+
+async function openRemoteFileAndLaunch(user, drop, filePath) {
+    try {
+        if (!mountManager) {
+            logToRenderer("Cannot open file: mount manager not ready");
+            return;
+        }
+        var localPath = await mountManager.openRemoteFile(user, drop, filePath);
+        logToRenderer("Opening downloaded file: " + localPath);
+        await shell.openPath(localPath);
+    } catch (err) {
+        logToRenderer("Failed to open remote file: " + err.message);
     }
 }
 
@@ -52,12 +111,12 @@ async function initializeApp() {
         syncManager = new SyncManager(apiClient);
 
         mountManager.on("mounted", function (data) {
-            logToRenderer(" Mounted " + data.dropPath + " at " + data.mountPoint);
+            logToRenderer("Added " + data.dropPath + " at " + data.mountPoint);
             syncManager.startSync(data.dropPath, data.mountPoint);
         });
 
         mountManager.on("unmounted", function (data) {
-            logToRenderer(" Unmounted " + data.dropPath);
+            logToRenderer("Removed " + data.dropPath);
             syncManager.stopSync(data.dropPath);
         });
 
@@ -69,42 +128,92 @@ async function initializeApp() {
             logToRenderer("[sync error] " + data.dropPath + "/" + data.file + ": " + data.error);
         });
 
-        const auth = await settings.getAuth();
+        // Check for saved session
+        var auth = await settings.getAuth();
         if (auth) {
             apiClient.setSession(auth.email, auth.username, auth.session_id);
-            logToRenderer("Loaded session for " + auth.username);
+            logToRenderer("Saved session found for " + auth.username);
 
-            const mounts = await settings.getMounts();
-            logToRenderer("Found " + mounts.length + " saved mount(s)");
-            for (const mount of mounts) {
-                if (mount.auto_mount) {
-                    try {
-                        logToRenderer("Auto-mounting " + mount.drop_path + " at " + mount.mount_point);
-                        await mountManager.mount(mount.user, mount.drop, mount.mount_point);
-                    } catch (err) {
-                        logToRenderer("Failed to auto-mount " + mount.drop_path + ": " + err.message);
+            var sessionResult = await apiClient.sessionConfirm();
+            if (sessionResult.valid) {
+                logToRenderer("Session confirmed: " + sessionResult.username);
+                if (sessionResult.username && sessionResult.username !== auth.username) {
+                    await settings.saveAuth(auth.email, sessionResult.username, apiClient.sessionId);
+                }
+
+                try {
+                    if (!app.getLoginItemSettings().openAtLogin) {
+                        app.setLoginItemSettings({ openAtLogin: true, openAsHidden: true, path: process.execPath });
+                        logToRenderer("Auto-start enabled");
+                    }
+                } catch (e) {
+                    logToRenderer("Auto-start check: " + e.message);
+                }
+
+                var mounts = await settings.getMounts();
+                logToRenderer("Found " + mounts.length + " saved mount(s)");
+                for (var mi = 0; mi < mounts.length; mi++) {
+                    var mount = mounts[mi];
+                    if (mount.auto_mount) {
+                        try {
+                            logToRenderer("Auto-adding " + mount.drop_path + " at " + mount.mount_point);
+                            await mountManager.mount(mount.user, mount.drop, mount.mount_point);
+                        } catch (err) {
+                            logToRenderer("Failed to auto-add " + mount.drop_path + ": " + err.message);
+                        }
                     }
                 }
+
+                appReady = true;
+                if (win && !win.isDestroyed()) win.webContents.send("inker:ready", {
+                    valid: true,
+                    email: sessionResult.email || auth.email,
+                    username: sessionResult.username || auth.username
+                });
+            } else {
+                logToRenderer("Session expired on server");
+                await settings.clearAuth();
+                appReady = true;
+                if (win && !win.isDestroyed()) win.webContents.send("inker:ready", { valid: false });
             }
         } else {
             logToRenderer("No saved session found");
+            appReady = true;
+            if (win && !win.isDestroyed()) win.webContents.send("inker:ready", { valid: false });
         }
 
-        appReady = true;
-        if (win) win.webContents.send("inker:ready");
+        // Handle any inker:// protocol URL from argv (e.g. if launched from Explorer)
+        for (var ai = 0; ai < process.argv.length; ai++) {
+            if (typeof process.argv[ai] === "string" && process.argv[ai].startsWith("inker://")) {
+                setTimeout(function(url) { handleInkerUrl(url); }, 1000, process.argv[ai]);
+                break;
+            }
+        }
+
         logToRenderer("Application initialized successfully");
     } catch (err) {
         logToRenderer("Initialization error: " + err.message);
+        appReady = true;
+        if (win && !win.isDestroyed()) win.webContents.send("inker:ready", { valid: false });
     }
 }
+
+// ====== IPC Handlers ======
 
 ipcMain.handle("inker:login", async function (event, email, password) {
     try {
         logToRenderer("Attempting login for " + email);
-        const result = await apiClient.login(email, password);
+        var result = await apiClient.login(email, password);
         await settings.saveAuth(email, result.username, apiClient.sessionId);
-        logToRenderer("Login successful: " + result.username);
-        return { success: true, username: result.username, email: email };
+
+        var sessionResult = await apiClient.sessionConfirm();
+        if (sessionResult.valid) {
+            logToRenderer("Login confirmed: " + result.username);
+            return { success: true, username: result.username, email: email };
+        } else {
+            logToRenderer("Login succeeded but session not confirmed");
+            return { success: true, username: result.username, email: email };
+        }
     } catch (err) {
         logToRenderer("Login failed: " + err.message);
         throw err;
@@ -114,8 +223,8 @@ ipcMain.handle("inker:login", async function (event, email, password) {
 ipcMain.handle("inker:logout", async function () {
     try {
         logToRenderer("Logging out...");
-        mountManager.closeAll();
-        syncManager.stopAllSync();
+        if (mountManager) mountManager.closeAll();
+        if (syncManager) syncManager.stopAllSync();
         await settings.clearAuth();
         apiClient.sessionId = null;
         apiClient.email = null;
@@ -128,19 +237,26 @@ ipcMain.handle("inker:logout", async function () {
     }
 });
 
-ipcMain.handle("inker:get-current-user", async function () {
-    const auth = await settings.getAuth();
-    if (auth) {
-        return { email: auth.email, username: auth.username };
+ipcMain.handle("inker:get-session", async function () {
+    var auth = await settings.getAuth();
+    if (auth && apiClient.sessionId) {
+        var result = await apiClient.sessionConfirm();
+        if (result.valid) {
+            return { email: result.email || auth.email, username: result.username || auth.username };
+        } else {
+            await settings.clearAuth();
+            apiClient.sessionId = null;
+            return null;
+        }
     }
     return null;
 });
 
 ipcMain.handle("inker:search-drops", async function (event, query) {
     try {
-        logToRenderer("Searching Drops for: " + query);
-        const results = await apiClient.searchDrops(query);
-        logToRenderer("Search returned " + results.length + " result(s)");
+        logToRenderer("Searching for: " + query);
+        var results = await apiClient.searchDrops(query);
+        logToRenderer("Found " + results.length + " result(s)");
         return results;
     } catch (err) {
         logToRenderer("Search failed: " + err.message);
@@ -148,27 +264,30 @@ ipcMain.handle("inker:search-drops", async function (event, query) {
     }
 });
 
-ipcMain.handle("inker:list-drops", async function () {
+ipcMain.handle("inker:get-file-index", async function (event, user, drop) {
     try {
-        logToRenderer("Listing all Drops...");
-        const results = await apiClient.listDrops();
-        logToRenderer("List returned " + results.length + " Drop(s)");
-        return results;
+        if (!mountManager) return [];
+        var index = mountManager.getIndex(user + "/" + drop);
+        if (!index) return [];
+        // Return files (not directories) for the file browser
+        return index.filter(function(e) { return e.kind !== "directory"; });
     } catch (err) {
-        logToRenderer("List Drops failed: " + err.message);
-        throw err;
+        logToRenderer("Get file index error: " + err.message);
+        return [];
     }
 });
 
-ipcMain.handle("inker:verify-drop", async function (event, user, drop) {
+ipcMain.handle("inker:open-file", async function (event, user, drop, filePath) {
     try {
-        logToRenderer("Verifying Drop " + user + "/" + drop + "...");
-        var result = await apiClient.verifyDrop(user, drop);
-        logToRenderer("Drop " + user + "/" + drop + " verification: " + (result ? "exists" : "not found"));
-        return result;
+        logToRenderer("Opening file: " + user + "/" + drop + "/" + filePath);
+        var localPath = await mountManager.openRemoteFile(user, drop, filePath);
+        logToRenderer("Downloaded to cache: " + localPath);
+        var result = await shell.openPath(localPath);
+        logToRenderer("Shell open result: " + result);
+        return { path: localPath, openResult: result };
     } catch (err) {
-        logToRenderer("Verify Drop failed: " + err.message);
-        return false;
+        logToRenderer("Open file error: " + err.message);
+        throw err;
     }
 });
 
@@ -179,42 +298,72 @@ ipcMain.handle("inker:mount-drop", async function (event, user, drop, mountPoint
         }
 
         fs.mkdirSync(mountPoint, { recursive: true });
-        logToRenderer("Mounting " + user + "/" + drop + " at " + mountPoint);
-        const result = await mountManager.mount(user, drop, mountPoint);
+        logToRenderer("Adding " + user + "/" + drop + " at " + mountPoint);
 
+        var dropPath = user + "/" + drop;
+        if (mountManager.isMounted(dropPath)) {
+            logToRenderer(user + "/" + drop + " already added, reloading...");
+            await mountManager.unmount(dropPath);
+            syncManager.stopSync(dropPath);
+        }
+
+        var result = await mountManager.mount(user, drop, mountPoint);
         await settings.addMount(user, drop, mountPoint);
-        logToRenderer("Mount saved: " + user + "/" + drop);
+        logToRenderer("Added " + user + "/" + drop);
         return result;
     } catch (err) {
-        logToRenderer("Mount failed: " + err.message);
+        logToRenderer("Add failed: " + err.message);
         throw err;
     }
 });
 
 ipcMain.handle("inker:unmount-drop", async function (event, user, drop) {
     try {
-        const dropPath = user + "/" + drop;
-        logToRenderer("Unmounting " + dropPath);
+        var dropPath = user + "/" + drop;
+        logToRenderer("Removing " + dropPath);
 
         if (!mountManager.isMounted(dropPath)) {
-            throw new Error(dropPath + " is not currently mounted");
+            throw new Error(dropPath + " is not currently added");
         }
 
-        const result = await mountManager.unmount(dropPath);
+        var state = mountManager.getMount(dropPath);
+        var result = await mountManager.unmount(dropPath);
+        syncManager.stopSync(dropPath);
         await settings.removeMount(dropPath);
-        logToRenderer("Unmount successful: " + dropPath);
+
+        if (state && state.mountPoint) {
+            var mp = state.mountPoint;
+            logToRenderer("Cleaning up files at " + mp);
+            if (fs.existsSync(mp)) {
+                fs.rmSync(mp, { recursive: true, force: true });
+                logToRenderer("Deleted " + mp);
+                var dirs = mp.split(path.sep);
+                for (var i = dirs.length - 1; i >= 2; i--) {
+                    var parent = dirs.slice(0, i).join(path.sep);
+                    if (parent.length < 4) break;
+                    try {
+                        if (fs.existsSync(parent) && fs.readdirSync(parent).length === 0) {
+                            fs.rmdirSync(parent);
+                            logToRenderer("Removed empty parent: " + parent);
+                        } else {
+                            break;
+                        }
+                    } catch (e) { break; }
+                }
+            }
+        }
+
+        logToRenderer("Removed " + dropPath);
         return result;
     } catch (err) {
-        logToRenderer("Unmount failed: " + err.message);
+        logToRenderer("Remove failed: " + err.message);
         throw err;
     }
 });
 
 ipcMain.handle("inker:get-mounts", async function () {
     try {
-        const mounts = mountManager.getActiveMounts();
-        logToRenderer("Returning " + mounts.length + " active mount(s)");
-        return mounts;
+        return mountManager ? mountManager.getActiveMounts() : [];
     } catch (err) {
         logToRenderer("Get mounts error: " + err.message);
         throw err;
@@ -223,9 +372,7 @@ ipcMain.handle("inker:get-mounts", async function () {
 
 ipcMain.handle("inker:get-saved-mounts", async function () {
     try {
-        const mounts = await settings.getMounts();
-        logToRenderer("Returning " + mounts.length + " saved mount(s)");
-        return mounts;
+        return await settings.getMounts();
     } catch (err) {
         logToRenderer("Get saved mounts error: " + err.message);
         throw err;
@@ -234,50 +381,35 @@ ipcMain.handle("inker:get-saved-mounts", async function () {
 
 ipcMain.handle("inker:set-auto-mount", async function (event, user, drop, enabled) {
     try {
-        const dropPath = user + "/" + drop;
+        var dropPath = user + "/" + drop;
         await settings.setAutoMount(dropPath, enabled);
-        logToRenderer("Auto-mount " + (enabled ? "enabled" : "disabled") + " for " + dropPath);
+        logToRenderer("Auto add " + (enabled ? "enabled" : "disabled") + " for " + dropPath);
         return { success: true };
     } catch (err) {
-        logToRenderer("Set auto-mount error: " + err.message);
+        logToRenderer("Set auto add error: " + err.message);
         throw err;
     }
 });
 
 ipcMain.handle("inker:open-path", async function (event, localPath) {
     try {
-        logToRenderer("Opening path: " + localPath);
+        logToRenderer("Opening: " + localPath);
         await shell.openPath(localPath);
         return { path: localPath };
     } catch (err) {
-        logToRenderer("Open path failed: " + err.message);
+        logToRenderer("Open failed: " + err.message);
         throw err;
     }
 });
 
-ipcMain.handle("inker:set-autostart", async function (event, enabled) {
+ipcMain.handle("inker:open-external", async function (event, url) {
     try {
-        app.setLoginItemSettings({
-            openAtLogin: !!enabled,
-            openAsHidden: true,
-            path: process.execPath,
-            args: []
-        });
-        logToRenderer("Auto-start " + (enabled ? "enabled" : "disabled"));
-        return { success: true, enabled: !!enabled };
+        logToRenderer("Opening external: " + url);
+        await shell.openExternal(url);
+        return { success: true };
     } catch (err) {
-        logToRenderer("Set auto-start error: " + err.message);
+        logToRenderer("Open external failed: " + err.message);
         throw err;
-    }
-});
-
-ipcMain.handle("inker:get-autostart", async function () {
-    try {
-        const status = app.getLoginItemSettings();
-        return { enabled: !!status.openAtLogin };
-    } catch (err) {
-        logToRenderer("Get auto-start error: " + err.message);
-        return { enabled: false, error: err.message };
     }
 });
 
@@ -306,7 +438,7 @@ app.whenReady().then(function () {
 });
 
 app.on("before-quit", function () {
-    logToRenderer("Application shutting down...");
+    if (!win || win.isDestroyed()) return;
     if (mountManager) mountManager.closeAll();
     if (syncManager) syncManager.stopAllSync();
     if (settings) settings.close();

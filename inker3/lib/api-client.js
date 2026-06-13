@@ -314,6 +314,30 @@ class InkDropClient {
         return result;
     }
 
+    async sessionConfirm() {
+        var ts = new Date().toISOString().replace("T", " ").slice(0, 19);
+        console.log("[API] " + ts + " Session confirmation check...");
+        try {
+            var result = await this._makeRequest("GET", "/sessionconfirm", null, true);
+            if (result && result.success === true) {
+                if (result.username) {
+                    this.username = result.username;
+                }
+                console.log("[API] " + ts + " Session confirmed: " + (this.username || "yes"));
+                return {
+                    valid: true,
+                    email: this.email,
+                    username: this.username || result.username
+                };
+            }
+            console.log("[API] " + ts + " Session not valid");
+            return { valid: false };
+        } catch (e) {
+            console.log("[API] " + ts + " Session confirm error: " + e.message);
+            return { valid: false };
+        }
+    }
+
     async createDirectory(user, drop, dirPath) {
         var result = await this._makeRequest("POST",
             "/api/fs/" + encodeURIComponent(user) + "/" + encodeURIComponent(drop) + "/" +

@@ -7,7 +7,7 @@ contextBridge.exposeInMainWorld("inker", {
 
     login: function (email, password) { return ipcRenderer.invoke("inker:login", email, password); },
     logout: function () { return ipcRenderer.invoke("inker:logout"); },
-    getCurrentUser: function () { return ipcRenderer.invoke("inker:get-current-user"); },
+    getSession: function () { return ipcRenderer.invoke("inker:get-session"); },
 
     searchDrops: function (query) { return ipcRenderer.invoke("inker:search-drops", query); },
     listDrops: function () { return ipcRenderer.invoke("inker:list-drops"); },
@@ -18,13 +18,14 @@ contextBridge.exposeInMainWorld("inker", {
     getSavedMounts: function () { return ipcRenderer.invoke("inker:get-saved-mounts"); },
     setAutoMount: function (user, drop, enabled) { return ipcRenderer.invoke("inker:set-auto-mount", user, drop, enabled); },
 
+    // File access
+    getFileIndex: function (user, drop) { return ipcRenderer.invoke("inker:get-file-index", user, drop); },
+    openFile: function (user, drop, filePath) { return ipcRenderer.invoke("inker:open-file", user, drop, filePath); },
+
     openPath: function (localPath) { return ipcRenderer.invoke("inker:open-path", localPath); },
-
-    setAutoStart: function (enabled) { return ipcRenderer.invoke("inker:set-autostart", enabled); },
-    getAutoStart: function () { return ipcRenderer.invoke("inker:get-autostart"); },
-
-    onLog: function (callback) { ipcRenderer.on("inker:log", function (event, message) { callback(message); }); },
+    openExternal: function (url) { return ipcRenderer.invoke("inker:open-external", url); },
     verifyDrop: function (user, drop) { return ipcRenderer.invoke("inker:verify-drop", user, drop); },
 
-    onReady: function (callback) { ipcRenderer.on("inker:ready", function () { callback(); }); }
+    onLog: function (callback) { ipcRenderer.on("inker:log", function (event, message) { callback(message); }); },
+    onReady: function (callback) { ipcRenderer.on("inker:ready", function (event, data) { callback(data); }); }
 });
