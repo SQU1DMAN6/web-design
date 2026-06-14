@@ -1,13 +1,12 @@
-INKER = "FtR Inker"
-
 run:
 	npm start
 
 build:
-	npx electron-packager . $(INKER) --platform=win32 --arch=x64 --out=dist --icon=icon.png --overwrite --no-prune
+	npm install
+	npx electron-packager . --platform=win32 --arch=x64 --out=dist --icon=icon.png --overwrite
 
 msi:
-	npx electron-packager . $(INKER) --platform=win32 --arch=x64 --out=dist --icon=icon.png --overwrite --no-prune
+	npx electron-packager . --platform=win32 --arch=x64 --out=dist --icon=icon.png --overwrite
 	node BUILD\generate-wxs.js
 	if not exist BUILD\windows-x64 mkdir BUILD\windows-x64
 	wix build -arch x64 BUILD\FtR_Inker_full.wxs -out BUILD\windows-x64\FtR-Inker-3.2.0-x64.msi

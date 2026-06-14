@@ -4,7 +4,7 @@
         Name="FtR Inker"
         Language="1033"
         Version="3.2.0"
-        Manufacturer="FtR"
+        Manufacturer="Quan Thai"
         UpgradeCode="5da499e7-668a-4df9-8a69-f1b6310fd334">
         
         <MajorUpgrade DowngradeErrorMessage="A newer version of FtR Inker is already installed." />

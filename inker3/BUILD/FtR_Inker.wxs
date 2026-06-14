@@ -6,7 +6,7 @@
     Name="FtR Inker"
     Language="1033"
     Version="1.0.0.0"
-    Manufacturer="FtR"
+    Manufacturer="Quan Thai"
     UpgradeCode="5da499e7-668a-4df9-8a69-f1b6310fd334">
 
     <Package InstallerVersion="500" Compressed="yes" InstallScope="perUser" />

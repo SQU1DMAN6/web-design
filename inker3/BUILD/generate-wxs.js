@@ -2,12 +2,23 @@ const fs = require('fs');
 const path = require('path');
 
 function findAppDir() {
-    const cands = [
-        path.resolve(__dirname, '..', 'dist', 'win-unpacked'),
-        path.resolve(__dirname, '..', 'dist', 'FtR Inker-win32-x64'),
-    ];
-    for (const c of cands) {
-        if (fs.existsSync(path.join(c, 'FtR Inker.exe'))) return c;
+    // Possible directory names (with/without leading space from quoting issues)
+    const distDir = path.resolve(__dirname, '..', 'dist');
+    if (!fs.existsSync(distDir)) return null;
+    const entries = fs.readdirSync(distDir);
+    for (const entry of entries) {
+        if (entry.endsWith('-win32-x64') && entry.includes('Inker')) {
+            // Check for exe with matching name
+            const exeCandidates = [
+                'FtR Inker.exe',
+                ' FtR Inker.exe',
+                entry.replace(/-win32-x64$/, '.exe'),
+            ];
+            const fullPath = path.join(distDir, entry);
+            for (const exe of exeCandidates) {
+                if (fs.existsSync(path.join(fullPath, exe))) return fullPath;
+            }
+        }
     }
     return null;
 }
@@ -16,60 +27,64 @@ const APP_DIR = findAppDir();
 if (!APP_DIR) { console.error('ERROR: Run "make build" first.'); process.exit(1); }
 console.log('App dir: ' + APP_DIR);
 
-function esc(p) { return p.replace(/\\/g, '\\\\'); }
+// Collect files from the packaged app directory.
+// Handles both resources/app.asar (single file) and resources/app/ (directory).
+const allFiles = [];
 
-function rel(p) { return path.relative(APP_DIR, p); }
+// Directories and files to skip inside resources/app/ (dev-only, not needed at runtime)
+const SKIP_DIRS = ['node_modules', 'BUILD', '.git', '.pnpm-store'];
+const SKIP_FILES = ['electron-builder.yml', 'Makefile', 'TODO.md', 'pnpm-lock.yaml', 'pnpm-workspace.yaml'];
 
-// Collect only top-level files + direct children of known subdirs (locales, resources)
-// Do NOT recursively scan into resources (it contains app.asar + extracted node_modules)
-const components = [];
-
-function add(name, fullpath, subdir) {
-    components.push({ name, source: esc(fullpath), subdir: subdir || null });
-}
-
-// Top-level files
-for (const e of fs.readdirSync(APP_DIR)) {
-    const fp = path.join(APP_DIR, e);
-    if (e === '.' || e === '..') continue;
-    if (fs.statSync(fp).isFile()) {
-        add(e, fp, null);
-    }
-}
-
-// Locales - first-level only
-const localesDir = path.join(APP_DIR, 'locales');
-if (fs.existsSync(localesDir)) {
-    for (const e of fs.readdirSync(localesDir)) {
-        const fp = path.join(localesDir, e);
-        if (e !== '.' && e !== '..' && fs.statSync(fp).isFile()) {
-            add(e, fp, 'locales');
+function scan(dir, subdir, depth) {
+    for (const e of fs.readdirSync(dir)) {
+        if (e === '.' || e === '..') continue;
+        const fp = path.join(dir, e);
+        const stat = fs.statSync(fp);
+        if (stat.isDirectory()) {
+            if (depth === 0 && (e === 'resources' || e === 'locales')) {
+                scan(fp, e, 1);
+            } else if (depth === 1 && subdir === 'resources' && e === 'app') {
+                // resources/app is a directory (not app.asar) — fully recurse into it
+                // to include main.js, preload.js, lib/, renderer/, etc.
+                scan(fp, path.join(subdir, e), 2);
+            } else if (depth >= 2 && subdir && subdir.startsWith('resources\\app')) {
+                // Skip dev-only directories inside resources/app
+                if (SKIP_DIRS.indexOf(e) !== -1) continue;
+                scan(fp, path.join(subdir, e), depth + 1);
+            }
+        } else {
+            // Skip dev-only files inside resources/app
+            if (subdir && subdir.startsWith('resources\\app') && depth === 2 && SKIP_FILES.indexOf(e) !== -1) {
+                continue;
+            }
+            const d = subdir || '.';
+            if (!allFiles[d]) allFiles[d] = [];
+            allFiles[d].push({ name: e, fullpath: fp.replace(/\\/g, '\\\\') });
         }
     }
 }
+scan(APP_DIR, null, 0);
 
-// Resources - first-level files only (just app.asar)
-const resourcesDir = path.join(APP_DIR, 'resources');
-if (fs.existsSync(resourcesDir)) {
-    for (const e of fs.readdirSync(resourcesDir)) {
-        const fp = path.join(resourcesDir, e);
-        if (e !== '.' && e !== '..' && fs.statSync(fp).isFile()) {
-            add(e, fp, 'resources');
-        }
-    }
-}
+const totalFiles = Object.values(allFiles).reduce((a, b) => a + b.length, 0);
+console.log('Files: ' + totalFiles);
 
-console.log('Files: ' + components.length);
+const dirs = Object.keys(allFiles).sort(function(a, b) {
+    return a.split('\\').length - b.split('\\').length || a.localeCompare(b);
+});
 
+let compIdx = 0;
 let wxs = `<?xml version="1.0" encoding="UTF-8"?>
 <Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
-  <Package Name="FtR Inker" Language="1033" Version="3.2.0" Manufacturer="FtR" UpgradeCode="5da499e7-668a-4df9-8a69-f1b6310fd334">
+  <Package Name="FtR Inker" Language="1033" Version="3.2.0" Manufacturer="Quan Thai" UpgradeCode="5da499e7-668a-4df9-8a69-f1b6310fd334">
     <MajorUpgrade DowngradeErrorMessage="A newer version is already installed." />
     <MediaTemplate EmbedCab="yes" />
     <Feature Id="ProductFeature" Title="FtR Inker" Level="1">\n`;
 
-for (let i = 0; i < components.length; i++) {
-    wxs += `      <ComponentRef Id="C${i}" />\n`;
+for (const dir of dirs) {
+    for (const f of allFiles[dir]) {
+        wxs += `      <ComponentRef Id="C${compIdx}" />\n`;
+        compIdx++;
+    }
 }
 wxs += `      <ComponentRef Id="Start" />
       <ComponentRef Id="Desktop" />
@@ -78,32 +93,60 @@ wxs += `      <ComponentRef Id="Start" />
     <StandardDirectory Id="ProgramFiles64Folder">
       <Directory Id="INSTALLDIR" Name="FtR\\Inker">\n`;
 
-const rootComps = components.filter(c => !c.subdir);
-const subdirComps = {};
-for (const c of components) {
-    if (c.subdir) {
-        if (!subdirComps[c.subdir]) subdirComps[c.subdir] = [];
-        subdirComps[c.subdir].push(c);
+// Build directory tree from dirs array
+compIdx = 0;
+const tree = {};
+tree['.'] = { _files: allFiles['.'] || [] };
+
+for (const dir of dirs) {
+    if (dir === '.') continue;
+    const parts = dir.split('\\');
+    let node = tree;
+    for (let i = 0; i < parts.length; i++) {
+        if (!node[parts[i]]) {
+            node[parts[i]] = { _files: [] };
+        }
+        if (i === parts.length - 1) {
+            node[parts[i]]._files = allFiles[dir] || [];
+        }
+        node = node[parts[i]];
     }
 }
 
-for (let i = 0; i < rootComps.length; i++) {
-    const c = rootComps[i];
-    wxs += `        <Component Id="C${i}" Guid="*">
-          <File Id="F${i}" Name="${c.name}" Source="${c.source}" KeyPath="yes" />
-        </Component>\n`;
+// Recursively emit directories and components with proper nesting
+function emitDir(dirNode, dirName, dirId, depth) {
+    // Emit components for files in this directory
+    for (const f of dirNode._files || []) {
+        wxs += '        '.repeat(depth) + `<Component Id="C${compIdx}" Guid="*">\n`;
+        wxs += '        '.repeat(depth + 1) + `<File Id="F${compIdx}" Name="${f.name}" Source="${f.fullpath}" KeyPath="yes" />\n`;
+        wxs += '        '.repeat(depth) + `</Component>\n`;
+        compIdx++;
+    }
+
+    // Emit child directories
+    const childDirs = Object.keys(dirNode).filter(function(k) { return k !== '_files'; }).sort();
+    for (const childName of childDirs) {
+        const childId = dirId ? dirId + '_' + childName.replace(/[^a-zA-Z0-9]/g, '_') : 'D' + childName.replace(/[^a-zA-Z0-9]/g, '_');
+        wxs += '        '.repeat(depth) + `<Directory Id="${childId}" Name="${childName}">\n`;
+        emitDir(tree_getNode(dirNode, childName), childName, childId, depth + 1);
+        wxs += '        '.repeat(depth) + `</Directory>\n`;
+    }
 }
 
-for (const [sd, scomps] of Object.entries(subdirComps)) {
-    const dirId = 'D' + sd.replace(/[^a-zA-Z0-9_]/g, '_');
-    wxs += `        <Directory Id="${dirId}" Name="${sd}">\n`;
-    for (const c of scomps) {
-        const idx = components.indexOf(c);
-        wxs += `          <Component Id="C${idx}" Guid="*">
-            <File Id="F${idx}" Name="${c.name}" Source="${c.source}" KeyPath="yes" />
-          </Component>\n`;
-    }
-    wxs += '        </Directory>\n';
+function tree_getNode(treeNode, name) {
+    return treeNode[name];
+}
+
+// Emit root-level components first
+emitDir(tree['.'], '.', null, 3);
+
+// Emit subdirectories
+const topLevelDirs = Object.keys(tree).filter(function(k) { return k !== '.'; }).sort();
+for (const topDir of topLevelDirs) {
+    const topId = 'D' + topDir.replace(/[^a-zA-Z0-9]/g, '_');
+    wxs += '        '.repeat(3) + `<Directory Id="${topId}" Name="${topDir}">\n`;
+    emitDir(tree[topDir], topDir, topId, 4);
+    wxs += '        '.repeat(3) + `</Directory>\n`;
 }
 
 wxs += `      </Directory>
@@ -132,4 +175,4 @@ wxs += `      </Directory>
 const out = path.join(__dirname, 'FtR_Inker_full.wxs');
 fs.writeFileSync(out, wxs);
 console.log('Generated: ' + out);
-console.log('Components: ' + components.length);
+console.log('Components: ' + compIdx);
