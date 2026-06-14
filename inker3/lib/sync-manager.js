@@ -32,6 +32,33 @@ class SyncManager extends EventEmitter {
         }
     }
 
+    _startWatcher(pathToWatch, label, callback) {
+        try {
+            if (!fs.existsSync(pathToWatch)) return null;
+            var w = fs.watch(pathToWatch, { recursive: true }, function(eventType, filename) {
+                try { callback(eventType, filename); } catch (e) {
+                    if (e.message && e.message.includes("EPERM")) {
+                        // EPERM is transient on Windows — ignore
+                        console.log("[SyncManager] watcher EPERM ignored for " + label + ": " + (filename || "?"));
+                    } else {
+                        console.log("[SyncManager] watcher callback error for " + label + ": " + e.message);
+                    }
+                }
+            });
+            // Handle watch-level errors (EPERM, etc.) — prevents uncaught exceptions
+            w.on("error", function(err) {
+                console.log("[SyncManager] watcher error event for " + label + " " + pathToWatch + ": " + err.message);
+                // EPERM means the path is locked/removed — close and retry later
+                try { w.close(); } catch (e) {}
+            });
+            console.log("[SyncManager] fs.watch started for " + label + " " + pathToWatch);
+            return w;
+        } catch (err) {
+            console.log("[SyncManager] fs.watch failed for " + label + " " + pathToWatch + ": " + err.message);
+            return null;
+        }
+    }
+
     startSync(dropPath, mountPoint) {
         if (this.activeSyncs.has(dropPath)) return;
 
@@ -60,44 +87,28 @@ class SyncManager extends EventEmitter {
             self._syncRemote(s);
         }).bind(null, this, state), this.remotePollInterval);
 
-        try {
-            if (fs.existsSync(mountPoint)) {
-                var self = this;
-                var s = state;
-                state.watcher = fs.watch(mountPoint, { recursive: true }, function(eventType, filename) {
-                    self._onLocalChange(s, eventType, filename);
-                });
-                console.log("[SyncManager] fs.watch started for mount " + mountPoint);
-            }
-        } catch (err) {
-            console.log("[SyncManager] fs.watch on mount failed: " + err.message);
-        }
+        // Start mount point watcher
+        var self = this;
+        var s = state;
+        state.watcher = this._startWatcher(mountPoint, "mount", function(eventType, filename) {
+            self._onLocalChange(s, eventType, filename);
+        });
 
-        // Also watch the cache directory so edits to cached files are synced back
-        try {
-            fs.mkdirSync(state.cacheDir, { recursive: true });
-            var self = this;
-            var s = state;
-            state.cacheWatcher = fs.watch(state.cacheDir, { recursive: true }, function(eventType, filename) {
-                if (!s.running || !filename) return;
-                // When a cached file changes, upload it to the remote
-                var relPath = filename.replace(/\\/g, "/");
-                // Skip hidden files
-                if (relPath.startsWith(".")) return;
-                // Debounce
-                if (s.debounceTimers.has("cache:" + relPath)) {
-                    clearTimeout(s.debounceTimers.get("cache:" + relPath));
-                }
-                var timer = setTimeout(function() {
-                    s.debounceTimers.delete("cache:" + relPath);
-                    self._processCacheChange(s, relPath);
-                }, 500);
-                s.debounceTimers.set("cache:" + relPath, timer);
-            });
-            console.log("[SyncManager] fs.watch started for cache " + state.cacheDir);
-        } catch (err) {
-            console.log("[SyncManager] fs.watch on cache failed: " + err.message);
-        }
+        // Start cache directory watcher
+        try { fs.mkdirSync(state.cacheDir, { recursive: true }); } catch (e) {}
+        state.cacheWatcher = this._startWatcher(state.cacheDir, "cache", function(eventType, filename) {
+            if (!s.running || !filename) return;
+            var relPath = filename.replace(/\\/g, "/");
+            if (relPath.startsWith(".")) return;
+            if (s.debounceTimers.has("cache:" + relPath)) {
+                clearTimeout(s.debounceTimers.get("cache:" + relPath));
+            }
+            var timer = setTimeout(function() {
+                s.debounceTimers.delete("cache:" + relPath);
+                self._processCacheChange(s, relPath);
+            }, 500);
+            s.debounceTimers.set("cache:" + relPath, timer);
+        });
 
         setTimeout((function(self, s) {
             self._syncRemote(s);
@@ -313,6 +324,23 @@ class SyncManager extends EventEmitter {
         }
     }
 
+    _downloadToCache(state, relPath) {
+        // Re-download a remote file to the cache, overwriting the old cached copy
+        var fileName = relPath.split("/").pop();
+        var cachePath = path.join(state.cacheDir, fileName);
+        var self = this;
+        this.apiClient.downloadFile(state.user, state.drop, relPath).then(function(stream) {
+            var out = fs.createWriteStream(cachePath);
+            stream.pipe(out);
+            out.on("finish", function() {
+                console.log("[SyncManager] Updated cache for " + relPath);
+            });
+        }).catch(function(err) {
+            // Download may fail if file is locked — ignore, user will re-download on access
+            console.log("[SyncManager] Cache update failed for " + relPath + ": " + err.message);
+        });
+    }
+
     async _syncRemote(state) {
         if (!state.running) return;
         try {
@@ -348,11 +376,21 @@ class SyncManager extends EventEmitter {
                     changed = true;
                     this.emit("file-synced", { dropPath: state.dropPath, file: relPath, type: "remote-add" });
                 } else if (!isDir && remoteMtime !== known.mtime) {
-                    // Remote file changed — update index
+                    // Remote file changed — update index, recreate .url, update cache
                     known.mtime = remoteMtime;
                     known.size = remoteSize;
                     known.synced = false;
                     changed = true;
+                    // Recreate .url shortcut
+                    try {
+                        var urlPath = path.join(state.mountPoint, relPath + ".url");
+                        if (fs.existsSync(urlPath)) {
+                            fs.unlinkSync(urlPath);
+                        }
+                    } catch (e) {}
+                    this._createUrlShortcut(state.mountPoint, relPath, state.user, state.drop);
+                    // Update cached copy (overwrite if exists)
+                    this._downloadToCache(state, relPath);
                     this.emit("file-synced", { dropPath: state.dropPath, file: relPath, type: "remote-change" });
                 }
             }

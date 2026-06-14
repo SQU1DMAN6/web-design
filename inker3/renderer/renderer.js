@@ -512,11 +512,25 @@ if (window.inker) {
         }
     });
 
-    // Safety timeout: if onReady doesn't fire within 15s, show login
+    // Fallback: check session directly as a safety net
+    (async function () {
+        try {
+            var session = await window.inker.getSession();
+            if (session) {
+                sessionCheckDone = true;
+                showMainScreen(session);
+                appendLog("Session restored for " + session.username);
+            }
+        } catch (e) {
+            // onReady will handle it
+        }
+    })();
+
+    // Backup timeout: if nothing has happened within 30s, show login
     setTimeout(function () {
         if (!sessionCheckDone) {
             appendLog("[App] Session check timeout — showing login");
             showLoginScreen();
         }
-    }, 15000);
+    }, 30000);
 }

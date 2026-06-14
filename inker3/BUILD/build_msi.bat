@@ -220,7 +220,7 @@ light.exe "%TEMP%\FtR_Inker.wixobj" -out "%OUTPUT_DIR%\FtR-Inker-3.2.0-x64.msi" 
 if %ERRORLEVEL% neq 0 (
     echo WARNING: Linking had some warnings, but continuing...
     if not exist "%OUTPUT_DIR%\FtR-Inker-3.2.0-x64.msi" (
-        echo ERROR: MSI was not created.
+        echo "ERROR: MSI was not created."
         pause
         exit /b 1
     )
