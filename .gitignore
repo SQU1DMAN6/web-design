@@ -4,3 +4,4 @@ fileshare_OLD/connect.php
 inkdrop/database.db
 *node_modules*/
 *dist*/
+inker3\BUILD\windows-x64\*
