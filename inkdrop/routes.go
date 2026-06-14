@@ -72,6 +72,7 @@ func RegisterRoutes(r chi.Router) {
 	r.Get("/edit/{filename}/{user}/{reponame}/*", repository.RepositoryLiveEditTextFile)
 	r.Post("/edit/{filename}/{user}/{reponame}", repository.RepositoryLiveEditTextFile)
 	r.Post("/edit/{filename}/{user}/{reponame}/*", repository.RepositoryLiveEditTextFile)
+	r.Get("/pfp/default.png", account.DefaultPFP)
 }
 
 func NewTUSHandler() http.Handler {
