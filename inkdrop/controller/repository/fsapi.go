@@ -56,7 +56,7 @@ func RepositoryFSAPI(w http.ResponseWriter, r *http.Request) {
 
 func handleFSAPIGet(w http.ResponseWriter, r *http.Request, repoOwner string, repoName string, itemPath string) {
 	if r.URL.Query().Get("list") == "1" {
-		entries, err := repoStore.ListRepositoryEntriesRecursive(repoOwner, repoName)
+		entries, err := repoStore.ListDropEntriesRecursive(repoOwner, repoName)
 		if err != nil {
 			writeJSON(w, http.StatusNotFound, map[string]interface{}{"success": false, "error": err.Error()})
 			return
@@ -103,7 +103,7 @@ func handleFSAPIPut(w http.ResponseWriter, r *http.Request, repoOwner string, re
 		writeJSON(w, http.StatusBadRequest, map[string]interface{}{"success": false, "error": "failed to read request body"})
 		return
 	}
-	filePath, err := repoStore.WriteFileAtRepoPath(repoOwner, repoName, itemPath, data, true)
+	filePath, err := repoStore.WriteFileAtDropPath(repoOwner, repoName, itemPath, data, true)
 	if err != nil {
 		writeJSON(w, http.StatusBadRequest, map[string]interface{}{"success": false, "error": err.Error()})
 		return
@@ -136,7 +136,7 @@ func handleFSAPIPost(w http.ResponseWriter, r *http.Request, repoOwner string, r
 			writeJSON(w, http.StatusBadRequest, map[string]interface{}{"success": false, "error": "directory path is required"})
 			return
 		}
-		if _, err := repoStore.CreateDirectoryAtRepoPath(repoOwner, repoName, itemPath); err != nil {
+		if _, err := repoStore.CreateDirectoryAtDropPath(repoOwner, repoName, itemPath); err != nil {
 			writeJSON(w, http.StatusBadRequest, map[string]interface{}{"success": false, "error": err.Error()})
 			return
 		}
@@ -172,7 +172,7 @@ func fsAPIPermissions(r *http.Request, repoOwner string, repoName string) (strin
 	isLoggedIn := SS.GetBool(r.Context(), "isLoggedIn")
 
 	meta, _ := repoStore.LoadRepoMeta(repoOwner, repoName)
-	repoPath := fmt.Sprintf("%s/%s/%s", repoStore.RepoDir, repoOwner, repoName)
+	repoPath := fmt.Sprintf("%s/%s/%s", repoStore.DropDir, repoOwner, repoName)
 	if ok, _ := repoStore.DirExists(repoPath); !ok {
 		return sessionUser, false, false
 	}
@@ -193,7 +193,7 @@ func fsAPIPermissions(r *http.Request, repoOwner string, repoName string) (strin
 				}
 			}
 		}
-		if !canRead && userModel.CanReadContactRepositories(config.GetDB(), sessionUser, repoOwner) {
+		if !canRead && userModel.CanReadContactDrops(config.GetDB(), sessionUser, repoOwner) {
 			canRead = true
 		}
 	}

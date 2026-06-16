@@ -99,7 +99,7 @@ func TUSHandler() http.Handler {
 					return
 				}
 
-				repoPath := filepath.Join(repository.RepoDir, owner, repoName)
+				repoPath := filepath.Join(repository.DropDir, owner, repoName)
 				if ok, _ := repository.DirExists(repoPath); !ok {
 					http.Error(w, fmt.Sprintf("Repository %s/%s not found", owner, repoName), http.StatusNotFound)
 					return

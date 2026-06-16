@@ -33,17 +33,17 @@ func IndexMain(w http.ResponseWriter, r *http.Request) {
 	viewParam := r.URL.Query().Get("view")
 	if viewParam == "public" {
 		// Public browsing: allow anonymous access
-		matches, err := repository.ListPublicRepositories()
+		matches, err := repository.ListPublicDrops()
 		p := viewBackend.FrontEndParams{
 			Title:           "InkDrop Browser",
-			Message:         "Browse public repositories",
+			Message:         "Browse public Drops",
 			Name:            userName,
 			IsViewingPublic: true,
-			RepoMatches:     matches,
+			DropMatches:     matches,
 			Error:           make(map[string]string),
 		}
 		if err != nil {
-			p.Error["general"] = fmt.Sprintf("Failed to get public repositories: %s", err)
+			p.Error["general"] = fmt.Sprintf("Failed to get public Drops: %s", err)
 		}
 		// Friendly name for unauthenticated viewers
 		if p.Name == "" {
@@ -59,17 +59,17 @@ func IndexMain(w http.ResponseWriter, r *http.Request) {
 			http.Redirect(w, r, "/login", http.StatusSeeOther)
 			return
 		}
-		matches, err := repository.ListSharedRepositories(userName)
+		matches, err := repository.ListSharedDrops(userName)
 		p := viewBackend.FrontEndParams{
 			Title:           "InkDrop Browser",
-			Message:         "Repositories shared with you",
+			Message:         "Drops shared with you",
 			Name:            userName,
 			IsViewingPublic: true,
-			RepoMatches:     matches,
+			DropMatches:     matches,
 			Error:           make(map[string]string),
 		}
 		if err != nil {
-			p.Error["general"] = fmt.Sprintf("Failed to get shared repositories: %s", err)
+			p.Error["general"] = fmt.Sprintf("Failed to get shared Drops: %s", err)
 		}
 		enrichAccountParams(&p, userName)
 		viewBackend.IndexMain(w, p)
@@ -81,19 +81,19 @@ func IndexMain(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	repoList, err := repository.ListUserRepositories(userName)
+	dropList, err := repository.ListUserDrops(userName)
 
 	p := viewBackend.FrontEndParams{
 		Title:           "InkDrop Browser",
 		Message:         "Browse the InkDrop machine",
 		Name:            userName,
 		IsViewingPublic: false,
-		RepoList:        repoList,
+		DropList:        dropList,
 		Error:           make(map[string]string),
 	}
 
 	if err != nil {
-		p.Error["general"] = fmt.Sprintf("Failed to get repository listing: %s", err)
+		p.Error["general"] = fmt.Sprintf("Failed to get Drop listing: %s", err)
 	}
 
 	enrichAccountParams(&p, userName)
@@ -108,13 +108,13 @@ func RepositoryListAPI(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	repoList, err := repository.ListUserRepositories(userName)
+	dropList, err := repository.ListUserDrops(userName)
 	if err != nil {
 		writeJSON(w, http.StatusInternalServerError, map[string]interface{}{"success": false, "error": err.Error()})
 		return
 	}
 
-	writeJSON(w, http.StatusOK, map[string]interface{}{"success": true, "repos": repoList})
+	writeJSON(w, http.StatusOK, map[string]interface{}{"success": true, "drops": dropList})
 }
 
 func enrichAccountParams(p *viewBackend.FrontEndParams, userName string) {
@@ -138,7 +138,7 @@ func enrichAccountParams(p *viewBackend.FrontEndParams, userName string) {
 	}
 }
 
-func contactRequestParamMaps(contacts []userModel.Contact) []map[string]interface{} {
+func contactRequestParamMaps(contacts []userModel.ContactRequest) []map[string]interface{} {
 	out := make([]map[string]interface{}, 0, len(contacts))
 	for _, contact := range contacts {
 		out = append(out, map[string]interface{}{
@@ -164,7 +164,7 @@ func IndexMainPost(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/login", http.StatusSeeOther)
 		return
 	}
-	repoList, _ := repository.ListUserRepositories(userName)
+	dropList, _ := repository.ListUserDrops(userName)
 
 	err := r.ParseForm()
 	if err != nil {
@@ -180,54 +180,54 @@ func IndexMainPost(w http.ResponseWriter, r *http.Request) {
 			Message:         "Browse the InkDrop machine",
 			Name:            userName,
 			IsViewingPublic: false,
-			RepoList:        repoList,
+			DropList:        dropList,
 			Error:           make(map[string]string),
 		}
-		paramData.Error["general"] = "Repository name is required."
+		paramData.Error["general"] = "Drop name is required."
 		enrichAccountParams(&paramData, userName)
 		viewBackend.IndexMain(w, paramData)
 		return
 	}
 
-	repoNameCooked, err := repository.ProcessRepoName(repoName)
+	repoNameCooked, err := repository.ProcessDropName(repoName)
 	if err != nil {
-		fmt.Println("Error processing repository name:", err)
+		fmt.Println("Error processing Drop name:", err)
 		paramData := viewBackend.FrontEndParams{
 			Title:           "InkDrop Browser",
 			Message:         "Browse the InkDrop machine",
 			Name:            userName,
 			IsViewingPublic: false,
-			RepoList:        repoList,
+			DropList:        dropList,
 			Error:           make(map[string]string),
 		}
 
-		paramData.Error["general"] = fmt.Sprintf("Error creating repository: %s\n", err)
+		paramData.Error["general"] = fmt.Sprintf("Error creating Drop: %s\n", err)
 
 		enrichAccountParams(&paramData, userName)
 		viewBackend.IndexMain(w, paramData)
 		return
 	}
 
-	err = repository.CreateNewUserRepository(userName, repoNameCooked)
+	err = repository.CreateNewUserDrop(userName, repoNameCooked)
 	if err != nil {
-		fmt.Println("Error creating new user repository:", err)
+		fmt.Println("Error creating new user Drop:", err)
 		paramData := viewBackend.FrontEndParams{
 			Title:           "InkDrop Browser",
 			Message:         "Browse the InkDrop machine",
 			Name:            userName,
 			IsViewingPublic: false,
-			RepoList:        repoList,
+			DropList:        dropList,
 			Error:           make(map[string]string),
 		}
 
-		paramData.Error["general"] = fmt.Sprintf("Error creating repository: %s\n", err)
+		paramData.Error["general"] = fmt.Sprintf("Error creating Drop: %s\n", err)
 
 		enrichAccountParams(&paramData, userName)
 		viewBackend.IndexMain(w, paramData)
 		return
 	}
 
-	fmt.Printf("New Repository Created: %s/%s\n", userName, repoNameCooked)
+	fmt.Printf("New Drop Created: %s/%s\n", userName, repoNameCooked)
 
 	http.Redirect(w, r, "/", http.StatusSeeOther)
 }
@@ -252,20 +252,20 @@ func DeleteRepository(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	repoName := r.FormValue("reponame")
-	err = repository.DeleteUserRepository(userName, repoName)
+	err = repository.DeleteUserDrop(userName, repoName)
 	if err != nil {
-		repoList, _ := repository.ListUserRepositories(userName)
+		_dropList, _ := repository.ListUserDrops(userName)
 		paramData := viewBackend.FrontEndParams{
 			Title:           "InkDrop Browser",
 			Message:         "Browse the InkDrop machine",
 			Name:            userName,
 			IsViewingPublic: false,
-			RepoList:        repoList,
+			DropList:        _dropList,
 			Error:           make(map[string]string),
 		}
 
-		paramData.Error["general"] = fmt.Sprintf("Failed to delete repository %s/%s: %s", userName, repoName, err)
-		fmt.Printf("Failed to delete repository %s/%s: %s", userName, repoName, err)
+		paramData.Error["general"] = fmt.Sprintf("Failed to delete Drop %s/%s: %s", userName, repoName, err)
+		fmt.Printf("Failed to delete Drop %s/%s: %s", userName, repoName, err)
 		enrichAccountParams(&paramData, userName)
 		viewBackend.IndexMain(w, paramData)
 		return
@@ -318,7 +318,7 @@ func IndexMainBrowseRepository(w http.ResponseWriter, r *http.Request) {
 	if isOwner {
 		accessAllowed = true
 	}
-	if !accessAllowed && name != "" && userModel.CanReadContactRepositories(config.GetDB(), name, userName) {
+	if !accessAllowed && name != "" && userModel.CanReadContactDrops(config.GetDB(), name, userName) {
 		accessAllowed = true
 	}
 
@@ -328,7 +328,7 @@ func IndexMainBrowseRepository(w http.ResponseWriter, r *http.Request) {
 			Title:    fmt.Sprintf("%s/%s - InkDrop", userName, repoName),
 			Name:     name,
 			Error:    make(map[string]string),
-			Message:  "Repository Unavailable",
+			Message:  "Drop Unavailable",
 			Message2: userName,
 			Message3: repoName,
 			Path:     requestedPath,
@@ -336,7 +336,7 @@ func IndexMainBrowseRepository(w http.ResponseWriter, r *http.Request) {
 		if param.Name == "" {
 			param.Name = "Guest"
 		}
-		param.Error["general"] = "You do not have permission to view this repository."
+		param.Error["general"] = "You do not have permission to view this Drop."
 		w.WriteHeader(http.StatusForbidden)
 		viewBackend.IndexMainBrowseRepository(w, param)
 		return
@@ -364,10 +364,10 @@ func IndexMainBrowseRepository(w http.ResponseWriter, r *http.Request) {
 		} else {
 			paramData.Message = fmt.Sprintf("Browsing your repository '%s'", repoName)
 		}
-		paramData.UserOwnsRepository = true
+		paramData.UserOwnsDrop = true
 	} else {
-		paramData.Message = "You are viewing this repository in read-only mode."
-		paramData.UserOwnsRepository = false
+		paramData.Message = "You are viewing this Drop in read-only mode."
+		paramData.UserOwnsDrop = false
 	}
 
 	if isTrashView && userOwnsRepo {
@@ -380,7 +380,7 @@ func IndexMainBrowseRepository(w http.ResponseWriter, r *http.Request) {
 	}
 	if directoryListing == nil {
 		if requestedPath == "/" {
-			paramData.Error["general"] = "The repository is empty. If you are the owner, consider uploading files."
+			paramData.Error["general"] = "The Drop is empty. If you are the owner, consider uploading files."
 		}
 	}
 
@@ -390,13 +390,13 @@ func IndexMainBrowseRepository(w http.ResponseWriter, r *http.Request) {
 		}
 		directoryListing = decorateRepositoryListing(directoryListing, requestedPath, userOwnsRepo || repository.HasTrash(userName, repoName), isTrashView)
 	}
-	paramData.RepoList = directoryListing
+	paramData.DropList = directoryListing
 
-	// Load repository metadata if present
+	// Load drop metadata if present
 	if meta, err := repository.LoadRepoMeta(userName, repoName); err == nil && meta != nil {
-		paramData.RepoDescription = meta.Description
-		paramData.RepoOwners = strings.Join(meta.Owners, ",")
-		paramData.RepoPublic = meta.Public
+		paramData.DropDescription = meta.Description
+		paramData.DropOwners = strings.Join(meta.Owners, ",")
+		paramData.DropPublic = meta.Public
 	}
 
 	enrichAccountParams(&paramData, name)
@@ -426,7 +426,7 @@ func RepositorySettings(w http.ResponseWriter, r *http.Request) {
 
 	repoName := strings.TrimSpace(r.FormValue("repository"))
 	if repoName == "" {
-		http.Error(w, "Repository required", http.StatusBadRequest)
+		http.Error(w, "Drop required", http.StatusBadRequest)
 		return
 	}
 
@@ -533,14 +533,14 @@ func RepositoryCreateNewDirectory(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Ensure repository exists
-	root := fmt.Sprintf("%s/%s/%s", repository.RepoDir, repoOwner, repoName)
+	root := fmt.Sprintf("%s/%s/%s", repository.DropDir, repoOwner, repoName)
 	ok, derr := repository.DirExists(root)
 	if derr != nil {
-		http.Error(w, "Failed to verify repository existence", http.StatusInternalServerError)
+		http.Error(w, "Failed to verify Drop existence", http.StatusInternalServerError)
 		return
 	}
 	if !ok {
-		http.Error(w, "Repository not found", http.StatusNotFound)
+		http.Error(w, "Drop not found", http.StatusNotFound)
 		return
 	}
 
@@ -559,7 +559,7 @@ func RepositoryCreateNewDirectory(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	if !allowed {
-		http.Error(w, "You do not have permission to modify this repository", http.StatusForbidden)
+		http.Error(w, "You do not have permission to modify this Drop", http.StatusForbidden)
 		return
 	}
 
@@ -609,14 +609,14 @@ func RepositoryCreateNewFile(w http.ResponseWriter, r *http.Request) {
 		repoOwner = userName
 	}
 
-	root := fmt.Sprintf("%s/%s/%s", repository.RepoDir, repoOwner, repoName)
+	root := fmt.Sprintf("%s/%s/%s", repository.DropDir, repoOwner, repoName)
 	ok, derr := repository.DirExists(root)
 	if derr != nil {
-		http.Error(w, "Failed to verify repository existence", http.StatusInternalServerError)
+		http.Error(w, "failed to verify Drop existence", http.StatusInternalServerError)
 		return
 	}
 	if !ok {
-		http.Error(w, "Repository not found", http.StatusNotFound)
+		http.Error(w, "Drop not found", http.StatusNotFound)
 		return
 	}
 
@@ -634,7 +634,7 @@ func RepositoryCreateNewFile(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	if !allowed {
-		http.Error(w, "You do not have permission to modify this repository", http.StatusForbidden)
+		http.Error(w, "You do not have permission to modify this Drop", http.StatusForbidden)
 		return
 	}
 
@@ -706,12 +706,12 @@ func RepositoryRenameItem(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Ensure repo exists
-	repoPath := fmt.Sprintf("%s/%s/%s", repository.RepoDir, repoOwner, repoName)
+	repoPath := fmt.Sprintf("%s/%s/%s", repository.DropDir, repoOwner, repoName)
 	if ok, derr := repository.DirExists(repoPath); derr != nil {
-		http.Error(w, "Failed to verify repository existence", http.StatusInternalServerError)
+		http.Error(w, "failed to verify Drop existence", http.StatusInternalServerError)
 		return
 	} else if !ok {
-		http.Error(w, "Repository not found", http.StatusNotFound)
+		http.Error(w, "Drop not found", http.StatusNotFound)
 		return
 	}
 
@@ -730,7 +730,7 @@ func RepositoryRenameItem(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	if !allowed {
-		http.Error(w, "You do not have permission to modify this repository", http.StatusForbidden)
+		http.Error(w, "You do not have permission to modify this Drop", http.StatusForbidden)
 		return
 	}
 
@@ -789,12 +789,12 @@ func RepositoryDeleteItem(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Ensure repository exists
-	repoPath := fmt.Sprintf("%s/%s/%s", repository.RepoDir, owner, repoName)
+	repoPath := fmt.Sprintf("%s/%s/%s", repository.DropDir, owner, repoName)
 	if ok, derr := repository.DirExists(repoPath); derr != nil {
-		http.Error(w, "Failed to verify repository existence", http.StatusInternalServerError)
+		http.Error(w, "failed to verify Drop existence", http.StatusInternalServerError)
 		return
 	} else if !ok {
-		http.Error(w, "Repository not found", http.StatusNotFound)
+		http.Error(w, "Drop not found", http.StatusNotFound)
 		return
 	}
 
@@ -813,7 +813,7 @@ func RepositoryDeleteItem(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	if !allowed {
-		http.Error(w, "You do not have permission to modify this repository", http.StatusForbidden)
+		http.Error(w, "You do not have permission to modify this Drop", http.StatusForbidden)
 		return
 	}
 
@@ -861,7 +861,7 @@ func RepositoryEmptyTrash(w http.ResponseWriter, r *http.Request) {
 		repoOwner = userName
 	}
 	if !canModifyRepository(userName, repoOwner, repoName) {
-		http.Error(w, "You do not have permission to modify this repository", http.StatusForbidden)
+		http.Error(w, "You do not have permission to modify this Drop", http.StatusForbidden)
 		return
 	}
 	if err := repository.EmptyTrash(repoOwner, repoName); err != nil {
@@ -892,7 +892,7 @@ func RepositoryRestoreTrash(w http.ResponseWriter, r *http.Request) {
 		repoOwner = userName
 	}
 	if !canModifyRepository(userName, repoOwner, repoName) {
-		http.Error(w, "You do not have permission to modify this repository", http.StatusForbidden)
+		http.Error(w, "You do not have permission to modify this Drop", http.StatusForbidden)
 		return
 	}
 	itemNames := r.Form["itemName"]
@@ -958,7 +958,7 @@ func canReadRepository(sessionUser, repoOwner, repoName string, isPublic bool) b
 			}
 		}
 	}
-	return userModel.CanReadContactRepositories(config.GetDB(), sessionUser, repoOwner)
+	return userModel.CanReadContactDrops(config.GetDB(), sessionUser, repoOwner)
 }
 
 func normalizeBrowserPath(raw string) string {
@@ -1334,7 +1334,7 @@ func RepositoryIndex(w http.ResponseWriter, r *http.Request) {
 	if apiMode && searchQuery != "" {
 		SS := config.GetSessionManager()
 		currentUser := SS.GetString(r.Context(), "name")
-		matches, err := repository.SearchRepositories(searchQuery, currentUser)
+	matches, err := repository.SearchDrops(searchQuery, currentUser)
 		if err != nil {
 			writeJSON(w, http.StatusInternalServerError, map[string]interface{}{"success": false, "error": err.Error()})
 			return
@@ -1365,7 +1365,7 @@ func RepositoryAPI(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if query.Get("list") == "1" {
-		files, err := repository.ListRepositoryFilesRecursive(userName, repoName)
+		files, err := repository.ListDropFilesRecursive(userName, repoName)
 		if err != nil {
 			writeJSON(w, http.StatusInternalServerError, map[string]interface{}{"success": false, "error": err.Error()})
 			return
@@ -1402,9 +1402,9 @@ func RepositoryAPI(w http.ResponseWriter, r *http.Request) {
 		}
 		// Ensure repository directory exists; return not-found if missing so clients
 		// can decide to create the repository when authorized.
-		repoPath := fmt.Sprintf("%s/%s/%s", repository.RepoDir, userName, repoName)
+		repoPath := fmt.Sprintf("%s/%s/%s", repository.DropDir, userName, repoName)
 		if ok, _ := repository.DirExists(repoPath); !ok {
-			writeJSON(w, http.StatusNotFound, map[string]interface{}{"success": false, "error": "repository is not found"})
+			writeJSON(w, http.StatusNotFound, map[string]interface{}{"success": false, "error": "drop not found"})
 			return
 		}
 		if m == nil {
@@ -1465,22 +1465,22 @@ func RepositoryAPI(w http.ResponseWriter, r *http.Request) {
 					return
 				}
 
-				destDir := fmt.Sprintf("%s/%s/%s", repository.RepoDir, userName, repoName)
+				destDir := fmt.Sprintf("%s/%s/%s", repository.DropDir, userName, repoName)
 
 				ok, derr := repository.DirExists(destDir)
 				if derr != nil {
-					writeJSON(w, http.StatusInternalServerError, map[string]interface{}{"success": false, "error": "failed to verify repository"})
+					writeJSON(w, http.StatusInternalServerError, map[string]interface{}{"success": false, "error": "failed to verify Drop"})
 					return
 				}
 
 				if !ok {
 					// repository missing: only path owner may create it via upload
 					if sessionUser != userName {
-						writeJSON(w, http.StatusNotFound, map[string]interface{}{"success": false, "error": "repository does not exist"})
+						writeJSON(w, http.StatusNotFound, map[string]interface{}{"success": false, "error": "drop does not exist"})
 						return
 					}
 					if err := os.MkdirAll(destDir, 0755); err != nil {
-						writeJSON(w, http.StatusInternalServerError, map[string]interface{}{"success": false, "error": "failed to create repository"})
+						writeJSON(w, http.StatusInternalServerError, map[string]interface{}{"success": false, "error": "failed to create Drop"})
 						return
 					}
 				} else {
@@ -1554,8 +1554,8 @@ func RepositoryDownloadRepositoryAsSQAR(w http.ResponseWriter, r *http.Request) 
 
 	userName := chi.URLParam(r, "user")
 
-	repoToDownload := fmt.Sprintf("%s/%s/%s", repository.RepoDir, userName, repoName)
-	fmt.Printf("User %s tried to download repository at %s\n", userName, repoToDownload)
+	repoToDownload := fmt.Sprintf("%s/%s/%s", repository.DropDir, userName, repoName)
+	fmt.Printf("User %s tried to download Drop at %s\n", userName, repoToDownload)
 
 	archive, err := repository.PackSQAR(repoToDownload, userName, repoName)
 	if err != nil {

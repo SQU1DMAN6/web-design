@@ -16,7 +16,7 @@ type FrontEndParams struct {
 	CSRFToken                 template.HTML
 	LoggedIn                  bool
 	IsViewingPublic           bool
-	UserOwnsRepository        bool
+	UserOwnsDrop              bool
 	IsTrashView               bool
 	UserBio                   string
 	UserPFP                   string
@@ -24,15 +24,15 @@ type FrontEndParams struct {
 	PendingIncomingContacts   []map[string]interface{}
 	PendingOutgoingContacts   []map[string]interface{}
 	Error                     map[string]string
-	RepoList                  []string
-	RepoMatches               []map[string]string
-	RepoDescription           string
-	RepoOwners                string
-	RepoPublic                bool
+	DropList                  []string
+	DropMatches               []map[string]string
+	DropDescription           string
+	DropOwners                string
+	DropPublic                bool
 	EditorFileName            string
 	EditorFilePath            string
-	EditorRepoOwner           string
-	EditorRepoName            string
+	EditorDropOwner           string
+	EditorDropName            string
 	EditorBackURL             string
 	EditorLoadURL             string
 	EditorSyncURL             string

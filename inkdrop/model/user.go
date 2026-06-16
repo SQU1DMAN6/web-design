@@ -23,7 +23,7 @@ type User struct {
 	Bio      string `bun:",notnull"`
 }
 
-type Contact struct {
+type ContactRequest struct {
 	ID        int64     `bun:",pk,autoincrement"`
 	Requester string    `bun:",notnull"`
 	Recipient string    `bun:",notnull"`
@@ -43,7 +43,7 @@ func ModelUser(db *bun.DB) error {
 	}
 
 	_, err = db.NewCreateTable().
-		Model((*Contact)(nil)).
+		Model((*ContactRequest)(nil)).
 		IfNotExists().
 		Exec(ctx)
 	if err != nil {
@@ -267,7 +267,7 @@ func RepairLegacyProfilePicturePaths(db *bun.DB) error {
 	return nil
 }
 
-func SearchUsers(db *bun.DB, currentUser string, query string, limit int) ([]User, error) {
+func SearchUsersByName(db *bun.DB, currentUser string, query string, limit int) ([]User, error) {
 	if limit <= 0 || limit > 100 {
 		limit = 40
 	}
@@ -347,7 +347,7 @@ func RequestContact(db *bun.DB, requester string, recipient string) error {
 	if err == nil && existing != nil {
 		if existing.Status == "declined" {
 			_, err = db.NewUpdate().
-				Model((*Contact)(nil)).
+				Model((*ContactRequest)(nil)).
 				Set("status = ?", "pending").
 				Set("updated_at = ?", time.Now()).
 				Where("id = ?", existing.ID).
@@ -357,7 +357,7 @@ func RequestContact(db *bun.DB, requester string, recipient string) error {
 		return nil
 	}
 
-	contact := &Contact{Requester: requester, Recipient: recipient, Status: "pending", CreatedAt: time.Now(), UpdatedAt: time.Now()}
+	contact := &ContactRequest{Requester: requester, Recipient: recipient, Status: "pending", CreatedAt: time.Now(), UpdatedAt: time.Now()}
 	_, err = db.NewInsert().Model(contact).Exec(ctx)
 	return err
 }
@@ -369,7 +369,7 @@ func RespondToContact(db *bun.DB, id int64, recipient string, accept bool) error
 	}
 	ctx := context.Background()
 	res, err := db.NewUpdate().
-		Model((*Contact)(nil)).
+		Model((*ContactRequest)(nil)).
 		Set("status = ?", status).
 		Set("updated_at = ?", time.Now()).
 		Where("id = ?", id).
@@ -386,8 +386,8 @@ func RespondToContact(db *bun.DB, id int64, recipient string, accept bool) error
 	return nil
 }
 
-func GetContactBetween(db *bun.DB, a string, b string) (*Contact, error) {
-	var contact Contact
+func GetContactBetween(db *bun.DB, a string, b string) (*ContactRequest, error) {
+	var contact ContactRequest
 	ctx := context.Background()
 	err := db.NewSelect().
 		Model(&contact).
@@ -408,21 +408,21 @@ func ContactStatus(db *bun.DB, requester string, recipient string) string {
 	return contact.Status
 }
 
-func CanReadContactRepositories(db *bun.DB, requester string, repoOwner string) bool {
+func CanReadContactDrops(db *bun.DB, requester string, dropOwner string) bool {
 	var count int
 	ctx := context.Background()
 	err := db.NewSelect().
-		Model((*Contact)(nil)).
+		Model((*ContactRequest)(nil)).
 		ColumnExpr("count(*)").
 		Where("requester = ?", requester).
-		Where("recipient = ?", repoOwner).
+		Where("recipient = ?", dropOwner).
 		Where("status = ?", "accepted").
 		Scan(ctx, &count)
 	return err == nil && count > 0
 }
 
 func ListAcceptedContactOwners(db *bun.DB, requester string) ([]string, error) {
-	var contacts []Contact
+	var contacts []ContactRequest
 	ctx := context.Background()
 	err := db.NewSelect().
 		Model(&contacts).
@@ -441,7 +441,7 @@ func ListAcceptedContactOwners(db *bun.DB, requester string) ([]string, error) {
 }
 
 func ListMutualContacts(db *bun.DB, username string) ([]string, error) {
-	var contacts []Contact
+	var contacts []ContactRequest
 	ctx := context.Background()
 	err := db.NewSelect().
 		Model(&contacts).
@@ -468,7 +468,7 @@ func ListMutualContacts(db *bun.DB, username string) ([]string, error) {
 	return names, nil
 }
 
-func ListContactRequests(db *bun.DB, username string) (incoming []Contact, outgoing []Contact, err error) {
+func ListContactRequests(db *bun.DB, username string) (incoming []ContactRequest, outgoing []ContactRequest, err error) {
 	ctx := context.Background()
 	err = db.NewSelect().
 		Model(&incoming).

@@ -102,8 +102,8 @@ func handleDocumentEditGet(w http.ResponseWriter, r *http.Request, target *liveE
 		Path:                      target.WorkingDir,
 		EditorFileName:            target.FileName,
 		EditorFilePath:            target.DisplayPath,
-		EditorRepoOwner:           target.RepoOwner,
-		EditorRepoName:            target.RepoName,
+		EditorDropOwner:           target.RepoOwner,
+		EditorDropName:            target.RepoName,
 		EditorBackURL:             target.BackURL,
 		EditorEditable:            err == nil && snapshotErr == nil && target.FileSize <= documentEditMaxFileSize,
 		DocumentEditorFileURL:     initialFileURL,
@@ -290,7 +290,7 @@ func handleDocumentEditMutation(w http.ResponseWriter, r *http.Request, target *
 			return
 		}
 
-		filePath, err := repoStore.WriteFileAtRepoPath(target.RepoOwner, target.RepoName, savePath, data, req.Overwrite)
+		filePath, err := repoStore.WriteFileAtDropPath(target.RepoOwner, target.RepoName, savePath, data, req.Overwrite)
 		if err != nil {
 			if errors.Is(err, repoStore.ErrItemExists) {
 				writeJSON(w, http.StatusConflict, documentEditMutationResponse{

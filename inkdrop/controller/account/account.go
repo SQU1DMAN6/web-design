@@ -108,7 +108,7 @@ func CommunityAPI(w http.ResponseWriter, r *http.Request) {
 	}
 
 	db := config.GetDB()
-	users, err := userModel.SearchUsers(db, sessionUser, r.URL.Query().Get("q"), 80)
+	users, err := userModel.SearchUsersByName(db, sessionUser, r.URL.Query().Get("q"), 20)
 	if err != nil {
 		writeJSON(w, http.StatusInternalServerError, map[string]interface{}{"success": false, "error": err.Error()})
 		return
@@ -295,7 +295,7 @@ func userPayload(user userModel.User, status string) map[string]interface{} {
 	}
 }
 
-func contactPayloads(contacts []userModel.Contact) []map[string]interface{} {
+func contactPayloads(contacts []userModel.ContactRequest) []map[string]interface{} {
 	payload := make([]map[string]interface{}, 0, len(contacts))
 	for _, contact := range contacts {
 		payload = append(payload, map[string]interface{}{

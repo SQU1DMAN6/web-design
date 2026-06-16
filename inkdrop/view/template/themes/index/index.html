@@ -12,16 +12,61 @@
     <header class="topbar">
         <div class="topbar-inner">
             <a href="/" class="topbar-brand">InkDrop</a>
+
+            <div class="topbar-search">
+                <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                    <circle cx="11" cy="11" r="8"></circle>
+                    <path d="M21 21l-4.3-4.3"></path>
+                </svg>
+                <input id="globalSearch" class="global-search" type="search"
+                    aria-label="Search Drops, contacts" autocomplete="off" />
+            </div>
+
             <div class="topbar-right">
                 <div class="theme-switch" role="group" aria-label="Theme mode">
                     <button type="button" data-theme-set="light" aria-pressed="false">Light</button>
                     <button type="button" data-theme-set="dark" aria-pressed="false">Dark</button>
                 </div>
+
+                <div class="notification-menu">
+                    <button type="button" class="notification-button" id="notificationButton"
+                        aria-haspopup="menu" aria-expanded="false" aria-controls="notificationMenu"
+                        aria-label="Notifications">
+                        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                            <path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9"></path>
+                            <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+                        </svg>
+                        <span class="notification-ping" aria-hidden="true"></span>
+                    </button>
+                    <div id="notificationMenu" class="notification-dropdown" role="menu" hidden>
+                        <div class="dropdown-head">Notifications</div>
+
+                        {{if .PendingIncomingContacts}}
+                        {{range $i, $c := .PendingIncomingContacts}}
+                        <div class="notification-item">
+                            <div class="notification-title">{{$c.requester}} sent a contact request</div>
+                            <div class="notification-time">Needs review</div>
+                        </div>
+                        {{end}}
+                        {{else}}
+                        <div class="notification-item">
+                            <div class="notification-title">No new contact requests</div>
+                            <div class="notification-time">You are all caught up</div>
+                        </div>
+                        {{end}}
+
+                        <div class="notification-item">
+                            <div class="notification-title">Workspace ready</div>
+                            <div class="notification-time">InkDrop dashboard loaded</div>
+                        </div>
+                    </div>
+                </div>
+
                 <div class="profile-menu">
                     <button type="button" class="profile-button" id="profileMenuButton" aria-haspopup="menu"
                         aria-expanded="false" aria-controls="profileMenu">
                         <span class="profile-button-content">
-                            {{if .UserPFP}}<img src="{{.UserPFP}}" alt="" class="profile-chip-image" />{{end}}
+                            {{if .UserPFP}}<img src="{{.UserPFP}}" alt="" class="profile-chip-image" />{{else}}<img src="/pfp/default.png" alt="" class="profile-chip-image" />{{end}}
                             <span class="profile-button-name">{{.Name}}</span>
                             <span class="profile-caret" aria-hidden="true"></span>
                         </span>
@@ -29,7 +74,8 @@
                     <div id="profileMenu" class="profile-dropdown" role="menu" hidden>
                         <p class="menu-label">Signed in as</p>
                         <p class="menu-user">{{.Name}}</p>
-                        <button type="button" class="button-link small" id="openAccountSettings" role="menuitem">Open Settings</button>
+                        <button type="button" class="button-link small" id="openAccountSettings"
+                            role="menuitem">Open Settings</button>
                     </div>
                 </div>
             </div>
@@ -38,64 +84,88 @@
 
     <main class="page app-page">
         <section class="app-shell">
-            <aside class="left-panel" aria-label="Workspace navigation">
+            <aside class="left-panel" aria-label="Jobs and workspace tasks">
                 <nav class="left-panel-tabs" aria-label="Workspace sections">
-                    <a class="left-panel-tab {{if not .IsViewingPublic}}active{{end}}" href="/">Repositories</a>
-                    <a class="left-panel-tab {{if eq .Message "Browse public repositories"}}active{{end}}" href="/?view=public">Community Repositories</a>
-                    <a class="left-panel-tab {{if eq .Message "Repositories shared with you"}}active{{end}}" href="/?view=shared">Repositories Shared With Me</a>
-                    <button type="button" class="left-panel-tab" data-tab-target="communityPanel"><strong>Community</strong></button>
+                    <a class="left-panel-tab {{if not .IsViewingPublic}}active{{end}}" href="/">
+                        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                            <path d="M3 7h6l2 2h10v10H3z"></path>
+                        </svg>
+                        Drops
+                    </a>
+
+                    <a class="left-panel-tab {{if eq .Message "Browse public repositories"}}active{{end}}"
+                        href="/?view=public">
+                        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                            <circle cx="12" cy="12" r="9"></circle>
+                            <path d="M3 12h18"></path>
+                        </svg>
+                        Community Drops
+                    </a>
+
+                    <a class="left-panel-tab {{if eq .Message "Repositories shared with you"}}active{{end}}"
+                        href="/?view=shared">
+                        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                            <path d="M16 11a4 4 0 1 0-8 0"></path>
+                            <path d="M4 21a8 8 0 0 1 16 0"></path>
+                        </svg>
+                        Shared With Me
+                    </a>
+
+                    <button type="button" class="left-panel-tab" data-tab-target="contactsPanel">
+                        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                            <path d="M17 21v-2a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v2"></path>
+                            <circle cx="9" cy="7" r="4"></circle>
+                            <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                            <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                        </svg>
+                        Contacts
+                    </button>
                 </nav>
 
                 <div class="left-panel-section">
-                    <h2>Repository List</h2>
-                    <div class="left-repo-list">
-                        {{if .RepoList}}
-                        {{$parent := .}}
-                        {{range $i, $reponame := .RepoList}}
-                        <a href="/browse/{{$parent.Name}}/{{$reponame}}" title="{{$reponame}}">{{truncate $reponame 40}}</a>
-                        {{end}}
-                        {{else if .RepoMatches}}
-                        {{range $i, $m := .RepoMatches}}
-                        <a href="/browse/{{$m.user}}/{{$m.repo}}" title="{{$m.user}}/{{$m.repo}}">{{truncate $m.repo 40}}<small>{{$m.user}}</small></a>
-                        {{end}}
-                        {{else}}
-                        <p class="subtle">No repositories to show.</p>
-                        {{end}}
-                    </div>
-                </div>
+                    <h2>Quick Actions</h2>
 
-                <div class="left-panel-section">
-                    <h2>Contact Requests</h2>
-                    <div id="incomingRequests" class="compact-stack">
-                        {{if .PendingIncomingContacts}}
-                        {{range $i, $c := .PendingIncomingContacts}}
-                        <div class="contact-request" data-request-id="{{$c.id}}">
-                            <span>{{$c.requester}}</span>
-                            <div class="row">
-                                <button type="button" class="button-link small" data-contact-action="accept">Accept</button>
-                                <button type="button" class="button-link small danger" data-contact-action="decline">Decline</button>
-                            </div>
-                        </div>
-                        {{end}}
-                        {{else}}
-                        <p class="subtle">No pending requests.</p>
-                        {{end}}
-                    </div>
+                    <button type="button" class="side-action" id="quickNewDrop">
+                        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                            <path d="M12 5v14"></path>
+                            <path d="M5 12h14"></path>
+                        </svg>
+                        Create new Drop
+                    </button>
+
+                    <button type="button" class="side-action" id="quickNotifications">
+                        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                            <path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9"></path>
+                            <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+                        </svg>
+                        Check notifications
+                    </button>
                 </div>
             </aside>
 
-            <section class="content-panel">
+            <section class="content-panel" aria-label="InkDrop workspace">
                 <div class="workspace-strip">
                     <div>
-                        <h1>{{if .IsViewingPublic}}{{.Message}}{{else}}InkDrop Workspace{{end}}</h1>
-                        <p>{{if .IsViewingPublic}}Browse repositories and contacts without losing your place.{{else}}Create, open, and share repositories from one focused workspace.{{end}}</p>
+                        <h1>{{if .IsViewingPublic}}Community Drops{{else}}InkDrop Workspace{{end}}</h1>
+                        <p>{{if .IsViewingPublic}}Browse public Drops and contacts without losing your place.{{else}}Create, open, and share Drops from one focused workspace.{{end}}</p>
                     </div>
+
+                    <div class="workspace-divider" aria-hidden="true"></div>
+
                     {{if not .IsViewingPublic}}
-                    <form name="newrepo" method="POST" action="/" class="inline-create-form">
-                        <input id="reponame" name="reponame" type="text" class="details" placeholder="new_repository"
-                            minlength="1" maxlength="64" pattern="[A-Za-z0-9_- ]+" required />
-                        <button type="submit" class="redirect">Create</button>
-                    </form>
+                    <div class="inline-create-wrap">
+                        <label for="reponame">Create a new Drop</label>
+                        <form name="newrepo" method="POST" action="/" class="inline-create-form">
+                            <input id="reponame" name="reponame" type="text" class="details" aria-label="Drop name" autocomplete="off"
+                                minlength="1" maxlength="64" pattern="[A-Za-z0-9_- ]+" required />
+                            <button type="submit" class="redirect">Create</button>
+                        </form>
+                    </div>
+                    {{else}}
+                    <div class="inline-create-wrap">
+                        <label>Community mode</label>
+                        <a class="primary-btn" href="/">Back to Workspace</a>
+                    </div>
                     {{end}}
                 </div>
 
@@ -107,42 +177,153 @@
                 </div>
                 {{end}}
 
+                <section class="stats-grid" aria-label="Workspace stats">
+                    <div class="stat-card">
+                        <div id="dropCount" class="stat-number">0</div>
+                        <div class="stat-label">Drops</div>
+                    </div>
+                    <div class="stat-card">
+                        <div id="sharedCount" class="stat-number">0</div>
+                        <div class="stat-label">Shared</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-number">0</div>
+                        <div class="stat-label">Tasks Due</div>
+                    </div>
+                    <div class="stat-card">
+                        <div id="contactCount" class="stat-number">0</div>
+                        <div class="stat-label">Contacts Shown</div>
+                    </div>
+                </section>
+
                 <div class="panel-section" id="repoPanel">
-                    <h2 class="section">{{if .IsViewingPublic}}Repositories{{else}}Your Repositories{{end}}</h2>
-                    <div class="wide-list">
+                    <div class="section-header">
+                        <h2 class="section">{{if .IsViewingPublic}}Community Drops{{else}}Your Drops{{end}}</h2>
+
+                        <div class="tabs" aria-label="Drop filters">
+                            <button type="button" class="tab-btn active" data-filter="all">All</button>
+                            <button type="button" class="tab-btn" data-filter="starred">Starred</button>
+                            <button type="button" class="tab-btn" data-filter="shared">Shared</button>
+                            <button type="button" class="tab-btn" data-filter="recent">Recent</button>
+                            <button type="button" class="tab-btn" data-filter="archived">Archived</button>
+                        </div>
+                    </div>
+
+                    <div class="drop-list" id="dropList">
                         {{if .RepoList}}
                         {{$parent := .}}
                         {{range $i, $reponame := .RepoList}}
-                        <a class="wide-list-row" href="/browse/{{$parent.Name}}/{{$reponame}}">
-                            <strong title="{{$reponame}}">{{truncate $reponame 40}}</strong>
-                            <span>{{$parent.Name}}</span>
-                        </a>
+                        <div class="drop-row" data-name="{{$reponame}}" data-filter="recent" data-starred="false">
+                            <div class="drop-main">
+                                <svg class="doc-icon" viewBox="0 0 24 24" aria-hidden="true">
+                                    <path d="M6 3h9l4 4v14H6z"></path>
+                                    <path d="M15 3v5h5"></path>
+                                </svg>
+                                <div>
+                                    <a class="drop-name" href="/browse/{{$parent.Name}}/{{$reponame}}"
+                                        title="{{$reponame}}">{{truncate $reponame 40}}</a>
+                                    <div class="small-muted">Recent Drop</div>
+                                </div>
+                            </div>
+                            <div class="owner-col">{{$parent.Name}}</div>
+                            <div class="row-actions">
+                                <a class="action-btn" href="/browse/{{$parent.Name}}/{{$reponame}}">Open</a>
+                                <button type="button" class="action-btn" data-share="{{$reponame}}">Share</button>
+                                <button type="button" class="action-btn star-btn" aria-label="Star Drop">&#9734;</button>
+                            </div>
+                        </div>
                         {{end}}
                         {{else if .RepoMatches}}
                         {{range $i, $m := .RepoMatches}}
-                        <a class="wide-list-row" href="/browse/{{$m.user}}/{{$m.repo}}">
-                            <strong title="{{$m.repo}}">{{truncate $m.repo 40}}</strong>
-                            <span>{{$m.user}} {{if $m.description}}- {{$m.description}}{{end}}</span>
-                        </a>
+                        <div class="drop-row" data-name="{{$m.repo}} {{$m.user}}" data-filter="shared recent"
+                            data-starred="false">
+                            <div class="drop-main">
+                                <svg class="doc-icon" viewBox="0 0 24 24" aria-hidden="true">
+                                    <path d="M6 3h9l4 4v14H6z"></path>
+                                    <path d="M15 3v5h5"></path>
+                                </svg>
+                                <div>
+                                    <a class="drop-name" href="/browse/{{$m.user}}/{{$m.repo}}"
+                                        title="{{$m.repo}}">{{truncate $m.repo 40}}</a>
+                                    <div class="small-muted">{{if $m.description}}{{$m.description}}{{else}}Shared Drop{{end}}</div>
+                                </div>
+                            </div>
+                            <div class="owner-col">{{$m.user}}</div>
+                            <div class="row-actions">
+                                <a class="action-btn" href="/browse/{{$m.user}}/{{$m.repo}}">Open</a>
+                                <button type="button" class="action-btn" data-share="{{$m.repo}}">Share</button>
+                                <button type="button" class="action-btn star-btn" aria-label="Star Drop">&#9734;</button>
+                            </div>
+                        </div>
+                        {{end}}
+                        {{else}}
+                        <div class="empty-state" id="serverEmptyState">
+                            <strong>No Drops found.</strong>
+                            <span>Create your first Drop or try another view.</span>
+                        </div>
+                        {{end}}
+                    </div>
+
+                    <div id="clientEmptyState" class="empty-state hidden-empty">
+                        <strong>No Drops found.</strong>
+                        <span>Try another filter or search term.</span>
+                    </div>
+
+                    <div id="footerNote" class="footer-note">Showing Drops</div>
+                </div>
+            </section>
+
+            <aside class="right-panel" id="contactsPanel" aria-label="Contacts and requests">
+                <div class="right-panel-section">
+                    <h2>Contact Requests</h2>
+
+                    <div id="incomingRequests" class="compact-stack">
+                        {{if .PendingIncomingContacts}}
+                        {{range $i, $c := .PendingIncomingContacts}}
+                        <div class="contact-request contact-card" data-request-id="{{$c.id}}"
+                            data-searchable="{{$c.requester}} contact request">
+                            <div class="contact-row">
+                                <img class="avatar" src="/pfp/default.png" alt="" />
+                                <div class="contact-info">
+                                    <div class="contact-name">{{$c.requester}}</div>
+                                    <div class="contact-email">Wants to connect</div>
+                                </div>
+                            </div>
+                            <div class="contact-actions">
+                                <button type="button" class="button-link small" data-contact-action="accept">Accept</button>
+                                <button type="button" class="button-link small danger"
+                                    data-contact-action="decline">Decline</button>
+                            </div>
+                        </div>
                         {{end}}
                         {{else}}
                         <div class="empty-state">
-                            <p>No repositories found.</p>
+                            <strong>No pending requests.</strong>
+                            <span>New contact requests will appear here.</span>
                         </div>
                         {{end}}
                     </div>
                 </div>
 
-                <div class="panel-section" id="communityPanel" hidden>
-                    <div class="row space">
-                        <h2 class="section">Community</h2>
-                        <input type="search" class="details compact-input" id="communitySearch" placeholder="Find people" />
-                    </div>
-                    <div id="communityResults" class="wide-list"></div>
+                <div class="right-panel-section">
+                    <h2>Find People</h2>
+                    <input type="search" class="compact-input" id="communitySearch" aria-label="Find people" autocomplete="off" />
+                    <div id="communityResults" class="community-results" style="margin-top: 10px;"></div>
                 </div>
-            </section>
+
+                <div class="right-panel-section">
+                    <h2>My Contacts</h2>
+
+                    <div class="manage">
+                        <span>Manage Contacts</span>
+                        <span>&rsaquo;</span>
+                    </div>
+                </div>
+            </aside>
         </section>
     </main>
+
+    <button type="button" class="fab" id="fabNewDrop">+ New Drop</button>
 
     <dialog class="settings-modal popup account-settings-modal center" id="accountSettingsDialog">
         <form method="post" action="/account/settings" enctype="multipart/form-data" class="stack">
@@ -153,7 +334,8 @@
                     <label class="field-label" for="bio">Bio</label>
                     <textarea id="bio" name="bio" class="details account-bio" maxlength="512">{{.UserBio}}</textarea>
                     <label class="field-label" for="profilePicture">Profile Picture</label>
-                    <input id="profilePicture" name="profile_picture" type="file" accept="image/png,image/jpeg,image/gif,image/webp" />
+                    <input id="profilePicture" name="profile_picture" type="file"
+                        accept="image/png,image/jpeg,image/gif,image/webp" />
                 </div>
             </div>
             <div class="row space">
@@ -169,11 +351,22 @@
     <script>
         (function () {
             var themeKey = "inkdrop-theme";
+            var activeFilter = "all";
+
+            function qs(selector, root) {
+                return (root || document).querySelector(selector);
+            }
+
+            function qsa(selector, root) {
+                return Array.prototype.slice.call((root || document).querySelectorAll(selector));
+            }
 
             function setTheme(theme) {
                 var value = theme === "dark" ? "dark" : "light";
                 document.documentElement.setAttribute("data-theme", value);
-                document.querySelectorAll("[data-theme-set]").forEach(function (button) {
+                var themeSwitch = qs(".theme-switch");
+                if (themeSwitch) themeSwitch.classList.toggle("is-dark", value === "dark");
+                qsa("[data-theme-set]").forEach(function (button) {
                     button.setAttribute("aria-pressed", String(button.getAttribute("data-theme-set") === value));
                 });
             }
@@ -187,7 +380,7 @@
 
             function initTheme() {
                 setTheme(getSavedTheme());
-                document.querySelectorAll("[data-theme-set]").forEach(function (button) {
+                qsa("[data-theme-set]").forEach(function (button) {
                     button.type = "button";
                     button.addEventListener("click", function () {
                         var theme = button.getAttribute("data-theme-set");
@@ -197,53 +390,102 @@
                 });
             }
 
-            var profileButton = document.getElementById("profileMenuButton");
-            var profileMenu = document.getElementById("profileMenu");
-            var settingsDialog = document.getElementById("accountSettingsDialog");
-            var communityPanel = document.getElementById("communityPanel");
-            var repoPanel = document.getElementById("repoPanel");
-            var communitySearch = document.getElementById("communitySearch");
-            var communityResults = document.getElementById("communityResults");
+            var profileButton = qs("#profileMenuButton");
+            var profileMenu = qs("#profileMenu");
+            var settingsDialog = qs("#accountSettingsDialog");
+            var communitySearch = qs("#communitySearch");
+            var communityResults = qs("#communityResults");
+            var notificationButton = qs("#notificationButton");
+            var notificationMenu = qs("#notificationMenu");
+            var globalSearch = qs("#globalSearch");
+            var dropList = qs("#dropList");
+            var clientEmptyState = qs("#clientEmptyState");
+            var footerNote = qs("#footerNote");
+            var reponame = qs("#reponame");
+            var createForm = qs(".inline-create-form");
+            var createWrap = qs(".inline-create-wrap");
+            var createButton = createForm ? qs(".redirect", createForm) : null;
+            var fabNewDrop = qs("#fabNewDrop");
+            var quickNewDrop = qs("#quickNewDrop");
+            var quickNotifications = qs("#quickNotifications");
 
             function closeMenu() {
+                if (!profileMenu || !profileButton) return;
                 profileMenu.hidden = true;
                 profileButton.setAttribute("aria-expanded", "false");
             }
 
-            profileButton.addEventListener("click", function () {
-                var isHidden = profileMenu.hidden;
-                profileMenu.hidden = !isHidden;
-                profileButton.setAttribute("aria-expanded", String(isHidden));
-            });
+            function closeNotifications() {
+                if (!notificationMenu || !notificationButton) return;
+                notificationMenu.hidden = true;
+                notificationButton.setAttribute("aria-expanded", "false");
+            }
 
-            document.getElementById("openAccountSettings").addEventListener("click", function () {
-                closeMenu();
-                settingsDialog.showModal();
-            });
-            document.getElementById("cancelAccountSettings").addEventListener("click", function () {
-                settingsDialog.close();
-            });
+            function openNotifications() {
+                if (!notificationMenu || !notificationButton) return;
+                notificationMenu.hidden = false;
+                notificationButton.setAttribute("aria-expanded", "true");
+            }
+
+            if (profileButton && profileMenu) {
+                profileButton.addEventListener("click", function (event) {
+                    event.stopPropagation();
+                    var isHidden = profileMenu.hidden;
+                    profileMenu.hidden = !isHidden;
+                    profileButton.setAttribute("aria-expanded", String(isHidden));
+                    closeNotifications();
+                });
+            }
+
+            if (notificationButton && notificationMenu) {
+                notificationButton.addEventListener("click", function (event) {
+                    event.stopPropagation();
+                    var isHidden = notificationMenu.hidden;
+                    notificationMenu.hidden = !isHidden;
+                    notificationButton.setAttribute("aria-expanded", String(isHidden));
+                    closeMenu();
+                });
+            }
+
+            if (quickNotifications) {
+                quickNotifications.addEventListener("click", function () {
+                    openNotifications();
+                });
+            }
+
+            if (qs("#openAccountSettings")) {
+                qs("#openAccountSettings").addEventListener("click", function () {
+                    closeMenu();
+                    settingsDialog.showModal();
+                });
+            }
+
+            if (qs("#cancelAccountSettings")) {
+                qs("#cancelAccountSettings").addEventListener("click", function () {
+                    settingsDialog.close();
+                });
+            }
 
             document.addEventListener("click", function (event) {
-                if (!profileMenu.hidden && !event.target.closest(".profile-menu")) closeMenu();
-            });
-            document.addEventListener("keydown", function (event) {
-                if (event.key === "Escape") closeMenu();
+                if (profileMenu && !profileMenu.hidden && !event.target.closest(".profile-menu")) closeMenu();
+                if (notificationMenu && !notificationMenu.hidden && !event.target.closest(".notification-menu")) closeNotifications();
             });
 
-            document.querySelectorAll("[data-tab-target='communityPanel']").forEach(function (button) {
+            document.addEventListener("keydown", function (event) {
+                if (event.key === "Escape") {
+                    closeMenu();
+                    closeNotifications();
+                }
+            });
+
+            qsa("[data-tab-target='contactsPanel']").forEach(function (button) {
                 button.addEventListener("click", function () {
-                    openCommunity(button);
+                    var panel = qs("#contactsPanel");
+                    if (panel) panel.scrollIntoView({ behavior: "smooth", block: "start" });
+                    if (communitySearch) communitySearch.focus();
+                    loadCommunity();
                 });
             });
-
-            function openCommunity(activeButton) {
-                repoPanel.hidden = true;
-                communityPanel.hidden = false;
-                document.querySelectorAll(".left-panel-tab").forEach(function (tab) { tab.classList.remove("active"); });
-                if (activeButton) activeButton.classList.add("active");
-                loadCommunity();
-            }
 
             function postForm(url, values) {
                 var form = new URLSearchParams(values);
@@ -261,7 +503,7 @@
                 });
             }
 
-            document.querySelectorAll("[data-contact-action]").forEach(function (button) {
+            qsa("[data-contact-action]").forEach(function (button) {
                 button.addEventListener("click", function () {
                     var card = button.closest("[data-request-id]");
                     respondToContact(card.getAttribute("data-request-id"), button.getAttribute("data-contact-action"));
@@ -269,24 +511,34 @@
             });
 
             function loadCommunity() {
+                if (!communityResults) return;
                 var query = communitySearch ? communitySearch.value : "";
+                communityResults.innerHTML = '<div class="small-muted">Loading people...</div>';
+
                 fetch("/api/community?q=" + encodeURIComponent(query), { credentials: "same-origin" })
                     .then(function (response) { return response.json(); })
                     .then(function (data) {
                         communityResults.innerHTML = "";
                         if (!data.success || !Array.isArray(data.users) || data.users.length === 0) {
-                            communityResults.innerHTML = '<div class="empty-state"><p>No people found.</p></div>';
+                            communityResults.innerHTML = '<div class="empty-state"><strong>No people found.</strong><span>Try a different search.</span></div>';
+                            updateStats();
                             return;
                         }
+
                         data.users.forEach(function (user) {
                             var row = document.createElement("div");
-                            row.className = "wide-list-row";
+                            row.className = "community-card contact-card";
+                            row.setAttribute("data-searchable", [user.name, user.bio, user.status].join(" "));
+
                             var status = user.status || "";
-                            var action = document.createElement("span");
+                            var action;
+
                             if (status === "pending") {
+                                action = document.createElement("span");
                                 action.className = "status-pill";
                                 action.textContent = "Pending";
                             } else if (status === "accepted") {
+                                action = document.createElement("span");
                                 action.className = "status-pill";
                                 action.textContent = "Contact";
                             } else {
@@ -296,16 +548,20 @@
                                 action.setAttribute("data-request-contact", user.name);
                                 action.textContent = "Add Contact";
                             }
+
                             var person = document.createElement("div");
                             person.className = "community-person";
+
                             var img = document.createElement("img");
                             img.src = user.pfp || "/pfp/default.png";
                             img.alt = "";
+
                             var text = document.createElement("div");
                             var name = document.createElement("strong");
                             name.textContent = user.name;
                             var bio = document.createElement("span");
-                            bio.textContent = user.bio || "";
+                            bio.textContent = user.bio || "InkDrop user";
+
                             text.appendChild(name);
                             text.appendChild(bio);
                             person.appendChild(img);
@@ -314,11 +570,18 @@
                             row.appendChild(action);
                             communityResults.appendChild(row);
                         });
-                        communityResults.querySelectorAll("[data-request-contact]").forEach(function (button) {
+
+                        qsa("[data-request-contact]", communityResults).forEach(function (button) {
                             button.addEventListener("click", function () {
                                 postForm("/contacts/request", { recipient: button.getAttribute("data-request-contact") }).then(loadCommunity);
                             });
                         });
+
+                        filterPage();
+                        updateStats();
+                    })
+                    .catch(function () {
+                        communityResults.innerHTML = '<div class="empty-state"><strong>Could not load people.</strong><span>Please try again.</span></div>';
                     });
             }
 
@@ -328,14 +591,154 @@
                     communitySearch._timer = window.setTimeout(loadCommunity, 180);
                 });
             }
-            if (window.location.hash === "#community") {
-                openCommunity(document.querySelector("[data-tab-target='communityPanel']"));
+
+            function updateStats() {
+                var rows = qsa(".drop-row");
+                var sharedRows = rows.filter(function (row) {
+                    return (row.getAttribute("data-filter") || "").indexOf("shared") !== -1;
+                });
+                var contacts = qsa(".contact-card");
+                if (qs("#dropCount")) qs("#dropCount").textContent = rows.length;
+                if (qs("#sharedCount")) qs("#sharedCount").textContent = sharedRows.length;
+                if (qs("#contactCount")) qs("#contactCount").textContent = contacts.length;
+            }
+
+            function filterPage() {
+                var searchValue = (globalSearch && globalSearch.value || "").toLowerCase().trim();
+                var rows = qsa(".drop-row");
+                var visibleCount = 0;
+
+                rows.forEach(function (row) {
+                    var name = (row.getAttribute("data-name") || row.textContent || "").toLowerCase();
+                    var filters = row.getAttribute("data-filter") || "";
+                    var starred = row.getAttribute("data-starred") === "true";
+
+                    var filterMatch =
+                        activeFilter === "all" ||
+                        filters.indexOf(activeFilter) !== -1 ||
+                        (activeFilter === "starred" && starred);
+
+                    if (activeFilter === "archived") filterMatch = false;
+
+                    var searchMatch = !searchValue || name.indexOf(searchValue) !== -1;
+                    var visible = filterMatch && searchMatch;
+
+                    row.style.display = visible ? "grid" : "none";
+                    if (visible) visibleCount++;
+                });
+
+                qsa("[data-searchable]").forEach(function (item) {
+                    var text = (item.getAttribute("data-searchable") || item.textContent || "").toLowerCase();
+                    item.style.display = !searchValue || text.indexOf(searchValue) !== -1 ? "" : "none";
+                });
+
+                if (clientEmptyState && dropList) {
+                    var serverEmpty = qs("#serverEmptyState");
+                    var hasRows = rows.length > 0;
+                    clientEmptyState.classList.toggle("hidden-empty", !hasRows || visibleCount > 0);
+                    dropList.style.display = hasRows && visibleCount === 0 ? "none" : "";
+                    if (serverEmpty && !hasRows) clientEmptyState.classList.add("hidden-empty");
+                }
+
+                if (footerNote) footerNote.textContent = "Showing " + visibleCount + " of " + rows.length + " Drops";
+                updateStats();
+            }
+
+            qsa(".tab-btn").forEach(function (button) {
+                button.addEventListener("click", function () {
+                    qsa(".tab-btn").forEach(function (tab) { tab.classList.remove("active"); });
+                    button.classList.add("active");
+                    activeFilter = button.getAttribute("data-filter");
+                    filterPage();
+                });
+            });
+
+            if (globalSearch) globalSearch.addEventListener("input", filterPage);
+
+            document.addEventListener("click", function (event) {
+                if (event.target.classList.contains("star-btn")) {
+                    var row = event.target.closest(".drop-row");
+                    if (!row) return;
+                    var isStarred = row.getAttribute("data-starred") === "true";
+                    row.setAttribute("data-starred", isStarred ? "false" : "true");
+                    event.target.textContent = isStarred ? "\u2606" : "\u2605";
+                    event.target.classList.toggle("starred", !isStarred);
+                    filterPage();
+                }
+            });
+
+            function pulseCreateArea() {
+                if (createWrap) {
+                    createWrap.classList.add("is-highlighted");
+                    window.setTimeout(function () { createWrap.classList.remove("is-highlighted"); }, 1500);
+                }
+                if (fabNewDrop) {
+                    fabNewDrop.classList.add("is-glowing");
+                    window.setTimeout(function () { fabNewDrop.classList.remove("is-glowing"); }, 1200);
+                }
+            }
+
+            function focusNewDrop() {
+                if (!reponame) {
+                    window.location.href = "/";
+                    return;
+                }
+                reponame.scrollIntoView({ behavior: "smooth", block: "center" });
+                window.setTimeout(function () { reponame.focus(); }, 260);
+                pulseCreateArea();
+            }
+
+            function rememberDropForReveal() {
+                if (!reponame) return;
+                var name = reponame.value.trim();
+                if (!name) return;
+                try { sessionStorage.setItem("inkdrop-recent-drop", name.toLowerCase()); } catch (e) {}
+                if (createButton) {
+                    createButton.classList.add("is-loading");
+                    createButton.setAttribute("aria-busy", "true");
+                }
+            }
+
+            function revealRecentDrop() {
+                var name = "";
+                try { name = sessionStorage.getItem("inkdrop-recent-drop") || ""; } catch (e) {}
+                if (!name) return;
+
+                var rows = qsa(".drop-row");
+                var target = rows.find(function (row) {
+                    return (row.getAttribute("data-name") || "").toLowerCase() === name;
+                }) || rows[0];
+
+                if (target) {
+                    target.classList.add("drop-created");
+                    target.scrollIntoView({ behavior: "smooth", block: "center" });
+                    window.setTimeout(function () { target.classList.remove("drop-created"); }, 1900);
+                }
+
+                try { sessionStorage.removeItem("inkdrop-recent-drop"); } catch (e) {}
+            }
+
+            if (createForm) createForm.addEventListener("submit", rememberDropForReveal);
+            if (fabNewDrop) fabNewDrop.addEventListener("click", focusNewDrop);
+            if (quickNewDrop) quickNewDrop.addEventListener("click", focusNewDrop);
+
+            if (window.location.hash === "#contacts") {
+                var contactsPanel = qs("#contactsPanel");
+                if (contactsPanel) contactsPanel.scrollIntoView({ behavior: "smooth", block: "start" });
             }
 
             if (document.readyState === "loading") {
-                document.addEventListener("DOMContentLoaded", initTheme);
+                document.addEventListener("DOMContentLoaded", function () {
+                    initTheme();
+                    loadCommunity();
+                    filterPage();
+                    revealRecentDrop();
+                });
             } else {
                 initTheme();
+                loadCommunity();
+                filterPage();
+                revealRecentDrop();
             }
         })();
     </script>

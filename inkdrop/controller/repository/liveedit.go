@@ -168,8 +168,8 @@ func handleLiveEditGet(w http.ResponseWriter, r *http.Request, sessionUser strin
 		Path:                    target.WorkingDir,
 		EditorFileName:          target.FileName,
 		EditorFilePath:          target.DisplayPath,
-		EditorRepoOwner:         target.RepoOwner,
-		EditorRepoName:          target.RepoName,
+		EditorDropOwner:         target.RepoOwner,
+		EditorDropName:          target.RepoName,
 		EditorBackURL:           target.BackURL,
 		EditorLoadURL:           target.LoadURL,
 		EditorSyncURL:           target.EditURL,
@@ -340,7 +340,7 @@ func handleLiveEditMutation(w http.ResponseWriter, r *http.Request, sessionUser 
 			return
 		}
 
-		filePath, err := repoStore.WriteTextFileAtRepoPath(target.RepoOwner, target.RepoName, savePath, []byte(req.Content), req.Overwrite)
+		filePath, err := repoStore.WriteTextFileAtDropPath(target.RepoOwner, target.RepoName, savePath, []byte(req.Content), req.Overwrite)
 		if err != nil {
 			if errors.Is(err, repoStore.ErrItemExists) {
 				writeJSON(w, http.StatusConflict, liveEditMutationResponse{

@@ -301,6 +301,45 @@
             color: #1e293b;
             font-size: 0.78rem;
         }
+
+        /* Slim side panel for browse view */
+        .app-shell {
+            grid-template-columns: 240px minmax(0, 1fr);
+        }
+
+        .left-panel {
+            padding: 10px;
+        }
+
+        .left-panel-tabs {
+            gap: 3px;
+        }
+
+        .left-panel-tab {
+            font-size: 13px;
+            padding: 9px 10px;
+        }
+
+        .left-panel-section h2 {
+            font-size: 11px;
+        }
+
+        .left-repo-list a,
+        .left-repo-list span {
+            font-size: 13px;
+            padding: 6px 10px;
+        }
+
+        @media (max-width: 880px) {
+            .app-shell {
+                grid-template-columns: 1fr;
+            }
+
+            .left-panel {
+                height: auto;
+                position: static;
+            }
+        }
     </style>
     <title>{{ .Title }}</title>
 </head>
@@ -308,22 +347,26 @@
     <header class="topbar">
         <div class="topbar-inner">
             <a href="/" class="topbar-brand">InkDrop</a>
+
+            <div class="topbar-search">
+                <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                    <circle cx="11" cy="11" r="8"></circle>
+                    <path d="M21 21l-4.3-4.3"></path>
+                </svg>
+                <input id="globalSearch" class="global-search" type="search"
+                    aria-label="Search files" autocomplete="off" />
+            </div>
+
             <div class="topbar-right">
                 <div class="theme-switch" role="group" aria-label="Theme mode">
                     <button type="button" data-theme-set="light" aria-pressed="false">Light</button>
                     <button type="button" data-theme-set="dark" aria-pressed="false">Dark</button>
                 </div>
                 <div class="profile-menu">
-                    <button
-                        type="button"
-                        class="profile-button"
-                        id="profileMenuButton"
-                        aria-haspopup="menu"
-                        aria-expanded="false"
-                        aria-controls="profileMenu"
-                    >
+                    <button type="button" class="profile-button" id="profileMenuButton" aria-haspopup="menu"
+                        aria-expanded="false" aria-controls="profileMenu">
                         <span class="profile-button-content">
-                            {{if .UserPFP}}<img src="{{.UserPFP}}" alt="" class="profile-chip-image" />{{end}}
+                            {{if .UserPFP}}<img src="{{.UserPFP}}" alt="" class="profile-chip-image" />{{else}}<img src="/pfp/default.png" alt="" class="profile-chip-image" />{{end}}
                             <span class="profile-button-name">{{.Name}}</span>
                             <span class="profile-caret" aria-hidden="true"></span>
                         </span>
@@ -359,24 +402,6 @@
                         {{end}}
                         {{else}}
                         <p class="subtle">No contacts yet.</p>
-                        {{end}}
-                    </div>
-                </div>
-                <div class="left-panel-section">
-                    <h2>Contact Requests</h2>
-                    <div id="incomingRequests" class="compact-stack">
-                        {{if .PendingIncomingContacts}}
-                        {{range $i, $c := .PendingIncomingContacts}}
-                        <div class="contact-request" data-request-id="{{$c.id}}">
-                            <span>{{$c.requester}}</span>
-                            <div class="row">
-                                <button type="button" class="button-link small" data-contact-action="accept">Accept</button>
-                                <button type="button" class="button-link small danger" data-contact-action="decline">Decline</button>
-                            </div>
-                        </div>
-                        {{end}}
-                        {{else}}
-                        <p class="subtle">No pending requests.</p>
                         {{end}}
                     </div>
                 </div>
@@ -2121,6 +2146,4 @@
         })();
     </script>
 </body>
-<style>
-</style>
 </html>

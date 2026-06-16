@@ -18,6 +18,7 @@ func AddContact(w http.ResponseWriter, r *http.Request) {
 
 	if !isLoggedIn || currentUsername == "" {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
 	}
 	r.ParseForm()
 	contactUsername := strings.TrimSpace(r.FormValue("contact"))

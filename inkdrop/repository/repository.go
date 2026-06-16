@@ -37,8 +37,8 @@ var (
 
 	// Resolved at startup based on OS.
 	RootDir     string
-	RepoDir     string
-	RepoMetaDir string
+	DropDir     string
+	DropMetaDir string
 	TempDir     string
 	SessionDir  string
 	UserPFPDir  string
@@ -55,9 +55,9 @@ func init() {
 	}
 
 	RootDir = filepath.Clean(rootDir)
-	RepoDir = filepath.Join(RootDir, "userRepositories")
-	// RepoMetaDir stores per-repository metadata (meta.json files)
-	RepoMetaDir = filepath.Join(RepoDir, "_meta")
+	DropDir = filepath.Join(RootDir, "userRepositories")
+	// DropMetaDir stores per-drop metadata (meta.json files)
+	DropMetaDir = filepath.Join(DropDir, "_meta")
 	TempDir = filepath.Join(RootDir, "tmp")
 	SessionDir = filepath.Join(RootDir, "sessions")
 	userPFPDir := strings.TrimSpace(os.Getenv("FTR_PFP_DIR"))
@@ -69,7 +69,7 @@ func init() {
 }
 
 func EnsureStorageLayout() error {
-	for _, dir := range []string{RepoDir, RepoMetaDir, TempDir, SessionDir, UserPFPDir} {
+	for _, dir := range []string{DropDir, DropMetaDir, TempDir, SessionDir, UserPFPDir} {
 		if err := os.MkdirAll(dir, 0755); err != nil {
 			return err
 		}
@@ -174,39 +174,39 @@ func DirExists(path string) (bool, error) {
 	return false, err
 }
 
-func ProcessRepoName(raw string) (string, error) {
+func ProcessDropName(raw string) (string, error) {
 	rawWithoutSpaces := strings.ReplaceAll(raw, " ", "_")
 	pass, err := regexp.MatchString("^[a-zA-Z0-9_-]+$", rawWithoutSpaces)
 	if err != nil {
 		return "", err
 	}
 	if pass != true {
-		return "", errors.New("repository name contains special characters")
+		return "", errors.New("drop name contains special characters")
 	}
 	return rawWithoutSpaces, nil
 }
 
-func CreateNewUserRepository(username string, reponame string) error {
-	var userRepoDir string = fmt.Sprintf("%s/%s/%s", RepoDir, username, reponame)
-	var userRepoMetaDir string = fmt.Sprintf("%s/%s/%s", RepoMetaDir, username, reponame)
-	exists1, err1 := DirExists(userRepoDir)
-	exists2, err2 := DirExists(userRepoMetaDir)
+func CreateNewUserDrop(username string, dropname string) error {
+	var userDropDir string = fmt.Sprintf("%s/%s/%s", DropDir, username, dropname)
+	var userDropMetaDir string = fmt.Sprintf("%s/%s/%s", DropMetaDir, username, dropname)
+	exists1, err1 := DirExists(userDropDir)
+	exists2, err2 := DirExists(userDropMetaDir)
 	if err1 != nil || err2 != nil {
 		return fmt.Errorf("%s\n%s", err1, err2)
 	}
 	if exists1 || exists2 {
-		return errors.New("a path for this repository already exists. Consider renaming the repository")
+		return errors.New("a path for this Drop already exists. Consider renaming the Drop")
 	}
-	err1 = os.MkdirAll(userRepoDir, 0755)
-	err2 = os.MkdirAll(userRepoMetaDir, 0755)
+	err1 = os.MkdirAll(userDropDir, 0755)
+	err2 = os.MkdirAll(userDropMetaDir, 0755)
 	if err1 != nil || err2 != nil {
 		return fmt.Errorf("%s\n%s", err1, err2)
 	}
 	return nil
 }
 
-func CreateNewDirectory(userName, repoName, workingDir, folderName string) error {
-	root := repositoryRoot(userName, repoName)
+func CreateNewDirectory(userName, dropName, workingDir, folderName string) error {
+	root := repositoryRoot(userName, dropName)
 	target, err := resolvePathInRepo(root, workingDir, folderName)
 	if err != nil {
 		return err
@@ -219,9 +219,9 @@ func CreateNewDirectory(userName, repoName, workingDir, folderName string) error
 	return nil
 }
 
-func ListUserRepositories(userName string) ([]string, error) {
-	var userRepoDir string = fmt.Sprintf("%s/%s", RepoDir, userName)
-	entries, err := os.ReadDir(userRepoDir)
+func ListUserDrops(userName string) ([]string, error) {
+	var userDropDir string = fmt.Sprintf("%s/%s", DropDir, userName)
+	entries, err := os.ReadDir(userDropDir)
 	var clean []string
 	if err != nil {
 		return nil, err
@@ -236,7 +236,7 @@ func ListUserRepositories(userName string) ([]string, error) {
 	return clean, nil
 }
 
-func SearchRepositories(query string, currentUser string) ([]map[string]string, error) {
+func SearchDrops(query string, currentUser string) ([]map[string]string, error) {
 	q := strings.TrimSpace(query)
 	if q == "" {
 		return nil, nil
@@ -245,17 +245,17 @@ func SearchRepositories(query string, currentUser string) ([]map[string]string, 
 	all := q == "/" || q == "*"
 	q = strings.ToLower(q)
 	searchUser := ""
-	searchRepo := ""
+	searchDrop := ""
 	if strings.Contains(q, "/") {
 		parts := strings.SplitN(q, "/", 2)
 		searchUser = strings.TrimSpace(parts[0])
-		searchRepo = strings.TrimSpace(parts[1])
-		searchRepo = strings.TrimSuffix(searchRepo, "/")
+		searchDrop = strings.TrimSpace(parts[1])
+		searchDrop = strings.TrimSuffix(searchDrop, "/")
 	}
 
 	var results []map[string]string
 
-	users, err := os.ReadDir(RepoDir)
+	users, err := os.ReadDir(DropDir)
 	if err != nil {
 		return nil, err
 	}
@@ -266,30 +266,28 @@ func SearchRepositories(query string, currentUser string) ([]map[string]string, 
 		}
 		userName := userDir.Name()
 		if strings.HasPrefix(userName, "_") {
-			// skip internal/system dirs such as _meta
 			continue
 		}
-		repoDir := filepath.Join(RepoDir, userName)
-		repos, err := os.ReadDir(repoDir)
+		dropDirPath := filepath.Join(DropDir, userName)
+		drops, err := os.ReadDir(dropDirPath)
 		if err != nil {
 			continue
 		}
-		for _, repoDirEntry := range repos {
-			if !repoDirEntry.IsDir() {
+		for _, dropDirEntry := range drops {
+			if !dropDirEntry.IsDir() {
 				continue
 			}
-			// skip internal dirs
-			if strings.HasPrefix(repoDirEntry.Name(), "_") {
+			if strings.HasPrefix(dropDirEntry.Name(), "_") {
 				continue
 			}
-			repoName := repoDirEntry.Name()
-			meta, err := LoadRepoMeta(userName, repoName)
+			dropName := dropDirEntry.Name()
+			meta, err := LoadRepoMeta(userName, dropName)
 			if err != nil {
 				continue
 			}
 
 			isPublic := meta == nil || meta.Public
-			isOwnRepo := currentUser != "" && currentUser == userName
+			isOwnDrop := currentUser != "" && currentUser == userName
 			isShared := false
 			if currentUser != "" && meta != nil {
 				for _, o := range meta.Owners {
@@ -299,7 +297,7 @@ func SearchRepositories(query string, currentUser string) ([]map[string]string, 
 					}
 				}
 			}
-			if !isPublic && !isOwnRepo && !isShared {
+			if !isPublic && !isOwnDrop && !isShared {
 				continue
 			}
 
@@ -308,16 +306,16 @@ func SearchRepositories(query string, currentUser string) ([]map[string]string, 
 				desc = meta.Description
 			}
 
-			matches := all || strings.Contains(strings.ToLower(userName), q) || strings.Contains(strings.ToLower(repoName), q) || strings.Contains(strings.ToLower(desc), q)
+			matches := all || strings.Contains(strings.ToLower(userName), q) || strings.Contains(strings.ToLower(dropName), q) || strings.Contains(strings.ToLower(desc), q)
 			if searchUser != "" {
-				if searchRepo != "" {
-					matches = strings.Contains(strings.ToLower(userName), searchUser) && strings.Contains(strings.ToLower(repoName), searchRepo)
+				if searchDrop != "" {
+					matches = strings.Contains(strings.ToLower(userName), searchUser) && strings.Contains(strings.ToLower(dropName), searchDrop)
 				} else {
 					matches = strings.Contains(strings.ToLower(userName), searchUser)
 				}
 			}
 			if matches {
-				results = append(results, map[string]string{"user": userName, "repo": repoName, "description": desc})
+				results = append(results, map[string]string{"user": userName, "repo": dropName, "description": desc})
 			}
 		}
 	}
@@ -325,12 +323,12 @@ func SearchRepositories(query string, currentUser string) ([]map[string]string, 
 	return results, nil
 }
 
-// ListPublicRepositories returns a list of repositories that have their
+// ListPublicDrops returns a list of drops that have their
 // metadata Public flag set. Each item contains 'user', 'repo' and 'description'.
-func ListPublicRepositories() ([]map[string]string, error) {
+func ListPublicDrops() ([]map[string]string, error) {
 	var results []map[string]string
 
-	users, err := os.ReadDir(RepoDir)
+	users, err := os.ReadDir(DropDir)
 	if err != nil {
 		return nil, err
 	}
@@ -343,28 +341,28 @@ func ListPublicRepositories() ([]map[string]string, error) {
 		if strings.HasPrefix(userName, "_") {
 			continue
 		}
-		repos, err := os.ReadDir(filepath.Join(RepoDir, userName))
+		drops, err := os.ReadDir(filepath.Join(DropDir, userName))
 		if err != nil {
 			continue
 		}
-		for _, re := range repos {
+		for _, re := range drops {
 			if !re.IsDir() {
 				continue
 			}
-			repoName := re.Name()
-			if strings.HasPrefix(repoName, "_") {
+			dropName := re.Name()
+			if strings.HasPrefix(dropName, "_") {
 				continue
 			}
-			meta, err := LoadRepoMeta(userName, repoName)
+			meta, err := LoadRepoMeta(userName, dropName)
 			if err != nil {
 				continue
 			}
 			if meta != nil {
 				if meta.Public {
-					results = append(results, map[string]string{"user": userName, "repo": repoName, "description": meta.Description})
+					results = append(results, map[string]string{"user": userName, "repo": dropName, "description": meta.Description})
 				}
 			} else {
-				results = append(results, map[string]string{"user": userName, "repo": repoName, "description": ""})
+				results = append(results, map[string]string{"user": userName, "repo": dropName, "description": ""})
 			}
 		}
 	}
@@ -372,12 +370,12 @@ func ListPublicRepositories() ([]map[string]string, error) {
 	return results, nil
 }
 
-// ListSharedRepositories returns repositories where the given username is
-// listed as an owner in the repo metadata. Returns items with 'user', 'repo', 'description'.
-func ListSharedRepositories(username string) ([]map[string]string, error) {
+// ListSharedDrops returns drops where the given username is
+// listed as an owner in the drop metadata. Returns items with 'user', 'repo', 'description'.
+func ListSharedDrops(username string) ([]map[string]string, error) {
 	var results []map[string]string
 	seen := map[string]bool{}
-	users, err := os.ReadDir(RepoDir)
+	users, err := os.ReadDir(DropDir)
 	if err != nil {
 		return nil, err
 	}
@@ -395,35 +393,35 @@ func ListSharedRepositories(username string) ([]map[string]string, error) {
 		if strings.HasPrefix(userName, "_") {
 			continue
 		}
-		repos, err := os.ReadDir(filepath.Join(RepoDir, userName))
+		drops, err := os.ReadDir(filepath.Join(DropDir, userName))
 		if err != nil {
 			continue
 		}
-		for _, re := range repos {
+		for _, re := range drops {
 			if !re.IsDir() {
 				continue
 			}
-			repoName := re.Name()
-			if strings.HasPrefix(repoName, "_") {
+			dropName := re.Name()
+			if strings.HasPrefix(dropName, "_") {
 				continue
 			}
-			key := userName + "/" + repoName
+			key := userName + "/" + dropName
 			if contactOwnerSet[userName] {
 				desc := ""
-				if meta, err := LoadRepoMeta(userName, repoName); err == nil && meta != nil {
+				if meta, err := LoadRepoMeta(userName, dropName); err == nil && meta != nil {
 					desc = meta.Description
 				}
-				results = append(results, map[string]string{"user": userName, "repo": repoName, "description": desc})
+				results = append(results, map[string]string{"user": userName, "repo": dropName, "description": desc})
 				seen[key] = true
 				continue
 			}
-			if meta, err := LoadRepoMeta(userName, repoName); err == nil && meta != nil {
+			if meta, err := LoadRepoMeta(userName, dropName); err == nil && meta != nil {
 				for _, o := range meta.Owners {
 					if o == username {
 						if seen[key] {
 							break
 						}
-						results = append(results, map[string]string{"user": userName, "repo": repoName, "description": meta.Description})
+						results = append(results, map[string]string{"user": userName, "repo": dropName, "description": meta.Description})
 						seen[key] = true
 						break
 					}
@@ -435,10 +433,10 @@ func ListSharedRepositories(username string) ([]map[string]string, error) {
 	return results, nil
 }
 
-func ListRepositoryFilesRecursive(userName, repoName string) ([]map[string]interface{}, error) {
-	root := repositoryRoot(userName, repoName)
+func ListDropFilesRecursive(userName, dropName string) ([]map[string]interface{}, error) {
+	root := repositoryRoot(userName, dropName)
 	if ok, err := DirExists(root); err != nil || !ok {
-		return nil, fmt.Errorf("repository %s/%s not found", userName, repoName)
+		return nil, fmt.Errorf("drop %s/%s not found", userName, dropName)
 	}
 
 	var files []map[string]interface{}
@@ -467,10 +465,10 @@ func ListRepositoryFilesRecursive(userName, repoName string) ([]map[string]inter
 	return files, nil
 }
 
-func ListRepositoryEntriesRecursive(userName, repoName string) ([]map[string]interface{}, error) {
-	root := repositoryRoot(userName, repoName)
+func ListDropEntriesRecursive(userName, dropName string) ([]map[string]interface{}, error) {
+	root := repositoryRoot(userName, dropName)
 	if ok, err := DirExists(root); err != nil || !ok {
-		return nil, fmt.Errorf("repository %s/%s not found", userName, repoName)
+		return nil, fmt.Errorf("drop %s/%s not found", userName, dropName)
 	}
 
 	var entries []map[string]interface{}
@@ -514,19 +512,19 @@ func ListRepositoryEntriesRecursive(userName, repoName string) ([]map[string]int
 	return entries, nil
 }
 
-func CreateDirectoryAtRepoPath(userName, repoName, repoPath string) (string, error) {
-	rawPath := strings.TrimSpace(repoPath)
+func CreateDirectoryAtDropPath(userName, dropName, dropPath string) (string, error) {
+	rawPath := strings.TrimSpace(dropPath)
 	if rawPath == "" || rawPath == "/" {
 		return "", errors.New("invalid directory path")
 	}
 
-	cleanRepoPath := normalizeWorkingDir(rawPath)
-	relativePath := strings.TrimPrefix(cleanRepoPath, "/")
+	cleanDropPath := normalizeWorkingDir(rawPath)
+	relativePath := strings.TrimPrefix(cleanDropPath, "/")
 	if relativePath == "" {
 		return "", errors.New("invalid directory path")
 	}
 
-	targetPath, err := GetItemPath(userName, repoName, "/", relativePath)
+	targetPath, err := GetItemPath(userName, dropName, "/", relativePath)
 	if err != nil {
 		return "", err
 	}
@@ -551,8 +549,8 @@ func CalculateFileHash(filePath string) (string, error) {
 	return hex.EncodeToString(hasher.Sum(nil)), nil
 }
 
-func GetDirectoryListing(userName string, repoName string, path string) ([]string, error) {
-	root := repositoryRoot(userName, repoName)
+func GetDirectoryListing(userName string, dropName string, path string) ([]string, error) {
+	root := repositoryRoot(userName, dropName)
 	directoryToList, err := resolvePathInRepo(root, path, ".")
 	if err != nil {
 		return nil, err
@@ -577,8 +575,8 @@ func GetDirectoryListing(userName string, repoName string, path string) ([]strin
 	return clean, nil
 }
 
-func RenameItem(userName, repoName, workingDir, oldName, newName string) error {
-	root := repositoryRoot(userName, repoName)
+func RenameItem(userName, dropName, workingDir, oldName, newName string) error {
+	root := repositoryRoot(userName, dropName)
 	oldPath, err := resolvePathInRepo(root, workingDir, oldName)
 	if err != nil {
 		return err
@@ -612,24 +610,24 @@ func RenameItem(userName, repoName, workingDir, oldName, newName string) error {
 	return nil
 }
 
-func DeleteItem(userName, repoName, workingDir, name string) error {
+func DeleteItem(userName, dropName, workingDir, name string) error {
 	if IsProtectedTrashTarget(workingDir, name) {
 		return errors.New("trash cannot be deleted; empty it instead")
 	}
-	root := repositoryRoot(userName, repoName)
+	root := repositoryRoot(userName, dropName)
 	target, err := resolvePathInRepo(root, workingDir, name)
 	if err != nil {
 		return err
 	}
 	if target == root {
-		return errors.New("cannot delete repository root")
+		return errors.New("cannot delete drop root")
 	}
 
 	if repositoryPathContainsTrash(root, target) {
 		return os.RemoveAll(target)
 	}
 
-	if err := EnsureTrash(userName, repoName); err != nil {
+	if err := EnsureTrash(userName, dropName); err != nil {
 		return err
 	}
 
@@ -704,16 +702,16 @@ func IsProtectedTrashTarget(workingDir, name string) bool {
 	return target == "/"+TrashDisplayName || target == "/"+TrashInternalRoot
 }
 
-func HasTrash(userName, repoName string) bool {
-	filesDir := filepath.Join(repositoryRoot(userName, repoName), filepath.FromSlash(TrashFilesPath))
+func HasTrash(userName, dropName string) bool {
+	filesDir := filepath.Join(repositoryRoot(userName, dropName), filepath.FromSlash(TrashFilesPath))
 	ok, err := DirExists(filesDir)
 	return err == nil && ok
 }
 
-func EnsureTrash(userName, repoName string) error {
-	root := repositoryRoot(userName, repoName)
+func EnsureTrash(userName, dropName string) error {
+	root := repositoryRoot(userName, dropName)
 	if ok, err := DirExists(root); err != nil || !ok {
-		return fmt.Errorf("repository %s/%s not found", userName, repoName)
+		return fmt.Errorf("drop %s/%s not found", userName, dropName)
 	}
 	if err := os.MkdirAll(filepath.Join(root, filepath.FromSlash(TrashFilesPath)), 0755); err != nil {
 		return err
@@ -721,28 +719,28 @@ func EnsureTrash(userName, repoName string) error {
 	return os.MkdirAll(filepath.Join(root, filepath.FromSlash(TrashInfoPath)), 0755)
 }
 
-func EmptyTrash(userName, repoName string) error {
-	root := repositoryRoot(userName, repoName)
+func EmptyTrash(userName, dropName string) error {
+	root := repositoryRoot(userName, dropName)
 	for _, trashPath := range []string{TrashFilesPath, TrashInfoPath} {
 		target := filepath.Join(root, filepath.FromSlash(trashPath))
 		if !isWithinRoot(root, target) {
-			return errors.New("trash path escapes repository root")
+			return errors.New("trash path escapes drop root")
 		}
 		if err := os.RemoveAll(target); err != nil {
 			return err
 		}
 	}
-	return EnsureTrash(userName, repoName)
+	return EnsureTrash(userName, dropName)
 }
 
-func RestoreTrashItem(userName, repoName, itemName string) (string, error) {
+func RestoreTrashItem(userName, dropName, itemName string) (string, error) {
 	cleanName := filepath.ToSlash(strings.TrimSpace(itemName))
 	cleanName = strings.Trim(cleanName, "/")
 	if cleanName == "" || cleanName == "." || cleanName == ".." || strings.Contains(cleanName, "../") {
 		return "", errors.New("invalid trash item")
 	}
 
-	root := repositoryRoot(userName, repoName)
+	root := repositoryRoot(userName, dropName)
 	source, err := resolvePathInRepo(root, "/"+TrashFilesPath, cleanName)
 	if err != nil {
 		return "", err
@@ -837,8 +835,8 @@ func pruneEmptyDirs(start, stop string) error {
 	return nil
 }
 
-func repositoryRoot(userName, repoName string) string {
-	return filepath.Clean(filepath.Join(RepoDir, userName, repoName))
+func repositoryRoot(userName, dropName string) string {
+	return filepath.Clean(filepath.Join(DropDir, userName, dropName))
 }
 
 func normalizeWorkingDir(path string) string {
@@ -858,7 +856,7 @@ func resolvePathInRepo(root, workingDir, name string) (string, error) {
 	wd := normalizeWorkingDir(workingDir)
 	workingAbs := filepath.Clean(filepath.Join(rootClean, strings.TrimPrefix(wd, "/")))
 	if !isWithinRoot(rootClean, workingAbs) {
-		return "", errors.New("working directory is outside repository root")
+		return "", errors.New("working directory is outside drop root")
 	}
 
 	if name == "" || name == "." {
@@ -872,26 +870,26 @@ func resolvePathInRepo(root, workingDir, name string) (string, error) {
 
 	target := filepath.Clean(filepath.Join(workingAbs, name))
 	if !isWithinRoot(rootClean, target) {
-		return "", errors.New("target path is outside repository root")
+		return "", errors.New("target path is outside drop root")
 	}
 
 	return target, nil
 }
 
-func GetItemPath(userName, repoName, workingDir, itemName string) (string, error) {
+func GetItemPath(userName, dropName, workingDir, itemName string) (string, error) {
 	if itemName == "" || itemName == "." || itemName == ".." {
 		return "", errors.New("invalid file name")
 	}
-	root := repositoryRoot(userName, repoName)
+	root := repositoryRoot(userName, dropName)
 	return resolvePathInRepo(root, workingDir, itemName)
 }
 
-func WriteTextFile(userName, repoName, workingDir, fileName string, data []byte) (string, error) {
-	return WriteFile(userName, repoName, workingDir, fileName, data)
+func WriteTextFile(userName, dropName, workingDir, fileName string, data []byte) (string, error) {
+	return WriteFile(userName, dropName, workingDir, fileName, data)
 }
 
-func WriteFile(userName, repoName, workingDir, fileName string, data []byte) (string, error) {
-	targetPath, err := GetItemPath(userName, repoName, workingDir, fileName)
+func WriteFile(userName, dropName, workingDir, fileName string, data []byte) (string, error) {
+	targetPath, err := GetItemPath(userName, dropName, workingDir, fileName)
 	if err != nil {
 		return "", err
 	}
@@ -901,23 +899,23 @@ func WriteFile(userName, repoName, workingDir, fileName string, data []byte) (st
 	return targetPath, nil
 }
 
-func WriteTextFileAtRepoPath(userName, repoName, repoPath string, data []byte, overwrite bool) (string, error) {
-	return WriteFileAtRepoPath(userName, repoName, repoPath, data, overwrite)
+func WriteTextFileAtDropPath(userName, dropName, dropPath string, data []byte, overwrite bool) (string, error) {
+	return WriteFileAtDropPath(userName, dropName, dropPath, data, overwrite)
 }
 
-func WriteFileAtRepoPath(userName, repoName, repoPath string, data []byte, overwrite bool) (string, error) {
-	rawPath := strings.TrimSpace(repoPath)
+func WriteFileAtDropPath(userName, dropName, dropPath string, data []byte, overwrite bool) (string, error) {
+	rawPath := strings.TrimSpace(dropPath)
 	if rawPath == "" || strings.HasSuffix(rawPath, "/") {
 		return "", errors.New("invalid file path")
 	}
 
-	cleanRepoPath := normalizeWorkingDir(rawPath)
-	relativePath := strings.TrimPrefix(cleanRepoPath, "/")
+	cleanDropPath := normalizeWorkingDir(rawPath)
+	relativePath := strings.TrimPrefix(cleanDropPath, "/")
 	if relativePath == "" {
 		return "", errors.New("invalid file path")
 	}
 
-	targetPath, err := GetItemPath(userName, repoName, "/", relativePath)
+	targetPath, err := GetItemPath(userName, dropName, "/", relativePath)
 	if err != nil {
 		return "", err
 	}
@@ -988,15 +986,15 @@ func isWithinRoot(root, target string) bool {
 	return rel == "." || (rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator)))
 }
 
-// MoveUploadedFile moves a TUS-uploaded file into the user's repository at the
+// MoveUploadedFile moves a TUS-uploaded file into the user's drop at the
 // given working directory, using the original filename. It validates that the
-// destination stays within the repository root and cleans up the TUS .info sidecar.
-func MoveUploadedFile(userName, repoName, workingDir, filename, tusFilePath string) error {
-	root := repositoryRoot(userName, repoName)
+// destination stays within the drop root and cleans up the TUS .info sidecar.
+func MoveUploadedFile(userName, dropName, workingDir, filename, tusFilePath string) error {
+	root := repositoryRoot(userName, dropName)
 
 	// Ensure root exists
 	if ok, _ := DirExists(root); !ok {
-		return fmt.Errorf("repository %s/%s does not exist", userName, repoName)
+		return fmt.Errorf("drop %s/%s does not exist", userName, dropName)
 	}
 
 	destDir, err := resolvePathInRepo(root, workingDir, ".")
@@ -1010,7 +1008,7 @@ func MoveUploadedFile(userName, repoName, workingDir, filename, tusFilePath stri
 
 	destPath := filepath.Join(destDir, filepath.Base(filename))
 	if !isWithinRoot(root, destPath) {
-		return fmt.Errorf("destination path escapes repository root")
+		return fmt.Errorf("destination path escapes drop root")
 	}
 
 	// Move (rename) the uploaded blob to the final destination
@@ -1025,9 +1023,9 @@ func MoveUploadedFile(userName, repoName, workingDir, filename, tusFilePath stri
 	return nil
 }
 
-func DeleteUserRepository(userName string, repoName string) error {
-	var mainDirToRemove string = fmt.Sprintf("%s/%s/%s", RepoDir, userName, repoName)
-	var metaDirToRemove string = fmt.Sprintf("%s/%s/%s", RepoMetaDir, userName, repoName)
+func DeleteUserDrop(userName string, dropName string) error {
+	var mainDirToRemove string = fmt.Sprintf("%s/%s/%s", DropDir, userName, dropName)
+	var metaDirToRemove string = fmt.Sprintf("%s/%s/%s", DropMetaDir, userName, dropName)
 
 	err1 := os.RemoveAll(mainDirToRemove)
 	err2 := os.RemoveAll(metaDirToRemove)
@@ -1055,7 +1053,7 @@ func PackSQAR(in, user, out string) (string, error) {
 		return nil
 	})
 	if err == nil {
-		return "", fmt.Errorf("No files in repository.")
+		return "", fmt.Errorf("No files in drop.")
 	}
 	_, err = exec.Command("sqar", "pack", "-PCI", in, "-O", fullArchivePath).Output()
 	if err != nil {

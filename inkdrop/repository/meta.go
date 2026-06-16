@@ -11,7 +11,7 @@ import (
 	"time"
 )
 
-// RepoMeta represents repository metadata stored on disk as JSON.
+// RepoMeta represents drop metadata stored on disk as JSON.
 type RepoMeta struct {
 	Owners      []string               `json:"owners"`
 	Description string                 `json:"description"`
@@ -21,14 +21,14 @@ type RepoMeta struct {
 	Extra       map[string]interface{} `json:"extra,omitempty"`
 }
 
-// metaPath returns path to the metadata file for a repo.
-func metaPath(userName, repoName string) string {
-	return filepath.Join(RepoMetaDir, userName, repoName, "meta.json")
+// metaPath returns path to the metadata file for a drop.
+func metaPath(userName, dropName string) string {
+	return filepath.Join(DropMetaDir, userName, dropName, "meta.json")
 }
 
-// LoadRepoMeta loads metadata for a repository. If not present, returns nil, nil.
-func LoadRepoMeta(userName, repoName string) (*RepoMeta, error) {
-	p := metaPath(userName, repoName)
+// LoadRepoMeta loads metadata for a drop. If not present, returns nil, nil.
+func LoadRepoMeta(userName, dropName string) (*RepoMeta, error) {
+	p := metaPath(userName, dropName)
 	b, err := os.ReadFile(p)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -43,9 +43,9 @@ func LoadRepoMeta(userName, repoName string) (*RepoMeta, error) {
 	return &m, nil
 }
 
-// SaveRepoMeta writes repository metadata to disk, creating directories as needed.
-func SaveRepoMeta(userName, repoName string, m *RepoMeta) error {
-	dir := filepath.Join(RepoMetaDir, userName, repoName)
+// SaveRepoMeta writes drop metadata to disk, creating directories as needed.
+func SaveRepoMeta(userName, dropName string, m *RepoMeta) error {
+	dir := filepath.Join(DropMetaDir, userName, dropName)
 	if err := os.MkdirAll(dir, 0755); err != nil {
 		return err
 	}

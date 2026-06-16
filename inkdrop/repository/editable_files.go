@@ -22,7 +22,7 @@ const (
 
 var errUnsupportedEditableFile = errors.New("unsupported editable file type")
 
-func CreateEmptyEditableFile(userName, repoName, workingDir, fileName, fileType, extension string) (string, error) {
+func CreateEmptyEditableFile(userName, dropName, workingDir, fileName, fileType, extension string) (string, error) {
 	finalName, err := buildEditableFileName(fileName, extension)
 	if err != nil {
 		return "", err
@@ -33,8 +33,8 @@ func CreateEmptyEditableFile(userName, repoName, workingDir, fileName, fileType,
 		return "", err
 	}
 
-	repoPath := normalizeWorkingDir(path.Join(workingDir, finalName))
-	if _, err := WriteFileAtRepoPath(userName, repoName, repoPath, data, false); err != nil {
+	dropPath := normalizeWorkingDir(path.Join(workingDir, finalName))
+	if _, err := WriteFileAtDropPath(userName, dropName, dropPath, data, false); err != nil {
 		return "", err
 	}
 
