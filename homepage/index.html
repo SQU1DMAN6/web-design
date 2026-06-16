@@ -1,390 +1,355 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>FtR Project</title>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>FtR Project</title>
+    <style>
+        :root {
+            --bg: #05060a;
+            --fg: #f5f7ff;
+            --muted: rgba(245, 247, 255, 0.62);
+            --a1: #7c5cff;
+            --a2: #00d4ff;
+            --glass: rgba(255, 255, 255, 0.05);
+            --stroke: rgba(255, 255, 255, 0.10);
+        }
 
-<style>
-:root{
-    --bg:#05060a;
-    --fg:#f5f7ff;
-    --muted:rgba(245,247,255,0.62);
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
 
-    --a1:#7c5cff;
-    --a2:#00d4ff;
+        body {
+            background:
+                radial-gradient(circle at 20% 10%, rgba(124, 92, 255, 0.18), transparent 60%),
+                radial-gradient(circle at 80% 30%, rgba(0, 212, 255, 0.12), transparent 65%),
+                var(--bg);
+            color: var(--fg);
+            font-family: ui-sans-serif, system-ui;
+            overflow-x: hidden;
+        }
 
-    --glass:rgba(255,255,255,0.05);
-    --stroke:rgba(255,255,255,0.10);
-}
+        /* atmosphere */
+        .void {
+            position: fixed;
+            inset: 0;
+            z-index: -2;
+            filter: blur(100px);
+            background:
+                radial-gradient(circle at 30% 30%, rgba(124, 92, 255, 0.16), transparent 60%),
+                radial-gradient(circle at 70% 60%, rgba(0, 212, 255, 0.10), transparent 65%);
+        }
 
-*{margin:0;padding:0;box-sizing:border-box;}
+        .noise {
+            position: fixed;
+            inset: 0;
+            z-index: -1;
+            opacity: 0.04;
+            background-image: url("https://grainy-gradients.vercel.app/noise.svg");
+        }
 
-body{
-    background:
-        radial-gradient(circle at 20% 10%, rgba(124,92,255,0.18), transparent 60%),
-        radial-gradient(circle at 80% 30%, rgba(0,212,255,0.12), transparent 65%),
-        var(--bg);
+        /* nav */
+        nav {
+            position: fixed;
+            top: 18px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: min(1000px, 92vw);
+            display: flex;
+            justify-content: space-between;
+            padding: 14px 18px;
+            background: rgba(10, 12, 18, 0.65);
+            backdrop-filter: blur(16px);
+            border: 1px solid var(--stroke);
+            border-radius: 14px;
+        }
 
-    color:var(--fg);
-    font-family:ui-sans-serif, system-ui;
-    overflow-x:hidden;
-}
+        nav a {
+            color: var(--muted);
+            text-decoration: none;
+            font-size: 13px;
+            margin-left: 14px;
+        }
 
-/* atmosphere */
-.void{
-    position:fixed;
-    inset:0;
-    z-index:-2;
-    filter:blur(100px);
-    background:
-        radial-gradient(circle at 30% 30%, rgba(124,92,255,0.16), transparent 60%),
-        radial-gradient(circle at 70% 60%, rgba(0,212,255,0.10), transparent 65%);
-}
+        nav a:hover {
+            color: var(--fg);
+        }
 
-.noise{
-    position:fixed;
-    inset:0;
-    z-index:-1;
-    opacity:0.04;
-    background-image:url("https://grainy-gradients.vercel.app/noise.svg");
-}
+        /* hero */
+        .hero {
+            min-height: 100vh;
+            display: grid;
+            place-items: center;
+            text-align: center;
+            padding: 140px 24px;
+        }
 
-/* nav */
-nav{
-    position:fixed;
-    top:18px;
-    left:50%;
-    transform:translateX(-50%);
-    width:min(1000px,92vw);
+        .hero h1 {
+            font-size: clamp(2.8rem, 6vw, 5.6rem);
+            line-height: 1.05;
+            letter-spacing: -2px;
+            background: linear-gradient(120deg, var(--fg), var(--a2));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
 
-    display:flex;
-    justify-content:space-between;
-    padding:14px 18px;
+        .hero p {
+            margin-top: 22px;
+            max-width: 780px;
+            margin-inline: auto;
+            color: var(--muted);
+            line-height: 1.9;
+            font-size: 1.05rem;
+        }
 
-    background:rgba(10,12,18,0.65);
-    backdrop-filter:blur(16px);
-    border:1px solid var(--stroke);
-    border-radius:14px;
-}
+        /* sections */
+        section {
+            padding: 130px 24px;
+        }
 
-nav a{
-    color:var(--muted);
-    text-decoration:none;
-    font-size:13px;
-    margin-left:14px;
-}
+        .container {
+            max-width: 920px;
+            margin: auto;
+        }
 
-nav a:hover{color:var(--fg);}
+        .tag {
+            font-size: 11px;
+            letter-spacing: 3px;
+            color: var(--a2);
+            margin-bottom: 14px;
+        }
 
-/* hero */
-.hero{
-    min-height:100vh;
-    display:grid;
-    place-items:center;
-    text-align:center;
-    padding:140px 24px;
-}
+        h2 {
+            font-size: 2.4rem;
+            margin-bottom: 18px;
+        }
 
-.hero h1{
-    font-size:clamp(2.8rem,6vw,5.6rem);
-    line-height:1.05;
-    letter-spacing:-2px;
+        p {
+            color: var(--muted);
+            line-height: 2;
+            margin-bottom: 16px;
+            font-size: 1.05rem;
+        }
 
-    background:linear-gradient(120deg,var(--fg),var(--a2));
-    -webkit-background-clip:text;
-    -webkit-text-fill-color:transparent;
-}
+        /* memory blocks */
+        .memory {
+            margin-top: 26px;
+            padding: 20px;
+            border-left: 2px solid var(--a1);
+            background: var(--glass);
+            font-style: italic;
+            line-height: 1.9;
+        }
 
-.hero p{
-    margin-top:22px;
-    max-width:780px;
-    margin-inline:auto;
-    color:var(--muted);
-    line-height:1.9;
-    font-size:1.05rem;
-}
+        /* divider */
+        .divider {
+            margin: 44px 0;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, var(--stroke), transparent);
+        }
 
-/* sections */
-section{
-    padding:130px 24px;
-}
+        /* start cards */
+        .start-grid {
+            display: grid;
+            gap: 16px;
+            margin-top: 26px;
+        }
 
-.container{
-    max-width:920px;
-    margin:auto;
-}
+        .card {
+            padding: 20px;
+            border: 1px solid var(--stroke);
+            background: var(--glass);
+            border-radius: 14px;
+        }
 
-.tag{
-    font-size:11px;
-    letter-spacing:3px;
-    color:var(--a2);
-    margin-bottom:14px;
-}
+        .code {
+            margin-top: 12px;
+            padding: 14px;
+            background: #0b0d12;
+            border: 1px solid var(--stroke);
+            border-radius: 12px;
+            font-family: monospace;
+            font-size: 13px;
+            color: #cfd6ff;
+            line-height: 1.6;
+        }
 
-h2{
-    font-size:2.4rem;
-    margin-bottom:18px;
-}
-
-p{
-    color:var(--muted);
-    line-height:2;
-    margin-bottom:16px;
-    font-size:1.05rem;
-}
-
-/* memory blocks */
-.memory{
-    margin-top:26px;
-    padding:20px;
-    border-left:2px solid var(--a1);
-    background:var(--glass);
-    font-style:italic;
-    line-height:1.9;
-}
-
-/* divider */
-.divider{
-    margin:44px 0;
-    height:1px;
-    background:linear-gradient(90deg,transparent,var(--stroke),transparent);
-}
-
-/* start cards */
-.start-grid{
-    display:grid;
-    gap:16px;
-    margin-top:26px;
-}
-
-.card{
-    padding:20px;
-    border:1px solid var(--stroke);
-    background:var(--glass);
-    border-radius:14px;
-}
-
-.code{
-    margin-top:12px;
-    padding:14px;
-    background:#0b0d12;
-    border:1px solid var(--stroke);
-    border-radius:12px;
-    font-family:monospace;
-    font-size:13px;
-    color:#cfd6ff;
-    line-height:1.6;
-}
-
-.cta{
-    display:inline-block;
-    margin-top:14px;
-    padding:12px 16px;
-    border-radius:10px;
-    text-decoration:none;
-
-    color:var(--fg);
-    background:linear-gradient(135deg,rgba(124,92,255,0.2),rgba(0,212,255,0.15));
-    border:1px solid var(--stroke);
-}
-</style>
+        .cta {
+            display: inline-block;
+            margin-top: 14px;
+            padding: 12px 16px;
+            border-radius: 10px;
+            text-decoration: none;
+            color: var(--fg);
+            background: linear-gradient(135deg, rgba(124, 92, 255, 0.2), rgba(0, 212, 255, 0.15));
+            border: 1px solid var(--stroke);
+        }
+    </style>
 </head>
 
 <body>
-
-<div class="void"></div>
-<div class="noise"></div>
-
-<nav>
-    <div style="font-weight:700;letter-spacing:3px;">FtR</div>
-    <div>
-        <a href="#origin">Origin</a>
-        <a href="#mind">Mind</a>
-        <a href="#memory">Memory</a>
-        <a href="#start">Get Started</a>
-    </div>
-</nav>
-
-<section class="hero">
-    <div>
-        <h1>
-            The FtR Project is not for files.<br/>
-            It is for minds in motion.
-        </h1>
-
-        <p>
-            FtR is a philosophy disguised as infrastructure.
-            It is built on a simple refusal: that digital life should not fracture attention,
-            scatter memory, or turn creativity into a sequence of interruptions.
-            It is not about storing data. It is about preserving the continuity of thought.
+    <div class="void"></div>
+    <div class="noise"></div>
+    <nav>
+        <div style="font-weight:700;letter-spacing:3px;">FtR</div>
+        <div>
+            <a href="#origin">Origin</a>
+            <a href="#mind">Mind</a>
+            <a href="#memory">Memory</a>
+            <a href="#start">Get Started</a>
+        </div>
+    </nav>
+    <section class="hero">
+        <div>
+            <h1>
+                The FtR Project is not for files.<br />
+                It is for minds in motion.
+            </h1>
+            <p>
+                FtR is a philosophy implemented into infrastructure.
+                It is built on a simple promise: that digital life should not fracture attention,
+                scatter memory, or turn creativity into a sequence of interruptions.
+                FtR is not just about storing data. The true function of FtR is conserving the continuity of thought.
+            </p>
+        </div>
+    </section>
+    <section id="origin">
+        <div class="container">
+            <div class="tag">THE BEGINNING</div>
+            <h2>When everything became accessible, nothing became stable.</h2>
+            <p>
+                There was once a time when digital work felt contained. A file lived somewhere. A task had an origin, a
+                sense of belonging.
+                You opened it, you worked on it, and when you closed it, it remained exactly where your mind left it.
+            </p>
+            <p>
+                Then systems expanded.
+                Clouds appeared. Sync layers multiplied. Applications began to behave like piles of information thrown
+                on one another.
+                Nothing disappeared, but everything stopped feeling like it belonged anywhere.
+            </p>
+            <div class="divider"></div>
+            <p>
+                The result was not chaos.
+                It was quieter than that. It was cognitive leakage.
+                Small fragments of attention broken down and thrown across useless tools that never agreed on what “a
+                thing” actually was.
+            </p>
+            <div class="memory">
+                FtR begins here — not as a solution, but as a response to the cognitive fragmentation that plagues us
+                all..
+            </div>
+        </div>
+    </section>
+    <section id="mind">
+        <div class="container">
+            <div class="tag">WHAT LIES INSIDE</div>
+            <h2>Creativity does not fail from lack of tools. It fails from interruption.</h2>
+            <p>
+                Most systems assume the user is always returning with a clean state of mind.
+                But no one ever returns clean.
+                People return mid-thought, mid-problem, mid-idea.
+                They return carrying partial thought frameworks that rarely survive the transition between tools.
+            </p>
+            <p>
+                FtR is built around a different philosophy:
+                that thinking is continuous, even when software is not.
+                And if the system cannot preserve that continuity, it becomes noise instead of support.
+            </p>
+            <p>
+                A “Drop” is not just a unit of storage.
+                It is a preserved mental state — a moment of intent that can be re-entered without reconstruction.
+                Not a file. Not a project. A trace of thought that refuses to collapse under the distractions of everday
+                life.
+            </p>
+            <div class="memory">
+                If a system forces you to remember what you were doing, it has already failed you once.
+                FtR aims to avoid that first failure entirely.
+            </div>
+        </div>
+    </section>
+    <section id="memory">
+        <div class="container">
+            <div class="tag">MEMORY</div>
+            <h2>Memory is not storage. It is coherence over time.</h2>
+            <p>
+                Human memory is not a database. It is unstable, emotional, and incomplete.
+                Yet the beauty of human memory is that it maintains continuity of meaning even when detail is lost.
+            </p>
+            <p>
+                FtR mirrors this idea.
+                It does not attempt to preserve everything equally. Instead, it preserves relationships between things:
+                what was worked on, what belonged, what is destined to evolve.
+            </p>
+            <p>
+                This is why InkDrop exists — not as a dashboard, but as a visible memory field, always understood by the
+                user.
+                And this is also why Inker exists — not as a tool, but as direct access to that same field from a
+                different perspective of interaction.
+            </p>
+            <div class="memory">
+                You are not interacting with files.
+                You are interacting with the shape of your own unfinished thoughts.
+                If FtR is implemented properly into one's life, they can accomplish feats never thought of before.
+                Finish ideas faster.
+                Plan more efficiently.
+                Change your world.
+            </div>
+        </div>
+    </section>
+    <section id="start">
+        <div class="container">
+            <div class="tag">MAKE A DIFFERENCE</div>
+            <h2>Entry is not installation. It is alignment.</h2>
+            <p>
+                FtR does not begin with setup. It begins with agreement:
+                that your work should not be scattered across tools that do not understand each other.
+            </p>
+            <div class="start-grid">
+                <div class="card">
+                    <strong>Inker (Windows)</strong>
+                    <p style="margin-top:10px;">
+                        A native interface for working with Drops as visual thought structures rather than files.
+                    </p>
+                    <a class="cta" href="https://quanthai.net/FtR-Inker-3.2.0-x64.msi">
+                        Download Inker for Windows
+                    </a>
+                </div>
+                <div class="card">
+                    <strong>FtR CLI (Linux)</strong>
+                    <div class="code">
+                        curl -sSL https://quanthai.net/installftr.sh | sh
+                        <br>
+                        ftr login
+                        <br>
+                        ftr get JFtR/sqar
+                        <br>
+                    </div>
+                </div>
+                <div class="card">
+                    <strong>InkDrop (Web)</strong>
+                    <p style="margin-top:10px;">
+                        The shared surface of FtR — where structure becomes visible and collaborative.
+                    </p>
+                    <a class="cta" href="https://inkdrop.quanthai.net">
+                        Enter InkDrop
+                    </a>
+                </div>
+            </div>
+        </div>
+    </section>
+    <footer style="padding:80px 24px;text-align:center;border-top:1px solid rgba(255,255,255,0.08);">
+        <div
+            style="font-size:1.8rem;letter-spacing:4px;background:linear-gradient(90deg,#7c5cff,#00d4ff);-webkit-background-clip:text;-webkit-text-fill-color:transparent;">
+            FtR Project
+        </div>
+        <p style="margin-top:10px;color:rgba(255,255,255,0.5);line-height:1.8;">
+            The FtR Project, philosophy created by Quan Thai, 16 June 2026
         </p>
-    </div>
-</section>
-
-<section id="origin">
-<div class="container">
-
-<div class="tag">ORIGIN</div>
-
-<h2>When everything became accessible, nothing became stable.</h2>
-
-<p>
-There was a time when digital work felt contained. A file lived somewhere. A task had a place.
-You opened it, you worked on it, and when you closed it, it remained exactly where your mind left it.
-</p>
-
-<p>
-Then systems expanded.
-Clouds appeared. Sync layers multiplied. Applications began to behave like cities built on top of other cities.
-Nothing disappeared, but everything stopped feeling like it belonged anywhere in particular.
-</p>
-
-<div class="divider"></div>
-
-<p>
-The result was not chaos in the dramatic sense.
-It was quieter than that. It was cognitive leakage.
-Small fragments of attention scattered across tools that never agreed on what “a thing” actually was.
-</p>
-
-<div class="memory">
-FtR begins here — not as a solution, but as a response to fragmentation.
-Not fragmentation of data, but fragmentation of thought.
-</div>
-
-</div>
-</section>
-
-<section id="mind">
-<div class="container">
-
-<div class="tag">THE MIND</div>
-
-<h2>Creativity does not fail from lack of tools. It fails from interruption.</h2>
-
-<p>
-Most systems assume the user is always returning with a clean state of mind.
-But no one returns clean.
-People return mid-thought, mid-problem, mid-idea.
-They return carrying partial structures that rarely survive the transition between tools.
-</p>
-
-<p>
-FtR is built around a different assumption:
-that thinking is continuous, even when software is not.
-And if the system cannot preserve that continuity, it becomes noise instead of support.
-</p>
-
-<p>
-A “Drop” is not just a unit of storage.
-It is a preserved mental state — a moment of intent that can be re-entered without reconstruction.
-Not a file. Not a project. A trace of thought that refuses to collapse under context switching.
-</p>
-
-<div class="memory">
-If a system forces you to remember what you were doing, it has already failed you once.
-FtR tries to avoid that first failure entirely.
-</div>
-
-</div>
-</section>
-
-<section id="memory">
-<div class="container">
-
-<div class="tag">MEMORY</div>
-
-<h2>Memory is not storage. It is coherence over time.</h2>
-
-<p>
-Human memory is not a database. It is unstable, emotional, and incomplete.
-Yet it maintains something systems rarely achieve: continuity of meaning even when detail is lost.
-</p>
-
-<p>
-FtR mirrors this idea in structure.
-It does not attempt to preserve everything equally. Instead, it preserves relationships between things:
-what belonged together, what was being worked on, what was meant to evolve.
-</p>
-
-<p>
-This is why InkDrop exists — not as a dashboard, but as a visible memory field.
-And why Inker exists — not as a tool, but as direct access to that same field from a different posture of interaction.
-</p>
-
-<div class="memory">
-You are not interacting with files.
-You are interacting with the shape of your own unfinished thoughts.
-</div>
-
-</div>
-</section>
-
-<section id="start">
-<div class="container">
-
-<div class="tag">GET STARTED</div>
-
-<h2>Entry is not installation. It is alignment.</h2>
-
-<p>
-FtR does not begin with setup. It begins with agreement:
-that your work should not be scattered across tools that do not understand each other.
-</p>
-
-<div class="start-grid">
-
-<div class="card">
-<strong>FtR CLI (Linux)</strong>
-<div class="code">
-curl -sSL https://quanthai.net/installftr.sh | sh
-<br>
-ftr login
-<br>
-ftr search core
-<br>
-ftr get user/drop
-<br>
-</div>
-</div>
-
-<div class="card">
-<strong>Inker (Windows)</strong>
-<p style="margin-top:10px;">
-A native interface for working with Drops as visual thought structures rather than files.
-</p>
-
-<a class="cta" href="https://quanthai.net/FtR-Inker-3.2.0-x64.msi">
-Download Inker for Windows
-</a>
-</div>
-
-<div class="card">
-<strong>InkDrop (Web)</strong>
-<p style="margin-top:10px;">
-The shared surface of FtR — where structure becomes visible and collaborative.
-</p>
-
-<a class="cta" href="https://inkdrop.quanthai.net">
-Enter InkDrop
-</a>
-</div>
-
-</div>
-
-</div>
-</section>
-
-<footer style="padding:80px 24px;text-align:center;border-top:1px solid rgba(255,255,255,0.08);">
-    <div style="font-size:1.8rem;letter-spacing:4px;background:linear-gradient(90deg,#7c5cff,#00d4ff);-webkit-background-clip:text;-webkit-text-fill-color:transparent;">
-        FtR Project
-    </div>
-
-    <p style="margin-top:10px;color:rgba(255,255,255,0.5);line-height:1.8;">
-        The FtR Project, written by Quan Thai, 14 June 2026
-    </p>
-</footer>
-
+    </footer>
 </body>
+
 </html>

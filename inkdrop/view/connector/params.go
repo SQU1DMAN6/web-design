@@ -24,11 +24,11 @@ type FrontEndParams struct {
 	PendingIncomingContacts   []map[string]interface{}
 	PendingOutgoingContacts   []map[string]interface{}
 	Error                     map[string]string
-	DropList                  []string
-	DropMatches               []map[string]string
-	DropDescription           string
-	DropOwners                string
-	DropPublic                bool
+	RepoList                  []string
+	RepoMatches               []map[string]string
+	RepoDescription           string
+	RepoOwners                string
+	RepoPublic                bool
 	EditorFileName            string
 	EditorFilePath            string
 	EditorDropOwner           string

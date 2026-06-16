@@ -95,263 +95,263 @@
     <StandardDirectory Id="ProgramFiles64Folder">
       <Directory Id="INSTALLDIR" Name="FtR\Inker">
                         <Component Id="C0" Guid="*">
-                                <File Id="F0" Name="chrome_100_percent.pak" Source="C:\\Users\\THA0065\\FtR-Project\\ftr-project\\inker3\\dist\\FtR Inker-win32-x64\\chrome_100_percent.pak" KeyPath="yes" />
+                                <File Id="F0" Name="chrome_100_percent.pak" Source="c:\\Users\\THA0065\\FtR-Project\\ftr-project\\inker3\\dist\\FtR Inker-win32-x64\\chrome_100_percent.pak" KeyPath="yes" />
                         </Component>
                         <Component Id="C1" Guid="*">
-                                <File Id="F1" Name="chrome_200_percent.pak" Source="C:\\Users\\THA0065\\FtR-Project\\ftr-project\\inker3\\dist\\FtR Inker-win32-x64\\chrome_200_percent.pak" KeyPath="yes" />
+                                <File Id="F1" Name="chrome_200_percent.pak" Source="c:\\Users\\THA0065\\FtR-Project\\ftr-project\\inker3\\dist\\FtR Inker-win32-x64\\chrome_200_percent.pak" KeyPath="yes" />
                         </Component>
                         <Component Id="C2" Guid="*">
-                                <File Id="F2" Name="d3dcompiler_47.dll" Source="C:\\Users\\THA0065\\FtR-Project\\ftr-project\\inker3\\dist\\FtR Inker-win32-x64\\d3dcompiler_47.dll" KeyPath="yes" />
+                                <File Id="F2" Name="d3dcompiler_47.dll" Source="c:\\Users\\THA0065\\FtR-Project\\ftr-project\\inker3\\dist\\FtR Inker-win32-x64\\d3dcompiler_47.dll" KeyPath="yes" />
                         </Component>
                         <Component Id="C3" Guid="*">
-                                <File Id="F3" Name="ffmpeg.dll" Source="C:\\Users\\THA0065\\FtR-Project\\ftr-project\\inker3\\dist\\FtR Inker-win32-x64\\ffmpeg.dll" KeyPath="yes" />
+                                <File Id="F3" Name="ffmpeg.dll" Source="c:\\Users\\THA0065\\FtR-Project\\ftr-project\\inker3\\dist\\FtR Inker-win32-x64\\ffmpeg.dll" KeyPath="yes" />
                         </Component>
                         <Component Id="C4" Guid="*">
-                                <File Id="F4" Name="FtR Inker.exe" Source="C:\\Users\\THA0065\\FtR-Project\\ftr-project\\inker3\\dist\\FtR Inker-win32-x64\\FtR Inker.exe" KeyPath="yes" />
+                                <File Id="F4" Name="FtR Inker.exe" Source="c:\\Users\\THA0065\\FtR-Project\\ftr-project\\inker3\\dist\\FtR Inker-win32-x64\\FtR Inker.exe" KeyPath="yes" />
                         </Component>
                         <Component Id="C5" Guid="*">
-                                <File Id="F5" Name="icudtl.dat" Source="C:\\Users\\THA0065\\FtR-Project\\ftr-project\\inker3\\dist\\FtR Inker-win32-x64\\icudtl.dat" KeyPath="yes" />
+                                <File Id="F5" Name="icudtl.dat" Source="c:\\Users\\THA0065\\FtR-Project\\ftr-project\\inker3\\dist\\FtR Inker-win32-x64\\icudtl.dat" KeyPath="yes" />
                         </Component>
                         <Component Id="C6" Guid="*">
-                                <File Id="F6" Name="libEGL.dll" Source="C:\\Users\\THA0065\\FtR-Project\\ftr-project\\inker3\\dist\\FtR Inker-win32-x64\\libEGL.dll" KeyPath="yes" />
+                                <File Id="F6" Name="libEGL.dll" Source="c:\\Users\\THA0065\\FtR-Project\\ftr-project\\inker3\\dist\\FtR Inker-win32-x64\\libEGL.dll" KeyPath="yes" />
                         </Component>
                         <Component Id="C7" Guid="*">
-                                <File Id="F7" Name="libGLESv2.dll" Source="C:\\Users\\THA0065\\FtR-Project\\ftr-project\\inker3\\dist\\FtR Inker-win32-x64\\libGLESv2.dll" KeyPath="yes" />
+                                <File Id="F7" Name="libGLESv2.dll" Source="c:\\Users\\THA0065\\FtR-Project\\ftr-project\\inker3\\dist\\FtR Inker-win32-x64\\libGLESv2.dll" KeyPath="yes" />
                         </Component>
                         <Component Id="C8" Guid="*">
-                                <File Id="F8" Name="LICENSE" Source="C:\\Users\\THA0065\\FtR-Project\\ftr-project\\inker3\\dist\\FtR Inker-win32-x64\\LICENSE" KeyPath="yes" />
+                                <File Id="F8" Name="LICENSE" Source="c:\\Users\\THA0065\\FtR-Project\\ftr-project\\inker3\\dist\\FtR Inker-win32-x64\\LICENSE" KeyPath="yes" />
                         </Component>
                         <Component Id="C9" Guid="*">
-                                <File Id="F9" Name="LICENSES.chromium.html" Source="C:\\Users\\THA0065\\FtR-Project\\ftr-project\\inker3\\dist\\FtR Inker-win32-x64\\LICENSES.chromium.html" KeyPath="yes" />
+                                <File Id="F9" Name="LICENSES.chromium.html" Source="c:\\Users\\THA0065\\FtR-Project\\ftr-project\\inker3\\dist\\FtR Inker-win32-x64\\LICENSES.chromium.html" KeyPath="yes" />
                         </Component>
                         <Component Id="C10" Guid="*">
-                                <File Id="F10" Name="resources.pak" Source="C:\\Users\\THA0065\\FtR-Project\\ftr-project\\inker3\\dist\\FtR Inker-win32-x64\\resources.pak" KeyPath="yes" />
+                                <File Id="F10" Name="resources.pak" Source="c:\\Users\\THA0065\\FtR-Project\\ftr-project\\inker3\\dist\\FtR Inker-win32-x64\\resources.pak" KeyPath="yes" />
                         </Component>
                         <Component Id="C11" Guid="*">
-                                <File Id="F11" Name="snapshot_blob.bin" Source="C:\\Users\\THA0065\\FtR-Project\\ftr-project\\inker3\\dist\\FtR Inker-win32-x64\\snapshot_blob.bin" KeyPath="yes" />
+                                <File Id="F11" Name="snapshot_blob.bin" Source="c:\\Users\\THA0065\\FtR-Project\\ftr-project\\inker3\\dist\\FtR Inker-win32-x64\\snapshot_blob.bin" KeyPath="yes" />
                         </Component>
                         <Component Id="C12" Guid="*">
-                                <File Id="F12" Name="v8_context_snapshot.bin" Source="C:\\Users\\THA0065\\FtR-Project\\ftr-project\\inker3\\dist\\FtR Inker-win32-x64\\v8_context_snapshot.bin" KeyPath="yes" />
+                                <File Id="F12" Name="v8_context_snapshot.bin" Source="c:\\Users\\THA0065\\FtR-Project\\ftr-project\\inker3\\dist\\FtR Inker-win32-x64\\v8_context_snapshot.bin" KeyPath="yes" />
                         </Component>
                         <Component Id="C13" Guid="*">
-                                <File Id="F13" Name="version" Source="C:\\Users\\THA0065\\FtR-Project\\ftr-project\\inker3\\dist\\FtR Inker-win32-x64\\version" KeyPath="yes" />
+                                <File Id="F13" Name="version" Source="c:\\Users\\THA0065\\FtR-Project\\ftr-project\\inker3\\dist\\FtR Inker-win32-x64\\version" KeyPath="yes" />
                         </Component>
                         <Component Id="C14" Guid="*">
-                                <File Id="F14" Name="vk_swiftshader.dll" Source="C:\\Users\\THA0065\\FtR-Project\\ftr-project\\inker3\\dist\\FtR Inker-win32-x64\\vk_swiftshader.dll" KeyPath="yes" />
+                                <File Id="F14" Name="vk_swiftshader.dll" Source="c:\\Users\\THA0065\\FtR-Project\\ftr-project\\inker3\\dist\\FtR Inker-win32-x64\\vk_swiftshader.dll" KeyPath="yes" />
                         </Component>
                         <Component Id="C15" Guid="*">
-                                <File Id="F15" Name="vk_swiftshader_icd.json" Source="C:\\Users\\THA0065\\FtR-Project\\ftr-project\\inker3\\dist\\FtR Inker-win32-x64\\vk_swiftshader_icd.json" KeyPath="yes" />
+                                <File Id="F15" Name="vk_swiftshader_icd.json" Source="c:\\Users\\THA0065\\FtR-Project\\ftr-project\\inker3\\dist\\FtR Inker-win32-x64\\vk_swiftshader_icd.json" KeyPath="yes" />
                         </Component>
                         <Component Id="C16" Guid="*">
-                                <File Id="F16" Name="vulkan-1.dll" Source="C:\\Users\\THA0065\\FtR-Project\\ftr-project\\inker3\\dist\\FtR Inker-win32-x64\\vulkan-1.dll" KeyPath="yes" />
+                                <File Id="F16" Name="vulkan-1.dll" Source="c:\\Users\\THA0065\\FtR-Project\\ftr-project\\inker3\\dist\\FtR Inker-win32-x64\\vulkan-1.dll" KeyPath="yes" />
                         </Component>
                         <Directory Id="Dlocales" Name="locales">
                                 <Component Id="C17" Guid="*">
-                                        <File Id="F17" Name="af.pak" Source="C:\\Users\\THA0065\\FtR-Project\\ftr-project\\inker3\\dist\\FtR Inker-win32-x64\\locales\\af.pak" KeyPath="yes" />
+                                        <File Id="F17" Name="af.pak" Source="c:\\Users\\THA0065\\FtR-Project\\ftr-project\\inker3\\dist\\FtR Inker-win32-x64\\locales\\af.pak" KeyPath="yes" />
                                 </Component>
                                 <Component Id="C18" Guid="*">
-                                        <File Id="F18" Name="am.pak" Source="C:\\Users\\THA0065\\FtR-Project\\ftr-project\\inker3\\dist\\FtR Inker-win32-x64\\locales\\am.pak" KeyPath="yes" />
+                                        <File Id="F18" Name="am.pak" Source="c:\\Users\\THA0065\\FtR-Project\\ftr-project\\inker3\\dist\\FtR Inker-win32-x64\\locales\\am.pak" KeyPath="yes" />
                                 </Component>
                                 <Component Id="C19" Guid="*">
-                                        <File Id="F19" Name="ar.pak" Source="C:\\Users\\THA0065\\FtR-Project\\ftr-project\\inker3\\dist\\FtR Inker-win32-x64\\locales\\ar.pak" KeyPath="yes" />
+                                        <File Id="F19" Name="ar.pak" Source="c:\\Users\\THA0065\\FtR-Project\\ftr-project\\inker3\\dist\\FtR Inker-win32-x64\\locales\\ar.pak" KeyPath="yes" />
                                 </Component>
                                 <Component Id="C20" Guid="*">
-                                        <File Id="F20" Name="bg.pak" Source="C:\\Users\\THA0065\\FtR-Project\\ftr-project\\inker3\\dist\\FtR Inker-win32-x64\\locales\\bg.pak" KeyPath="yes" />
+                                        <File Id="F20" Name="bg.pak" Source="c:\\Users\\THA0065\\FtR-Project\\ftr-project\\inker3\\dist\\FtR Inker-win32-x64\\locales\\bg.pak" KeyPath="yes" />
                                 </Component>
                                 <Component Id="C21" Guid="*">
-                                        <File Id="F21" Name="bn.pak" Source="C:\\Users\\THA0065\\FtR-Project\\ftr-project\\inker3\\dist\\FtR Inker-win32-x64\\locales\\bn.pak" KeyPath="yes" />
+                                        <File Id="F21" Name="bn.pak" Source="c:\\Users\\THA0065\\FtR-Project\\ftr-project\\inker3\\dist\\FtR Inker-win32-x64\\locales\\bn.pak" KeyPath="yes" />
                                 </Component>
                                 <Component Id="C22" Guid="*">
-                                        <File Id="F22" Name="ca.pak" Source="C:\\Users\\THA0065\\FtR-Project\\ftr-project\\inker3\\dist\\FtR Inker-win32-x64\\locales\\ca.pak" KeyPath="yes" />
+                                        <File Id="F22" Name="ca.pak" Source="c:\\Users\\THA0065\\FtR-Project\\ftr-project\\inker3\\dist\\FtR Inker-win32-x64\\locales\\ca.pak" KeyPath="yes" />
                                 </Component>
                                 <Component Id="C23" Guid="*">
-                                        <File Id="F23" Name="cs.pak" Source="C:\\Users\\THA0065\\FtR-Project\\ftr-project\\inker3\\dist\\FtR Inker-win32-x64\\locales\\cs.pak" KeyPath="yes" />
+                                        <File Id="F23" Name="cs.pak" Source="c:\\Users\\THA0065\\FtR-Project\\ftr-project\\inker3\\dist\\FtR Inker-win32-x64\\locales\\cs.pak" KeyPath="yes" />
                                 </Component>
                                 <Component Id="C24" Guid="*">
-                                        <File Id="F24" Name="da.pak" Source="C:\\Users\\THA0065\\FtR-Project\\ftr-project\\inker3\\dist\\FtR Inker-win32-x64\\locales\\da.pak" KeyPath="yes" />
+                                        <File Id="F24" Name="da.pak" Source="c:\\Users\\THA0065\\FtR-Project\\ftr-project\\inker3\\dist\\FtR Inker-win32-x64\\locales\\da.pak" KeyPath="yes" />
                                 </Component>
                                 <Component Id="C25" Guid="*">
-                                        <File Id="F25" Name="de.pak" Source="C:\\Users\\THA0065\\FtR-Project\\ftr-project\\inker3\\dist\\FtR Inker-win32-x64\\locales\\de.pak" KeyPath="yes" />
+                                        <File Id="F25" Name="de.pak" Source="c:\\Users\\THA0065\\FtR-Project\\ftr-project\\inker3\\dist\\FtR Inker-win32-x64\\locales\\de.pak" KeyPath="yes" />
                                 </Component>
                                 <Component Id="C26" Guid="*">
-                                        <File Id="F26" Name="el.pak" Source="C:\\Users\\THA0065\\FtR-Project\\ftr-project\\inker3\\dist\\FtR Inker-win32-x64\\locales\\el.pak" KeyPath="yes" />
+                                        <File Id="F26" Name="el.pak" Source="c:\\Users\\THA0065\\FtR-Project\\ftr-project\\inker3\\dist\\FtR Inker-win32-x64\\locales\\el.pak" KeyPath="yes" />
                                 </Component>
                                 <Component Id="C27" Guid="*">
-                                        <File Id="F27" Name="en-GB.pak" Source="C:\\Users\\THA0065\\FtR-Project\\ftr-project\\inker3\\dist\\FtR Inker-win32-x64\\locales\\en-GB.pak" KeyPath="yes" />
+                                        <File Id="F27" Name="en-GB.pak" Source="c:\\Users\\THA0065\\FtR-Project\\ftr-project\\inker3\\dist\\FtR Inker-win32-x64\\locales\\en-GB.pak" KeyPath="yes" />
                                 </Component>
                                 <Component Id="C28" Guid="*">
-                                        <File Id="F28" Name="en-US.pak" Source="C:\\Users\\THA0065\\FtR-Project\\ftr-project\\inker3\\dist\\FtR Inker-win32-x64\\locales\\en-US.pak" KeyPath="yes" />
+                                        <File Id="F28" Name="en-US.pak" Source="c:\\Users\\THA0065\\FtR-Project\\ftr-project\\inker3\\dist\\FtR Inker-win32-x64\\locales\\en-US.pak" KeyPath="yes" />
                                 </Component>
                                 <Component Id="C29" Guid="*">
-                                        <File Id="F29" Name="es-419.pak" Source="C:\\Users\\THA0065\\FtR-Project\\ftr-project\\inker3\\dist\\FtR Inker-win32-x64\\locales\\es-419.pak" KeyPath="yes" />
+                                        <File Id="F29" Name="es-419.pak" Source="c:\\Users\\THA0065\\FtR-Project\\ftr-project\\inker3\\dist\\FtR Inker-win32-x64\\locales\\es-419.pak" KeyPath="yes" />
                                 </Component>
                                 <Component Id="C30" Guid="*">
-                                        <File Id="F30" Name="es.pak" Source="C:\\Users\\THA0065\\FtR-Project\\ftr-project\\inker3\\dist\\FtR Inker-win32-x64\\locales\\es.pak" KeyPath="yes" />
+                                        <File Id="F30" Name="es.pak" Source="c:\\Users\\THA0065\\FtR-Project\\ftr-project\\inker3\\dist\\FtR Inker-win32-x64\\locales\\es.pak" KeyPath="yes" />
                                 </Component>
                                 <Component Id="C31" Guid="*">
-                                        <File Id="F31" Name="et.pak" Source="C:\\Users\\THA0065\\FtR-Project\\ftr-project\\inker3\\dist\\FtR Inker-win32-x64\\locales\\et.pak" KeyPath="yes" />
+                                        <File Id="F31" Name="et.pak" Source="c:\\Users\\THA0065\\FtR-Project\\ftr-project\\inker3\\dist\\FtR Inker-win32-x64\\locales\\et.pak" KeyPath="yes" />
                                 </Component>
                                 <Component Id="C32" Guid="*">
-                                        <File Id="F32" Name="fa.pak" Source="C:\\Users\\THA0065\\FtR-Project\\ftr-project\\inker3\\dist\\FtR Inker-win32-x64\\locales\\fa.pak" KeyPath="yes" />
+                                        <File Id="F32" Name="fa.pak" Source="c:\\Users\\THA0065\\FtR-Project\\ftr-project\\inker3\\dist\\FtR Inker-win32-x64\\locales\\fa.pak" KeyPath="yes" />
                                 </Component>
                                 <Component Id="C33" Guid="*">
-                                        <File Id="F33" Name="fi.pak" Source="C:\\Users\\THA0065\\FtR-Project\\ftr-project\\inker3\\dist\\FtR Inker-win32-x64\\locales\\fi.pak" KeyPath="yes" />
+                                        <File Id="F33" Name="fi.pak" Source="c:\\Users\\THA0065\\FtR-Project\\ftr-project\\inker3\\dist\\FtR Inker-win32-x64\\locales\\fi.pak" KeyPath="yes" />
                                 </Component>
                                 <Component Id="C34" Guid="*">
-                                        <File Id="F34" Name="fil.pak" Source="C:\\Users\\THA0065\\FtR-Project\\ftr-project\\inker3\\dist\\FtR Inker-win32-x64\\locales\\fil.pak" KeyPath="yes" />
+                                        <File Id="F34" Name="fil.pak" Source="c:\\Users\\THA0065\\FtR-Project\\ftr-project\\inker3\\dist\\FtR Inker-win32-x64\\locales\\fil.pak" KeyPath="yes" />
                                 </Component>
                                 <Component Id="C35" Guid="*">
-                                        <File Id="F35" Name="fr.pak" Source="C:\\Users\\THA0065\\FtR-Project\\ftr-project\\inker3\\dist\\FtR Inker-win32-x64\\locales\\fr.pak" KeyPath="yes" />
+                                        <File Id="F35" Name="fr.pak" Source="c:\\Users\\THA0065\\FtR-Project\\ftr-project\\inker3\\dist\\FtR Inker-win32-x64\\locales\\fr.pak" KeyPath="yes" />
                                 </Component>
                                 <Component Id="C36" Guid="*">
-                                        <File Id="F36" Name="gu.pak" Source="C:\\Users\\THA0065\\FtR-Project\\ftr-project\\inker3\\dist\\FtR Inker-win32-x64\\locales\\gu.pak" KeyPath="yes" />
+                                        <File Id="F36" Name="gu.pak" Source="c:\\Users\\THA0065\\FtR-Project\\ftr-project\\inker3\\dist\\FtR Inker-win32-x64\\locales\\gu.pak" KeyPath="yes" />
                                 </Component>
                                 <Component Id="C37" Guid="*">
-                                        <File Id="F37" Name="he.pak" Source="C:\\Users\\THA0065\\FtR-Project\\ftr-project\\inker3\\dist\\FtR Inker-win32-x64\\locales\\he.pak" KeyPath="yes" />
+                                        <File Id="F37" Name="he.pak" Source="c:\\Users\\THA0065\\FtR-Project\\ftr-project\\inker3\\dist\\FtR Inker-win32-x64\\locales\\he.pak" KeyPath="yes" />
                                 </Component>
                                 <Component Id="C38" Guid="*">
-                                        <File Id="F38" Name="hi.pak" Source="C:\\Users\\THA0065\\FtR-Project\\ftr-project\\inker3\\dist\\FtR Inker-win32-x64\\locales\\hi.pak" KeyPath="yes" />
+                                        <File Id="F38" Name="hi.pak" Source="c:\\Users\\THA0065\\FtR-Project\\ftr-project\\inker3\\dist\\FtR Inker-win32-x64\\locales\\hi.pak" KeyPath="yes" />
                                 </Component>
                                 <Component Id="C39" Guid="*">
-                                        <File Id="F39" Name="hr.pak" Source="C:\\Users\\THA0065\\FtR-Project\\ftr-project\\inker3\\dist\\FtR Inker-win32-x64\\locales\\hr.pak" KeyPath="yes" />
+                                        <File Id="F39" Name="hr.pak" Source="c:\\Users\\THA0065\\FtR-Project\\ftr-project\\inker3\\dist\\FtR Inker-win32-x64\\locales\\hr.pak" KeyPath="yes" />
                                 </Component>
                                 <Component Id="C40" Guid="*">
-                                        <File Id="F40" Name="hu.pak" Source="C:\\Users\\THA0065\\FtR-Project\\ftr-project\\inker3\\dist\\FtR Inker-win32-x64\\locales\\hu.pak" KeyPath="yes" />
+                                        <File Id="F40" Name="hu.pak" Source="c:\\Users\\THA0065\\FtR-Project\\ftr-project\\inker3\\dist\\FtR Inker-win32-x64\\locales\\hu.pak" KeyPath="yes" />
                                 </Component>
                                 <Component Id="C41" Guid="*">
-                                        <File Id="F41" Name="id.pak" Source="C:\\Users\\THA0065\\FtR-Project\\ftr-project\\inker3\\dist\\FtR Inker-win32-x64\\locales\\id.pak" KeyPath="yes" />
+                                        <File Id="F41" Name="id.pak" Source="c:\\Users\\THA0065\\FtR-Project\\ftr-project\\inker3\\dist\\FtR Inker-win32-x64\\locales\\id.pak" KeyPath="yes" />
                                 </Component>
                                 <Component Id="C42" Guid="*">
-                                        <File Id="F42" Name="it.pak" Source="C:\\Users\\THA0065\\FtR-Project\\ftr-project\\inker3\\dist\\FtR Inker-win32-x64\\locales\\it.pak" KeyPath="yes" />
+                                        <File Id="F42" Name="it.pak" Source="c:\\Users\\THA0065\\FtR-Project\\ftr-project\\inker3\\dist\\FtR Inker-win32-x64\\locales\\it.pak" KeyPath="yes" />
                                 </Component>
                                 <Component Id="C43" Guid="*">
-                                        <File Id="F43" Name="ja.pak" Source="C:\\Users\\THA0065\\FtR-Project\\ftr-project\\inker3\\dist\\FtR Inker-win32-x64\\locales\\ja.pak" KeyPath="yes" />
+                                        <File Id="F43" Name="ja.pak" Source="c:\\Users\\THA0065\\FtR-Project\\ftr-project\\inker3\\dist\\FtR Inker-win32-x64\\locales\\ja.pak" KeyPath="yes" />
                                 </Component>
                                 <Component Id="C44" Guid="*">
-                                        <File Id="F44" Name="kn.pak" Source="C:\\Users\\THA0065\\FtR-Project\\ftr-project\\inker3\\dist\\FtR Inker-win32-x64\\locales\\kn.pak" KeyPath="yes" />
+                                        <File Id="F44" Name="kn.pak" Source="c:\\Users\\THA0065\\FtR-Project\\ftr-project\\inker3\\dist\\FtR Inker-win32-x64\\locales\\kn.pak" KeyPath="yes" />
                                 </Component>
                                 <Component Id="C45" Guid="*">
-                                        <File Id="F45" Name="ko.pak" Source="C:\\Users\\THA0065\\FtR-Project\\ftr-project\\inker3\\dist\\FtR Inker-win32-x64\\locales\\ko.pak" KeyPath="yes" />
+                                        <File Id="F45" Name="ko.pak" Source="c:\\Users\\THA0065\\FtR-Project\\ftr-project\\inker3\\dist\\FtR Inker-win32-x64\\locales\\ko.pak" KeyPath="yes" />
                                 </Component>
                                 <Component Id="C46" Guid="*">
-                                        <File Id="F46" Name="lt.pak" Source="C:\\Users\\THA0065\\FtR-Project\\ftr-project\\inker3\\dist\\FtR Inker-win32-x64\\locales\\lt.pak" KeyPath="yes" />
+                                        <File Id="F46" Name="lt.pak" Source="c:\\Users\\THA0065\\FtR-Project\\ftr-project\\inker3\\dist\\FtR Inker-win32-x64\\locales\\lt.pak" KeyPath="yes" />
                                 </Component>
                                 <Component Id="C47" Guid="*">
-                                        <File Id="F47" Name="lv.pak" Source="C:\\Users\\THA0065\\FtR-Project\\ftr-project\\inker3\\dist\\FtR Inker-win32-x64\\locales\\lv.pak" KeyPath="yes" />
+                                        <File Id="F47" Name="lv.pak" Source="c:\\Users\\THA0065\\FtR-Project\\ftr-project\\inker3\\dist\\FtR Inker-win32-x64\\locales\\lv.pak" KeyPath="yes" />
                                 </Component>
                                 <Component Id="C48" Guid="*">
-                                        <File Id="F48" Name="ml.pak" Source="C:\\Users\\THA0065\\FtR-Project\\ftr-project\\inker3\\dist\\FtR Inker-win32-x64\\locales\\ml.pak" KeyPath="yes" />
+                                        <File Id="F48" Name="ml.pak" Source="c:\\Users\\THA0065\\FtR-Project\\ftr-project\\inker3\\dist\\FtR Inker-win32-x64\\locales\\ml.pak" KeyPath="yes" />
                                 </Component>
                                 <Component Id="C49" Guid="*">
-                                        <File Id="F49" Name="mr.pak" Source="C:\\Users\\THA0065\\FtR-Project\\ftr-project\\inker3\\dist\\FtR Inker-win32-x64\\locales\\mr.pak" KeyPath="yes" />
+                                        <File Id="F49" Name="mr.pak" Source="c:\\Users\\THA0065\\FtR-Project\\ftr-project\\inker3\\dist\\FtR Inker-win32-x64\\locales\\mr.pak" KeyPath="yes" />
                                 </Component>
                                 <Component Id="C50" Guid="*">
-                                        <File Id="F50" Name="ms.pak" Source="C:\\Users\\THA0065\\FtR-Project\\ftr-project\\inker3\\dist\\FtR Inker-win32-x64\\locales\\ms.pak" KeyPath="yes" />
+                                        <File Id="F50" Name="ms.pak" Source="c:\\Users\\THA0065\\FtR-Project\\ftr-project\\inker3\\dist\\FtR Inker-win32-x64\\locales\\ms.pak" KeyPath="yes" />
                                 </Component>
                                 <Component Id="C51" Guid="*">
-                                        <File Id="F51" Name="nb.pak" Source="C:\\Users\\THA0065\\FtR-Project\\ftr-project\\inker3\\dist\\FtR Inker-win32-x64\\locales\\nb.pak" KeyPath="yes" />
+                                        <File Id="F51" Name="nb.pak" Source="c:\\Users\\THA0065\\FtR-Project\\ftr-project\\inker3\\dist\\FtR Inker-win32-x64\\locales\\nb.pak" KeyPath="yes" />
                                 </Component>
                                 <Component Id="C52" Guid="*">
-                                        <File Id="F52" Name="nl.pak" Source="C:\\Users\\THA0065\\FtR-Project\\ftr-project\\inker3\\dist\\FtR Inker-win32-x64\\locales\\nl.pak" KeyPath="yes" />
+                                        <File Id="F52" Name="nl.pak" Source="c:\\Users\\THA0065\\FtR-Project\\ftr-project\\inker3\\dist\\FtR Inker-win32-x64\\locales\\nl.pak" KeyPath="yes" />
                                 </Component>
                                 <Component Id="C53" Guid="*">
-                                        <File Id="F53" Name="pl.pak" Source="C:\\Users\\THA0065\\FtR-Project\\ftr-project\\inker3\\dist\\FtR Inker-win32-x64\\locales\\pl.pak" KeyPath="yes" />
+                                        <File Id="F53" Name="pl.pak" Source="c:\\Users\\THA0065\\FtR-Project\\ftr-project\\inker3\\dist\\FtR Inker-win32-x64\\locales\\pl.pak" KeyPath="yes" />
                                 </Component>
                                 <Component Id="C54" Guid="*">
-                                        <File Id="F54" Name="pt-BR.pak" Source="C:\\Users\\THA0065\\FtR-Project\\ftr-project\\inker3\\dist\\FtR Inker-win32-x64\\locales\\pt-BR.pak" KeyPath="yes" />
+                                        <File Id="F54" Name="pt-BR.pak" Source="c:\\Users\\THA0065\\FtR-Project\\ftr-project\\inker3\\dist\\FtR Inker-win32-x64\\locales\\pt-BR.pak" KeyPath="yes" />
                                 </Component>
                                 <Component Id="C55" Guid="*">
-                                        <File Id="F55" Name="pt-PT.pak" Source="C:\\Users\\THA0065\\FtR-Project\\ftr-project\\inker3\\dist\\FtR Inker-win32-x64\\locales\\pt-PT.pak" KeyPath="yes" />
+                                        <File Id="F55" Name="pt-PT.pak" Source="c:\\Users\\THA0065\\FtR-Project\\ftr-project\\inker3\\dist\\FtR Inker-win32-x64\\locales\\pt-PT.pak" KeyPath="yes" />
                                 </Component>
                                 <Component Id="C56" Guid="*">
-                                        <File Id="F56" Name="ro.pak" Source="C:\\Users\\THA0065\\FtR-Project\\ftr-project\\inker3\\dist\\FtR Inker-win32-x64\\locales\\ro.pak" KeyPath="yes" />
+                                        <File Id="F56" Name="ro.pak" Source="c:\\Users\\THA0065\\FtR-Project\\ftr-project\\inker3\\dist\\FtR Inker-win32-x64\\locales\\ro.pak" KeyPath="yes" />
                                 </Component>
                                 <Component Id="C57" Guid="*">
-                                        <File Id="F57" Name="ru.pak" Source="C:\\Users\\THA0065\\FtR-Project\\ftr-project\\inker3\\dist\\FtR Inker-win32-x64\\locales\\ru.pak" KeyPath="yes" />
+                                        <File Id="F57" Name="ru.pak" Source="c:\\Users\\THA0065\\FtR-Project\\ftr-project\\inker3\\dist\\FtR Inker-win32-x64\\locales\\ru.pak" KeyPath="yes" />
                                 </Component>
                                 <Component Id="C58" Guid="*">
-                                        <File Id="F58" Name="sk.pak" Source="C:\\Users\\THA0065\\FtR-Project\\ftr-project\\inker3\\dist\\FtR Inker-win32-x64\\locales\\sk.pak" KeyPath="yes" />
+                                        <File Id="F58" Name="sk.pak" Source="c:\\Users\\THA0065\\FtR-Project\\ftr-project\\inker3\\dist\\FtR Inker-win32-x64\\locales\\sk.pak" KeyPath="yes" />
                                 </Component>
                                 <Component Id="C59" Guid="*">
-                                        <File Id="F59" Name="sl.pak" Source="C:\\Users\\THA0065\\FtR-Project\\ftr-project\\inker3\\dist\\FtR Inker-win32-x64\\locales\\sl.pak" KeyPath="yes" />
+                                        <File Id="F59" Name="sl.pak" Source="c:\\Users\\THA0065\\FtR-Project\\ftr-project\\inker3\\dist\\FtR Inker-win32-x64\\locales\\sl.pak" KeyPath="yes" />
                                 </Component>
                                 <Component Id="C60" Guid="*">
-                                        <File Id="F60" Name="sr.pak" Source="C:\\Users\\THA0065\\FtR-Project\\ftr-project\\inker3\\dist\\FtR Inker-win32-x64\\locales\\sr.pak" KeyPath="yes" />
+                                        <File Id="F60" Name="sr.pak" Source="c:\\Users\\THA0065\\FtR-Project\\ftr-project\\inker3\\dist\\FtR Inker-win32-x64\\locales\\sr.pak" KeyPath="yes" />
                                 </Component>
                                 <Component Id="C61" Guid="*">
-                                        <File Id="F61" Name="sv.pak" Source="C:\\Users\\THA0065\\FtR-Project\\ftr-project\\inker3\\dist\\FtR Inker-win32-x64\\locales\\sv.pak" KeyPath="yes" />
+                                        <File Id="F61" Name="sv.pak" Source="c:\\Users\\THA0065\\FtR-Project\\ftr-project\\inker3\\dist\\FtR Inker-win32-x64\\locales\\sv.pak" KeyPath="yes" />
                                 </Component>
                                 <Component Id="C62" Guid="*">
-                                        <File Id="F62" Name="sw.pak" Source="C:\\Users\\THA0065\\FtR-Project\\ftr-project\\inker3\\dist\\FtR Inker-win32-x64\\locales\\sw.pak" KeyPath="yes" />
+                                        <File Id="F62" Name="sw.pak" Source="c:\\Users\\THA0065\\FtR-Project\\ftr-project\\inker3\\dist\\FtR Inker-win32-x64\\locales\\sw.pak" KeyPath="yes" />
                                 </Component>
                                 <Component Id="C63" Guid="*">
-                                        <File Id="F63" Name="ta.pak" Source="C:\\Users\\THA0065\\FtR-Project\\ftr-project\\inker3\\dist\\FtR Inker-win32-x64\\locales\\ta.pak" KeyPath="yes" />
+                                        <File Id="F63" Name="ta.pak" Source="c:\\Users\\THA0065\\FtR-Project\\ftr-project\\inker3\\dist\\FtR Inker-win32-x64\\locales\\ta.pak" KeyPath="yes" />
                                 </Component>
                                 <Component Id="C64" Guid="*">
-                                        <File Id="F64" Name="te.pak" Source="C:\\Users\\THA0065\\FtR-Project\\ftr-project\\inker3\\dist\\FtR Inker-win32-x64\\locales\\te.pak" KeyPath="yes" />
+                                        <File Id="F64" Name="te.pak" Source="c:\\Users\\THA0065\\FtR-Project\\ftr-project\\inker3\\dist\\FtR Inker-win32-x64\\locales\\te.pak" KeyPath="yes" />
                                 </Component>
                                 <Component Id="C65" Guid="*">
-                                        <File Id="F65" Name="th.pak" Source="C:\\Users\\THA0065\\FtR-Project\\ftr-project\\inker3\\dist\\FtR Inker-win32-x64\\locales\\th.pak" KeyPath="yes" />
+                                        <File Id="F65" Name="th.pak" Source="c:\\Users\\THA0065\\FtR-Project\\ftr-project\\inker3\\dist\\FtR Inker-win32-x64\\locales\\th.pak" KeyPath="yes" />
                                 </Component>
                                 <Component Id="C66" Guid="*">
-                                        <File Id="F66" Name="tr.pak" Source="C:\\Users\\THA0065\\FtR-Project\\ftr-project\\inker3\\dist\\FtR Inker-win32-x64\\locales\\tr.pak" KeyPath="yes" />
+                                        <File Id="F66" Name="tr.pak" Source="c:\\Users\\THA0065\\FtR-Project\\ftr-project\\inker3\\dist\\FtR Inker-win32-x64\\locales\\tr.pak" KeyPath="yes" />
                                 </Component>
                                 <Component Id="C67" Guid="*">
-                                        <File Id="F67" Name="uk.pak" Source="C:\\Users\\THA0065\\FtR-Project\\ftr-project\\inker3\\dist\\FtR Inker-win32-x64\\locales\\uk.pak" KeyPath="yes" />
+                                        <File Id="F67" Name="uk.pak" Source="c:\\Users\\THA0065\\FtR-Project\\ftr-project\\inker3\\dist\\FtR Inker-win32-x64\\locales\\uk.pak" KeyPath="yes" />
                                 </Component>
                                 <Component Id="C68" Guid="*">
-                                        <File Id="F68" Name="ur.pak" Source="C:\\Users\\THA0065\\FtR-Project\\ftr-project\\inker3\\dist\\FtR Inker-win32-x64\\locales\\ur.pak" KeyPath="yes" />
+                                        <File Id="F68" Name="ur.pak" Source="c:\\Users\\THA0065\\FtR-Project\\ftr-project\\inker3\\dist\\FtR Inker-win32-x64\\locales\\ur.pak" KeyPath="yes" />
                                 </Component>
                                 <Component Id="C69" Guid="*">
-                                        <File Id="F69" Name="vi.pak" Source="C:\\Users\\THA0065\\FtR-Project\\ftr-project\\inker3\\dist\\FtR Inker-win32-x64\\locales\\vi.pak" KeyPath="yes" />
+                                        <File Id="F69" Name="vi.pak" Source="c:\\Users\\THA0065\\FtR-Project\\ftr-project\\inker3\\dist\\FtR Inker-win32-x64\\locales\\vi.pak" KeyPath="yes" />
                                 </Component>
                                 <Component Id="C70" Guid="*">
-                                        <File Id="F70" Name="zh-CN.pak" Source="C:\\Users\\THA0065\\FtR-Project\\ftr-project\\inker3\\dist\\FtR Inker-win32-x64\\locales\\zh-CN.pak" KeyPath="yes" />
+                                        <File Id="F70" Name="zh-CN.pak" Source="c:\\Users\\THA0065\\FtR-Project\\ftr-project\\inker3\\dist\\FtR Inker-win32-x64\\locales\\zh-CN.pak" KeyPath="yes" />
                                 </Component>
                                 <Component Id="C71" Guid="*">
-                                        <File Id="F71" Name="zh-TW.pak" Source="C:\\Users\\THA0065\\FtR-Project\\ftr-project\\inker3\\dist\\FtR Inker-win32-x64\\locales\\zh-TW.pak" KeyPath="yes" />
+                                        <File Id="F71" Name="zh-TW.pak" Source="c:\\Users\\THA0065\\FtR-Project\\ftr-project\\inker3\\dist\\FtR Inker-win32-x64\\locales\\zh-TW.pak" KeyPath="yes" />
                                 </Component>
                         </Directory>
                         <Directory Id="Dresources" Name="resources">
                                 <Directory Id="Dresources_app" Name="app">
                                         <Component Id="C72" Guid="*">
-                                                <File Id="F72" Name="icon.ico" Source="C:\\Users\\THA0065\\FtR-Project\\ftr-project\\inker3\\dist\\FtR Inker-win32-x64\\resources\\app\\icon.ico" KeyPath="yes" />
+                                                <File Id="F72" Name="icon.ico" Source="c:\\Users\\THA0065\\FtR-Project\\ftr-project\\inker3\\dist\\FtR Inker-win32-x64\\resources\\app\\icon.ico" KeyPath="yes" />
                                         </Component>
                                         <Component Id="C73" Guid="*">
-                                                <File Id="F73" Name="icon.png" Source="C:\\Users\\THA0065\\FtR-Project\\ftr-project\\inker3\\dist\\FtR Inker-win32-x64\\resources\\app\\icon.png" KeyPath="yes" />
+                                                <File Id="F73" Name="icon.png" Source="c:\\Users\\THA0065\\FtR-Project\\ftr-project\\inker3\\dist\\FtR Inker-win32-x64\\resources\\app\\icon.png" KeyPath="yes" />
                                         </Component>
                                         <Component Id="C74" Guid="*">
-                                                <File Id="F74" Name="main.js" Source="C:\\Users\\THA0065\\FtR-Project\\ftr-project\\inker3\\dist\\FtR Inker-win32-x64\\resources\\app\\main.js" KeyPath="yes" />
+                                                <File Id="F74" Name="main.js" Source="c:\\Users\\THA0065\\FtR-Project\\ftr-project\\inker3\\dist\\FtR Inker-win32-x64\\resources\\app\\main.js" KeyPath="yes" />
                                         </Component>
                                         <Component Id="C75" Guid="*">
-                                                <File Id="F75" Name="package.json" Source="C:\\Users\\THA0065\\FtR-Project\\ftr-project\\inker3\\dist\\FtR Inker-win32-x64\\resources\\app\\package.json" KeyPath="yes" />
+                                                <File Id="F75" Name="package.json" Source="c:\\Users\\THA0065\\FtR-Project\\ftr-project\\inker3\\dist\\FtR Inker-win32-x64\\resources\\app\\package.json" KeyPath="yes" />
                                         </Component>
                                         <Component Id="C76" Guid="*">
-                                                <File Id="F76" Name="preload.js" Source="C:\\Users\\THA0065\\FtR-Project\\ftr-project\\inker3\\dist\\FtR Inker-win32-x64\\resources\\app\\preload.js" KeyPath="yes" />
+                                                <File Id="F76" Name="preload.js" Source="c:\\Users\\THA0065\\FtR-Project\\ftr-project\\inker3\\dist\\FtR Inker-win32-x64\\resources\\app\\preload.js" KeyPath="yes" />
                                         </Component>
                                         <Directory Id="Dresources_app_lib" Name="lib">
                                                 <Component Id="C77" Guid="*">
-                                                        <File Id="F77" Name="api-client.js" Source="C:\\Users\\THA0065\\FtR-Project\\ftr-project\\inker3\\dist\\FtR Inker-win32-x64\\resources\\app\\lib\\api-client.js" KeyPath="yes" />
+                                                        <File Id="F77" Name="api-client.js" Source="c:\\Users\\THA0065\\FtR-Project\\ftr-project\\inker3\\dist\\FtR Inker-win32-x64\\resources\\app\\lib\\api-client.js" KeyPath="yes" />
                                                 </Component>
                                                 <Component Id="C78" Guid="*">
-                                                        <File Id="F78" Name="mount-manager.js" Source="C:\\Users\\THA0065\\FtR-Project\\ftr-project\\inker3\\dist\\FtR Inker-win32-x64\\resources\\app\\lib\\mount-manager.js" KeyPath="yes" />
+                                                        <File Id="F78" Name="mount-manager.js" Source="c:\\Users\\THA0065\\FtR-Project\\ftr-project\\inker3\\dist\\FtR Inker-win32-x64\\resources\\app\\lib\\mount-manager.js" KeyPath="yes" />
                                                 </Component>
                                                 <Component Id="C79" Guid="*">
-                                                        <File Id="F79" Name="settings.js" Source="C:\\Users\\THA0065\\FtR-Project\\ftr-project\\inker3\\dist\\FtR Inker-win32-x64\\resources\\app\\lib\\settings.js" KeyPath="yes" />
+                                                        <File Id="F79" Name="settings.js" Source="c:\\Users\\THA0065\\FtR-Project\\ftr-project\\inker3\\dist\\FtR Inker-win32-x64\\resources\\app\\lib\\settings.js" KeyPath="yes" />
                                                 </Component>
                                                 <Component Id="C80" Guid="*">
-                                                        <File Id="F80" Name="sync-manager.js" Source="C:\\Users\\THA0065\\FtR-Project\\ftr-project\\inker3\\dist\\FtR Inker-win32-x64\\resources\\app\\lib\\sync-manager.js" KeyPath="yes" />
+                                                        <File Id="F80" Name="sync-manager.js" Source="c:\\Users\\THA0065\\FtR-Project\\ftr-project\\inker3\\dist\\FtR Inker-win32-x64\\resources\\app\\lib\\sync-manager.js" KeyPath="yes" />
                                                 </Component>
                                         </Directory>
                                         <Directory Id="Dresources_app_renderer" Name="renderer">
                                                 <Component Id="C81" Guid="*">
-                                                        <File Id="F81" Name="index.html" Source="C:\\Users\\THA0065\\FtR-Project\\ftr-project\\inker3\\dist\\FtR Inker-win32-x64\\resources\\app\\renderer\\index.html" KeyPath="yes" />
+                                                        <File Id="F81" Name="index.html" Source="c:\\Users\\THA0065\\FtR-Project\\ftr-project\\inker3\\dist\\FtR Inker-win32-x64\\resources\\app\\renderer\\index.html" KeyPath="yes" />
                                                 </Component>
                                                 <Component Id="C82" Guid="*">
-                                                        <File Id="F82" Name="renderer.js" Source="C:\\Users\\THA0065\\FtR-Project\\ftr-project\\inker3\\dist\\FtR Inker-win32-x64\\resources\\app\\renderer\\renderer.js" KeyPath="yes" />
+                                                        <File Id="F82" Name="renderer.js" Source="c:\\Users\\THA0065\\FtR-Project\\ftr-project\\inker3\\dist\\FtR Inker-win32-x64\\resources\\app\\renderer\\renderer.js" KeyPath="yes" />
                                                 </Component>
                                                 <Component Id="C83" Guid="*">
-                                                        <File Id="F83" Name="style.css" Source="C:\\Users\\THA0065\\FtR-Project\\ftr-project\\inker3\\dist\\FtR Inker-win32-x64\\resources\\app\\renderer\\style.css" KeyPath="yes" />
+                                                        <File Id="F83" Name="style.css" Source="c:\\Users\\THA0065\\FtR-Project\\ftr-project\\inker3\\dist\\FtR Inker-win32-x64\\resources\\app\\renderer\\style.css" KeyPath="yes" />
                                                 </Component>
                                         </Directory>
                                 </Directory>

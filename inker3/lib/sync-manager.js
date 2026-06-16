@@ -38,17 +38,14 @@ class SyncManager extends EventEmitter {
             var w = fs.watch(pathToWatch, { recursive: true }, function(eventType, filename) {
                 try { callback(eventType, filename); } catch (e) {
                     if (e.message && e.message.includes("EPERM")) {
-                        // EPERM is transient on Windows — ignore
                         console.log("[SyncManager] watcher EPERM ignored for " + label + ": " + (filename || "?"));
                     } else {
                         console.log("[SyncManager] watcher callback error for " + label + ": " + e.message);
                     }
                 }
             });
-            // Handle watch-level errors (EPERM, etc.) — prevents uncaught exceptions
             w.on("error", function(err) {
                 console.log("[SyncManager] watcher error event for " + label + " " + pathToWatch + ": " + err.message);
-                // EPERM means the path is locked/removed — close and retry later
                 try { w.close(); } catch (e) {}
             });
             console.log("[SyncManager] fs.watch started for " + label + " " + pathToWatch);
@@ -78,7 +75,9 @@ class SyncManager extends EventEmitter {
             cacheWatcher: null,
             lastRemoteCheck: 0,
             knownFiles: new Map(),
-            debounceTimers: new Map()
+            debounceTimers: new Map(),
+            uploading: new Set(),
+            failedUploads: new Map()
         };
 
         this._loadIndex(state);
@@ -87,14 +86,12 @@ class SyncManager extends EventEmitter {
             self._syncRemote(s);
         }).bind(null, this, state), this.remotePollInterval);
 
-        // Start mount point watcher
         var self = this;
         var s = state;
         state.watcher = this._startWatcher(mountPoint, "mount", function(eventType, filename) {
             self._onLocalChange(s, eventType, filename);
         });
 
-        // Start cache directory watcher
         try { fs.mkdirSync(state.cacheDir, { recursive: true }); } catch (e) {}
         state.cacheWatcher = this._startWatcher(state.cacheDir, "cache", function(eventType, filename) {
             if (!s.running || !filename) return;
@@ -165,7 +162,6 @@ class SyncManager extends EventEmitter {
         if (!state.running || !filename) return;
         var relPath = filename.replace(/\\/g, "/");
 
-        // Skip hidden/metadata files but NOT .url files (we need to detect .url deletions)
         if (this._shouldSkip(relPath) && !relPath.endsWith(".url")) return;
 
         if (state.debounceTimers.has(relPath)) {
@@ -191,7 +187,6 @@ class SyncManager extends EventEmitter {
             if (fs.existsSync(fullPath)) {
                 var stat = fs.statSync(fullPath);
 
-                // If it's a .url shortcut or directory, skip upload
                 if (isUrlFile || stat.isDirectory()) return;
                 if (!stat.isFile()) return;
 
@@ -200,8 +195,6 @@ class SyncManager extends EventEmitter {
 
                 if (!known) {
                     if (localSize === 0) {
-                        // Empty new file — just track it without uploading or converting
-                        // It will be uploaded when content is written later
                         state.knownFiles.set(relPath, {
                             mtime: localMtime,
                             size: 0,
@@ -212,78 +205,98 @@ class SyncManager extends EventEmitter {
                         return;
                     }
                     // New file with content — upload, then convert to .url on success
+                    if (state.uploading.has(relPath)) return;
                     var self = this;
                     var s = state;
                     var rp = relPath;
                     var mp = state.mountPoint;
                     var u = state.user;
                     var d = state.drop;
-                    this._uploadLocalFile(state, relPath, function() {
-                        // Upload succeeded — replace original with .url shortcut
-                        var realPath = path.join(mp, rp);
-                        try {
-                            if (fs.existsSync(realPath) && fs.statSync(realPath).isFile() && !rp.endsWith(".url")) {
-                                fs.unlinkSync(realPath);
-                            }
-                        } catch (e) {}
-                        self._createUrlShortcut(mp, rp, u, d);
-                        s.knownFiles.set(rp, {
-                            mtime: new Date().toISOString(),
-                            size: 0,
-                            kind: "file",
-                            synced: true
-                        });
-                        self._saveIndex(s);
+                    this._uploadLocalFile(state, relPath, function(err) {
+                        self._finalizeUpload(s, rp, mp, u, d, err);
                     });
                 } else if (localMtime !== known.mtime || localSize !== known.size) {
                     // File changed — upload new content, then keep as .url
+                    if (state.uploading.has(relPath)) return;
                     var self = this;
                     var s = state;
                     var rp = relPath;
                     var mp = state.mountPoint;
                     var u = state.user;
                     var d = state.drop;
-                    this._uploadLocalFile(state, relPath, function() {
-                        // Upload succeeded — replace with .url shortcut (in case it's a real file)
-                        var realPath = path.join(mp, rp);
-                        try {
-                            if (fs.existsSync(realPath) && fs.statSync(realPath).isFile() && !rp.endsWith(".url")) {
-                                fs.unlinkSync(realPath);
-                            }
-                        } catch (e) {}
-                        self._createUrlShortcut(mp, rp, u, d);
-                        s.knownFiles.set(rp, {
-                            mtime: new Date().toISOString(),
-                            size: 0,
-                            kind: "file",
-                            synced: true
-                        });
-                        self._saveIndex(s);
+                    this._uploadLocalFile(state, relPath, function(err) {
+                        self._finalizeUpload(s, rp, mp, u, d, err);
                     });
                 }
             } else {
-                // File deleted locally
                 if (known) {
-                    // A known file was deleted — delete from remote
-                    state.knownFiles.delete(relPath);
-                    this._deleteRemoteFile(state, relPath);
-                    this.emit("file-synced", { dropPath: state.dropPath, file: relPath, type: "delete-local" });
-                    this._saveIndex(state);
+                    // Check if .url shortcut still exists — if so, file was synced
+                    // and the real file being removed is expected behavior
+                    var urlShortcut = path.join(state.mountPoint, relPath + ".url");
+                    var hasUrlShortcut = false;
+                    try { hasUrlShortcut = fs.existsSync(urlShortcut); } catch (e) {}
+
+                    if (hasUrlShortcut) {
+                        // .url shortcut exists — file was uploaded and replaced with shortcut.
+                        // The real file being removed is expected, do NOT delete from remote.
+                        this.emit("file-synced", { dropPath: state.dropPath, file: relPath, type: "synced-real-removed" });
+                    } else {
+                        // No .url shortcut — true deletion, remove from remote
+                        state.knownFiles.delete(relPath);
+                        this._deleteRemoteFile(state, relPath);
+                        this.emit("file-synced", { dropPath: state.dropPath, file: relPath, type: "delete-local" });
+                        this._saveIndex(state);
+                    }
                 } else if (isUrlFile) {
-                    // A .url file was deleted — delete corresponding remote file
+                    // .url file deleted — check if real file is replacing it
                     var remotePath = relPath.slice(0, -4);
                     var remoteKnown = state.knownFiles.get(remotePath);
                     if (remoteKnown) {
-                        state.knownFiles.delete(remotePath);
-                        this._deleteRemoteFile(state, remotePath);
-                        this.emit("file-synced", { dropPath: state.dropPath, file: remotePath, type: "delete-local-via-url" });
-                        this._saveIndex(state);
+                        var realPath = path.join(state.mountPoint, remotePath);
+                        var realFileExists = false;
+                        try { realFileExists = fs.existsSync(realPath) && fs.statSync(realPath).isFile(); } catch (e) {}
+                        if (realFileExists) {
+                            // Real file is replacing the .url — just clear known entry; upload will handle it
+                            state.knownFiles.delete(remotePath);
+                            this._saveIndex(state);
+                            this.emit("file-synced", { dropPath: state.dropPath, file: remotePath, type: "replace-url-with-real" });
+                        } else {
+                            // True deletion — remove from remote
+                            state.knownFiles.delete(remotePath);
+                            this._deleteRemoteFile(state, remotePath);
+                            this.emit("file-synced", { dropPath: state.dropPath, file: remotePath, type: "delete-local-via-url" });
+                            this._saveIndex(state);
+                        }
                     }
                 }
             }
         } catch (err) {
             this.emit("sync-error", { dropPath: state.dropPath, file: relPath, error: err.message });
         }
+    }
+
+    _finalizeUpload(state, relPath, mountPoint, user, drop, err) {
+        if (err) {
+            console.log("[SyncManager] Upload failed (will retry): " + relPath + ": " + err);
+            state.failedUploads.set(relPath, Date.now());
+            this.emit("sync-error", { dropPath: state.dropPath, file: relPath, error: err });
+            return;
+        }
+        state.failedUploads.delete(relPath);
+        var realPath = path.join(mountPoint, relPath);
+        try {
+            if (fs.existsSync(realPath) && fs.statSync(realPath).isFile() && !relPath.endsWith(".url")) {
+                fs.unlinkSync(realPath);
+            }
+        } catch (e) {}
+        this._createUrlShortcut(mountPoint, relPath, user, drop);
+        state.knownFiles.set(relPath, {
+            mtime: new Date().toISOString(),
+            size: 0,
+            kind: "file",
+            synced: true
+        });
+        this._saveIndex(state);
     }
 
     _processCacheChange(state, filename) {
@@ -294,12 +307,10 @@ class SyncManager extends EventEmitter {
             var stat = fs.statSync(fullPath);
             if (!stat.isFile() || stat.size === 0) return;
 
-            // Determine the remote path: cached file names match remote file names
             var relPath = filename;
 
             console.log("[SyncManager] Cache change detected, uploading: " + relPath);
 
-            // Read cached file content and upload to remote
             var fileStream = fs.createReadStream(fullPath);
             var self = this;
             var s = state;
@@ -307,7 +318,6 @@ class SyncManager extends EventEmitter {
             .then(function(result) {
                 self.emit("file-synced", { dropPath: s.dropPath, file: relPath, type: "upload-cache" });
                 console.log("[SyncManager] Cache upload complete: " + relPath);
-                // Update knownFiles so the mount point .url shortcut stays in sync
                 s.knownFiles.set(relPath, {
                     mtime: new Date().toISOString(),
                     size: stat.size,
@@ -325,7 +335,6 @@ class SyncManager extends EventEmitter {
     }
 
     _downloadToCache(state, relPath) {
-        // Re-download a remote file to the cache, overwriting the old cached copy
         var fileName = relPath.split("/").pop();
         var cachePath = path.join(state.cacheDir, fileName);
         var self = this;
@@ -336,7 +345,6 @@ class SyncManager extends EventEmitter {
                 console.log("[SyncManager] Updated cache for " + relPath);
             });
         }).catch(function(err) {
-            // Download may fail if file is locked — ignore, user will re-download on access
             console.log("[SyncManager] Cache update failed for " + relPath + ": " + err.message);
         });
     }
@@ -360,7 +368,7 @@ class SyncManager extends EventEmitter {
                 var remoteSize = entry.size || 0;
 
                 if (!known) {
-                    // New remote file — create .url shortcut + directory if needed
+                    // New remote file — create .url shortcut
                     state.knownFiles.set(relPath, {
                         mtime: remoteMtime,
                         size: remoteSize,
@@ -381,7 +389,6 @@ class SyncManager extends EventEmitter {
                     known.size = remoteSize;
                     known.synced = false;
                     changed = true;
-                    // Recreate .url shortcut
                     try {
                         var urlPath = path.join(state.mountPoint, relPath + ".url");
                         if (fs.existsSync(urlPath)) {
@@ -389,13 +396,12 @@ class SyncManager extends EventEmitter {
                         }
                     } catch (e) {}
                     this._createUrlShortcut(state.mountPoint, relPath, state.user, state.drop);
-                    // Update cached copy (overwrite if exists)
                     this._downloadToCache(state, relPath);
                     this.emit("file-synced", { dropPath: state.dropPath, file: relPath, type: "remote-change" });
                 }
             }
 
-            // Detect remote deletions — delete local .url files too
+            // Detect remote deletions — delete local .url files
             var remotePaths = {};
             for (var i = 0; i < entries.length; i++) {
                 var ep = entries[i].path || entries[i].name;
@@ -403,14 +409,13 @@ class SyncManager extends EventEmitter {
             }
             var toDelete = [];
             state.knownFiles.forEach(function(info, rp) {
-                if (!remotePaths[rp] && info.kind !== "directory") {
+                if (!remotePaths[rp] && info.kind !== "directory" && !state.uploading.has(rp)) {
                     toDelete.push(rp);
                 }
             });
             for (var di = 0; di < toDelete.length; di++) {
                 var rp = toDelete[di];
                 state.knownFiles.delete(rp);
-                // Delete local .url shortcut
                 var urlPath = path.join(state.mountPoint, rp + ".url");
                 try {
                     if (fs.existsSync(urlPath)) {
@@ -420,6 +425,27 @@ class SyncManager extends EventEmitter {
                 changed = true;
                 this.emit("file-synced", { dropPath: state.dropPath, file: rp, type: "remote-delete" });
             }
+
+            // Retry failed uploads
+            var self = this;
+            state.failedUploads.forEach(function(timestamp, retryPath) {
+                if (state.uploading.has(retryPath)) return;
+                var retryFullPath = path.join(state.mountPoint, retryPath);
+                if (!fs.existsSync(retryFullPath)) {
+                    state.failedUploads.delete(retryPath);
+                    return;
+                }
+                var retryStat;
+                try { retryStat = fs.statSync(retryFullPath); } catch (e) { state.failedUploads.delete(retryPath); return; }
+                if (!retryStat.isFile() || retryStat.size === 0) {
+                    state.failedUploads.delete(retryPath);
+                    return;
+                }
+                console.log("[SyncManager] Retrying upload: " + retryPath);
+                self._uploadLocalFile(state, retryPath, function(err) {
+                    self._finalizeUpload(state, retryPath, state.mountPoint, state.user, state.drop, err);
+                });
+            });
 
             if (changed) {
                 this._saveIndex(state);
@@ -433,29 +459,34 @@ class SyncManager extends EventEmitter {
         try {
             var fullPath = path.join(state.mountPoint, relPath);
             if (!fs.existsSync(fullPath)) {
-                if (callback) callback();
+                if (callback) callback("File not found");
                 return;
             }
             var stat = fs.statSync(fullPath);
             if (!stat.isFile() || stat.size === 0) {
-                if (callback) callback();
+                if (callback) callback("Not a valid file or empty");
                 return;
             }
 
+            state.uploading.add(relPath);
             var fileStream = fs.createReadStream(fullPath);
             var self = this;
+            var s = state;
             this.apiClient.uploadFile(state.user, state.drop, relPath, fileStream, stat.size)
             .then(function(result) {
-                self.emit("file-synced", { dropPath: state.dropPath, file: relPath, type: "upload" });
-                if (callback) callback();
+                s.uploading.delete(relPath);
+                self.emit("file-synced", { dropPath: s.dropPath, file: relPath, type: "upload" });
+                if (callback) callback(null);
             })
             .catch(function(err) {
-                self.emit("sync-error", { dropPath: state.dropPath, file: relPath, error: err.message });
-                if (callback) callback();
+                s.uploading.delete(relPath);
+                self.emit("sync-error", { dropPath: s.dropPath, file: relPath, error: err.message });
+                if (callback) callback(err.message);
             });
         } catch (err) {
+            state.uploading.delete(relPath);
             this.emit("sync-error", { dropPath: state.dropPath, file: relPath, error: err.message });
-            if (callback) callback();
+            if (callback) callback(err.message);
         }
     }
 

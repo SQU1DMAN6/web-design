@@ -61,10 +61,10 @@ func RepairDatabase(db *bun.DB) error {
 	if _, err := sqldb.Exec(`UPDATE users SET bio = '' WHERE bio IS NULL`); err != nil {
 		return err
 	}
-	if err := ensureColumn(sqldb, "contacts", "created_at", "TIMESTAMP DEFAULT CURRENT_TIMESTAMP"); err != nil {
+	if err := ensureColumn(sqldb, "contact_requests", "created_at", "TIMESTAMP DEFAULT CURRENT_TIMESTAMP"); err != nil {
 		return err
 	}
-	if err := ensureColumn(sqldb, "contacts", "updated_at", "TIMESTAMP DEFAULT CURRENT_TIMESTAMP"); err != nil {
+	if err := ensureColumn(sqldb, "contact_requests", "updated_at", "TIMESTAMP DEFAULT CURRENT_TIMESTAMP"); err != nil {
 		return err
 	}
 	if _, err := sqldb.Exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email ON users(email)`); err != nil {
@@ -73,13 +73,13 @@ func RepairDatabase(db *bun.DB) error {
 	if _, err := sqldb.Exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_users_name ON users(name)`); err != nil {
 		return err
 	}
-	if _, err := sqldb.Exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_contacts_pair ON contacts(requester, recipient)`); err != nil {
+	if _, err := sqldb.Exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_contacts_pair ON contact_requests(requester, recipient)`); err != nil {
 		return err
 	}
-	if _, err := sqldb.Exec(`CREATE INDEX IF NOT EXISTS idx_contacts_recipient_status ON contacts(recipient, status)`); err != nil {
+	if _, err := sqldb.Exec(`CREATE INDEX IF NOT EXISTS idx_contacts_recipient_status ON contact_requests(recipient, status)`); err != nil {
 		return err
 	}
-	if _, err := sqldb.Exec(`CREATE INDEX IF NOT EXISTS idx_contacts_requester_status ON contacts(requester, status)`); err != nil {
+	if _, err := sqldb.Exec(`CREATE INDEX IF NOT EXISTS idx_contacts_requester_status ON contact_requests(requester, status)`); err != nil {
 		return err
 	}
 	if err := RepairLegacyProfilePicturePaths(db); err != nil {

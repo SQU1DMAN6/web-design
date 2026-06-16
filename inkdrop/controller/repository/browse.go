@@ -39,7 +39,7 @@ func IndexMain(w http.ResponseWriter, r *http.Request) {
 			Message:         "Browse public Drops",
 			Name:            userName,
 			IsViewingPublic: true,
-			DropMatches:     matches,
+			RepoMatches:     matches,
 			Error:           make(map[string]string),
 		}
 		if err != nil {
@@ -65,7 +65,7 @@ func IndexMain(w http.ResponseWriter, r *http.Request) {
 			Message:         "Drops shared with you",
 			Name:            userName,
 			IsViewingPublic: true,
-			DropMatches:     matches,
+			RepoMatches:     matches,
 			Error:           make(map[string]string),
 		}
 		if err != nil {
@@ -88,7 +88,7 @@ func IndexMain(w http.ResponseWriter, r *http.Request) {
 		Message:         "Browse the InkDrop machine",
 		Name:            userName,
 		IsViewingPublic: false,
-		DropList:        dropList,
+		RepoList:        dropList,
 		Error:           make(map[string]string),
 	}
 
@@ -180,7 +180,7 @@ func IndexMainPost(w http.ResponseWriter, r *http.Request) {
 			Message:         "Browse the InkDrop machine",
 			Name:            userName,
 			IsViewingPublic: false,
-			DropList:        dropList,
+			RepoList:        dropList,
 			Error:           make(map[string]string),
 		}
 		paramData.Error["general"] = "Drop name is required."
@@ -197,7 +197,7 @@ func IndexMainPost(w http.ResponseWriter, r *http.Request) {
 			Message:         "Browse the InkDrop machine",
 			Name:            userName,
 			IsViewingPublic: false,
-			DropList:        dropList,
+			RepoList:        dropList,
 			Error:           make(map[string]string),
 		}
 
@@ -216,7 +216,7 @@ func IndexMainPost(w http.ResponseWriter, r *http.Request) {
 			Message:         "Browse the InkDrop machine",
 			Name:            userName,
 			IsViewingPublic: false,
-			DropList:        dropList,
+			RepoList:        dropList,
 			Error:           make(map[string]string),
 		}
 
@@ -260,7 +260,7 @@ func DeleteRepository(w http.ResponseWriter, r *http.Request) {
 			Message:         "Browse the InkDrop machine",
 			Name:            userName,
 			IsViewingPublic: false,
-			DropList:        _dropList,
+			RepoList:        _dropList,
 			Error:           make(map[string]string),
 		}
 
@@ -390,13 +390,13 @@ func IndexMainBrowseRepository(w http.ResponseWriter, r *http.Request) {
 		}
 		directoryListing = decorateRepositoryListing(directoryListing, requestedPath, userOwnsRepo || repository.HasTrash(userName, repoName), isTrashView)
 	}
-	paramData.DropList = directoryListing
+	paramData.RepoList = directoryListing
 
 	// Load drop metadata if present
 	if meta, err := repository.LoadRepoMeta(userName, repoName); err == nil && meta != nil {
-		paramData.DropDescription = meta.Description
-		paramData.DropOwners = strings.Join(meta.Owners, ",")
-		paramData.DropPublic = meta.Public
+		paramData.RepoDescription = meta.Description
+		paramData.RepoOwners = strings.Join(meta.Owners, ",")
+		paramData.RepoPublic = meta.Public
 	}
 
 	enrichAccountParams(&paramData, name)
@@ -748,7 +748,6 @@ func RepositoryRenameItem(w http.ResponseWriter, r *http.Request) {
 	} else {
 		redirectPath = buildBrowseRoutePath(repoOwner, repoName, wd)
 	}
-	http.Redirect(w, r, redirectPath, http.StatusSeeOther)
 	http.Redirect(w, r, redirectPath, http.StatusSeeOther)
 }
 
