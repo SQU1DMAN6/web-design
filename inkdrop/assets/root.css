@@ -2048,3 +2048,51 @@ html[data-theme="dark"] .preview-badge {
         width: 280px;
     }
 }
+
+/* ── Pagination Controls ─────────────────────────────────────────────── */
+.pagination-controls {
+    margin-top: 8px;
+}
+
+.pagination-inner {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 6px 0;
+}
+
+.pagination-btn {
+    background: var(--panel, #fff);
+    border: 1px solid var(--border, #d4d4d8);
+    color: var(--text, #1a1a2e);
+    padding: 4px 10px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 12px;
+    font-family: inherit;
+    transition: background 0.15s, opacity 0.15s;
+}
+
+.pagination-btn:hover:not(:disabled) {
+    background: var(--bg, #f4f4f7);
+}
+
+.pagination-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+.pagination-info {
+    font-size: 12px;
+    color: var(--muted, #71717a);
+    white-space: nowrap;
+}
+
+/* ── Small heading for sub-sections ──────────────────────────────────── */
+.small-heading {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text, #1a1a2e);
+    margin: 8px 0 4px;
+}

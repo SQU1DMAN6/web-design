@@ -487,3 +487,52 @@ func ListContactRequests(db *bun.DB, username string) (incoming []ContactRequest
 		Scan(ctx)
 	return incoming, outgoing, err
 }
+
+// CancelContactRequest deletes a pending outgoing contact request.
+// The requester must be the current user.
+func CancelContactRequest(db *bun.DB, requester string, recipient string) error {
+	requester = strings.TrimSpace(requester)
+	recipient = strings.TrimSpace(recipient)
+	if requester == "" || recipient == "" {
+		return errors.New("invalid contact request")
+	}
+	ctx := context.Background()
+	res, err := db.NewDelete().
+		Model((*ContactRequest)(nil)).
+		Where("requester = ?", requester).
+		Where("recipient = ?", recipient).
+		Where("status = ?", "pending").
+		Exec(ctx)
+	if err != nil {
+		return err
+	}
+	rows, _ := res.RowsAffected()
+	if rows == 0 {
+		return errors.New("pending contact request not found")
+	}
+	return nil
+}
+
+// RemoveAcceptedContact deletes an accepted contact relationship between two users.
+// It removes the row regardless of which direction it was created in.
+func RemoveAcceptedContact(db *bun.DB, username string, contactName string) error {
+	username = strings.TrimSpace(username)
+	contactName = strings.TrimSpace(contactName)
+	if username == "" || contactName == "" {
+		return errors.New("invalid contact")
+	}
+	ctx := context.Background()
+	res, err := db.NewDelete().
+		Model((*ContactRequest)(nil)).
+		Where("(requester = ? AND recipient = ?) OR (requester = ? AND recipient = ?)", username, contactName, contactName, username).
+		Where("status = ?", "accepted").
+		Exec(ctx)
+	if err != nil {
+		return err
+	}
+	rows, _ := res.RowsAffected()
+	if rows == 0 {
+		return errors.New("accepted contact not found")
+	}
+	return nil
+}

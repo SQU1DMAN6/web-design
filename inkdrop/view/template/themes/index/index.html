@@ -242,21 +242,41 @@
                         </div>
                         {{end}}
                     </div>
+
+                    <div id="outgoingRequests" class="compact-stack" style="margin-top: 10px;">
+                        {{if .PendingOutgoingContacts}}
+                        <h3 class="small-heading">Sent Requests</h3>
+                        {{range $i, $c := .PendingOutgoingContacts}}
+                        <div class="contact-request contact-card" data-recipient="{{$c.recipient}}"
+                            data-searchable="{{$c.recipient}} outgoing contact request">
+                            <div class="contact-row">
+                                <img class="avatar" src="/pfp/default.png" alt="" />
+                                <div class="contact-info">
+                                    <div class="contact-name">{{$c.recipient}}</div>
+                                    <div class="contact-email">Request sent</div>
+                                </div>
+                            </div>
+                            <div class="contact-actions">
+                                <button type="button" class="button-link small danger"
+                                    data-cancel-request="{{$c.recipient}}">Cancel</button>
+                            </div>
+                        </div>
+                        {{end}}
+                        {{end}}
+                    </div>
                 </div>
 
                 <div class="right-panel-section">
                     <h2>Find People</h2>
                     <input type="search" class="compact-input" id="communitySearch" aria-label="Find people" autocomplete="off" />
                     <div id="communityResults" class="community-results" style="margin-top: 10px;"></div>
+                    <div id="communityPagination" class="pagination-controls"></div>
                 </div>
 
                 <div class="right-panel-section">
                     <h2>My Contacts</h2>
-
-                    <div class="manage">
-                        <span>Manage Contacts</span>
-                        <span>&rsaquo;</span>
-                    </div>
+                    <div id="myContactsList" class="compact-stack"></div>
+                    <div id="contactsPagination" class="pagination-controls"></div>
                 </div>
             </aside>
         </section>
@@ -290,6 +310,7 @@
     <script>
         (function () {
             var themeKey = "inkdrop-theme";
+            var ITEMS_PER_PAGE = 5;
 
             function qs(selector, root) {
                 return (root || document).querySelector(selector);
@@ -378,7 +399,6 @@
                 if (shareBtn) {
                     event.preventDefault();
                     var dropName = shareBtn.getAttribute("data-share");
-                    // Navigate to browse view for this drop — user can click "Open Settings" there
                     var currentUser = "{{.Name}}";
                     if (currentUser && dropName) {
                         window.location.href = "/browse/" + encodeURIComponent(currentUser) + "/" + encodeURIComponent(dropName);
@@ -413,6 +433,77 @@
                 }).then(function (response) { return response.json(); });
             }
 
+            // ── Pagination helper ──────────────────────────────────────────
+            function paginate(items, containerId, perPage, renderFn) {
+                var container = qs("#" + containerId);
+                if (!container) return;
+                var page = 0;
+                var totalPages = Math.max(1, Math.ceil(items.length / perPage));
+
+                function render() {
+                    container.innerHTML = "";
+                    var start = page * perPage;
+                    var end = start + perPage;
+                    var visibleItems = items.slice(start, end);
+
+                    visibleItems.forEach(function (item, idx) {
+                        renderFn(item, start + idx, container);
+                    });
+
+                    if (totalPages <= 1) return;
+
+                    var controls = document.createElement("div");
+                    controls.className = "pagination-inner";
+
+                    var prevBtn = document.createElement("button");
+                    prevBtn.type = "button";
+                    prevBtn.className = "pagination-btn";
+                    prevBtn.textContent = "\u2190 Prev";
+                    prevBtn.disabled = page === 0;
+                    prevBtn.addEventListener("click", function () { page--; render(); });
+
+                    var info = document.createElement("span");
+                    info.className = "pagination-info";
+                    info.textContent = "Page " + (page + 1) + " of " + totalPages;
+
+                    var nextBtn = document.createElement("button");
+                    nextBtn.type = "button";
+                    nextBtn.className = "pagination-btn";
+                    nextBtn.textContent = "Next \u2192";
+                    nextBtn.disabled = page >= totalPages - 1;
+                    nextBtn.addEventListener("click", function () { page++; render(); });
+
+                    controls.appendChild(prevBtn);
+                    controls.appendChild(info);
+                    controls.appendChild(nextBtn);
+                    container.appendChild(controls);
+                }
+
+                render();
+            }
+
+            // ── Cancel outgoing contact request ───────────────────────────
+            document.addEventListener("click", function (event) {
+                var btn = event.target.closest("[data-cancel-request]");
+                if (!btn) return;
+                var recipient = btn.getAttribute("data-cancel-request");
+                btn.disabled = true;
+                btn.textContent = "Canceling...";
+                postForm("/contacts/cancel", { recipient: recipient }).then(function (resp) {
+                    if (resp && resp.success) {
+                        var card = btn.closest(".contact-card");
+                        if (card) card.remove();
+                    } else {
+                        btn.textContent = "Failed";
+                        btn.disabled = false;
+                    }
+                }).catch(function () {
+                    btn.textContent = "Failed";
+                    btn.disabled = false;
+                });
+            });
+
+            // ── Respond to incoming contact request ───────────────────────
             function respondToContact(id, action) {
                 postForm("/contacts/respond", { id: id, action: action }).then(function () {
                     window.location.reload();
@@ -426,6 +517,7 @@
                 });
             });
 
+            // ── Find People (Community) ───────────────────────────────────
             var communityFocusedIdx = -1;
 
             function loadCommunity() {
@@ -440,11 +532,12 @@
                         communityResults.innerHTML = "";
                         if (!data.success || !Array.isArray(data.users) || data.users.length === 0) {
                             communityResults.innerHTML = '<div class="empty-state"><strong>No people found.</strong><span>Try a different search.</span></div>';
+                            qs("#communityPagination").innerHTML = "";
                             updateStats();
                             return;
                         }
 
-                        data.users.forEach(function (user) {
+                        paginate(data.users, "communityPagination", ITEMS_PER_PAGE, function (user) {
                             var row = document.createElement("div");
                             row.className = "community-card contact-card";
                             row.setAttribute("data-searchable", [user.name, user.bio, user.status].join(" "));
@@ -491,6 +584,7 @@
                             communityResults.appendChild(row);
                         });
 
+                        // Wire up add-contact buttons
                         var resultButtons = qsa("[data-request-contact]", communityResults);
                         resultButtons.forEach(function (button) {
                             button.addEventListener("click", function () {
@@ -526,7 +620,6 @@
                     communitySearch._timer = window.setTimeout(loadCommunity, 180);
                 });
 
-                // Keyboard navigation: arrow keys on the search input
                 communitySearch.addEventListener("keydown", function (e) {
                     var items = qsa(".community-card", communityResults);
                     if (items.length === 0) return;
@@ -544,6 +637,156 @@
                 });
             }
 
+            // ── My Contacts ───────────────────────────────────────────────
+            function loadMyContacts() {
+                var listContainer = qs("#myContactsList");
+                if (!listContainer) return;
+
+                fetch("/api/contacts", { credentials: "same-origin" })
+                    .then(function (r) { return r.json(); })
+                    .then(function (data) {
+                        listContainer.innerHTML = "";
+                        if (!data.success || !Array.isArray(data.contacts) || data.contacts.length === 0) {
+                            listContainer.innerHTML = '<div class="empty-state"><strong>No contacts yet.</strong><span>Add people from Find People.</span></div>';
+                            qs("#contactsPagination").innerHTML = "";
+                            return;
+                        }
+
+                        paginate(data.contacts, "contactsPagination", ITEMS_PER_PAGE, function (contactName) {
+                            var card = document.createElement("div");
+                            card.className = "contact-card";
+
+                            var row = document.createElement("div");
+                            row.className = "contact-row";
+
+                            var img = document.createElement("img");
+                            img.className = "avatar";
+                            img.src = "/pfp/default.png";
+                            img.alt = "";
+
+                            var info = document.createElement("div");
+                            info.className = "contact-info";
+
+                            var nameDiv = document.createElement("div");
+                            nameDiv.className = "contact-name";
+                            nameDiv.textContent = contactName;
+
+                            info.appendChild(nameDiv);
+                            row.appendChild(img);
+                            row.appendChild(info);
+
+                            var actions = document.createElement("div");
+                            actions.className = "contact-actions";
+
+                            var removeBtn = document.createElement("button");
+                            removeBtn.type = "button";
+                            removeBtn.className = "button-link small danger";
+                            removeBtn.setAttribute("data-remove-contact", contactName);
+                            removeBtn.textContent = "Remove";
+
+                            actions.appendChild(removeBtn);
+                            card.appendChild(row);
+                            card.appendChild(actions);
+                            listContainer.appendChild(card);
+                        });
+
+                        // Wire up remove buttons
+                        qsa("[data-remove-contact]", listContainer).forEach(function (btn) {
+                            btn.addEventListener("click", function () {
+                                var contactName = btn.getAttribute("data-remove-contact");
+                                btn.disabled = true;
+                                btn.textContent = "Removing...";
+                                postForm("/contacts/remove", { contact: contactName }).then(function (resp) {
+                                    if (resp && resp.success) {
+                                        btn.textContent = "Removed";
+                                        var card = btn.closest(".contact-card");
+                                        if (card) {
+                                            card.style.opacity = "0.5";
+                                            window.setTimeout(function () { loadMyContacts(); }, 500);
+                                        }
+                                    } else {
+                                        btn.textContent = "Failed";
+                                        btn.disabled = false;
+                                    }
+                                }).catch(function () {
+                                    btn.textContent = "Failed";
+                                    btn.disabled = false;
+                                });
+                            });
+                        });
+                    })
+                    .catch(function () {
+                        listContainer.innerHTML = '<div class="empty-state"><strong>Could not load contacts.</strong></div>';
+                    });
+            }
+
+            // ── Drops list pagination ─────────────────────────────────────
+            function initDropPagination() {
+                var rows = qsa(".drop-row");
+                if (rows.length === 0) return;
+
+                var dropListEl = qs("#dropList");
+                var emptyState = qs("#serverEmptyState");
+
+                // Wrap drop rows in a pagination container
+                var paginationDiv = document.createElement("div");
+                paginationDiv.id = "dropPagination";
+                paginationDiv.className = "pagination-controls";
+                dropListEl.parentNode.insertBefore(paginationDiv, dropListEl.nextSibling);
+
+                // Track all rows and manage visibility
+                var allRows = rows.slice();
+                var page = 0;
+                var totalPages = Math.max(1, Math.ceil(allRows.length / ITEMS_PER_PAGE));
+
+                function renderDropPage() {
+                    allRows.forEach(function (row) { row.style.display = "none"; });
+                    var start = page * ITEMS_PER_PAGE;
+                    var end = start + ITEMS_PER_PAGE;
+                    for (var i = start; i < end && i < allRows.length; i++) {
+                        allRows[i].style.display = "grid";
+                    }
+
+                    // Update footer
+                    if (footerNote) {
+                        footerNote.textContent = "Showing " + Math.min(end, allRows.length) + " of " + allRows.length + " Drops";
+                    }
+
+                    // Render pagination controls
+                    paginationDiv.innerHTML = "";
+                    if (totalPages <= 1) return;
+
+                    var inner = document.createElement("div");
+                    inner.className = "pagination-inner";
+
+                    var prevBtn = document.createElement("button");
+                    prevBtn.type = "button";
+                    prevBtn.className = "pagination-btn";
+                    prevBtn.textContent = "\u2190 Prev";
+                    prevBtn.disabled = page === 0;
+                    prevBtn.addEventListener("click", function () { page--; renderDropPage(); });
+
+                    var info = document.createElement("span");
+                    info.className = "pagination-info";
+                    info.textContent = "Page " + (page + 1) + " of " + totalPages;
+
+                    var nextBtn = document.createElement("button");
+                    nextBtn.type = "button";
+                    nextBtn.className = "pagination-btn";
+                    nextBtn.textContent = "Next \u2192";
+                    nextBtn.disabled = page >= totalPages - 1;
+                    nextBtn.addEventListener("click", function () { page++; renderDropPage(); });
+
+                    inner.appendChild(prevBtn);
+                    inner.appendChild(info);
+                    inner.appendChild(nextBtn);
+                    paginationDiv.appendChild(inner);
+                }
+
+                renderDropPage();
+            }
+
+            // ── Stats & Filter ────────────────────────────────────────────
             function updateStats() {
                 var rows = qsa(".drop-row");
                 var sharedRows = rows.filter(function (row) {
@@ -561,8 +804,11 @@
                 rows.forEach(function (row) {
                     var name = (row.getAttribute("data-name") || row.textContent || "").toLowerCase();
                     var searchMatch = !searchValue || name.indexOf(searchValue) !== -1;
-                    row.style.display = searchMatch ? "grid" : "none";
-                    if (searchMatch) visibleCount++;
+                    if (!searchMatch) {
+                        row.style.display = "none";
+                    } else {
+                        visibleCount++;
+                    }
                 });
 
                 qsa("[data-searchable]").forEach(function (item) {
@@ -584,6 +830,7 @@
 
             if (globalSearch) globalSearch.addEventListener("input", filterPage);
 
+            // ── Misc UI ───────────────────────────────────────────────────
             function pulseCreateArea() {
                 if (createWrap) {
                     createWrap.classList.add("is-highlighted");
@@ -648,13 +895,17 @@
                 document.addEventListener("DOMContentLoaded", function () {
                     initTheme();
                     loadCommunity();
+                    loadMyContacts();
                     filterPage();
+                    initDropPagination();
                     revealRecentDrop();
                 });
             } else {
                 initTheme();
                 loadCommunity();
+                loadMyContacts();
                 filterPage();
+                initDropPagination();
                 revealRecentDrop();
             }
         })();

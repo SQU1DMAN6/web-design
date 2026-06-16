@@ -35,6 +35,8 @@ func RegisterRoutes(r chi.Router) {
 	r.Get("/api/contacts", account.ContactsAPI)
 	r.Post("/contacts/request", account.RequestContact)
 	r.Post("/contacts/respond", account.RespondContact)
+	r.Post("/contacts/cancel", account.CancelContact)
+	r.Post("/contacts/remove", account.RemoveContact)
 	r.Get("/index.php", repository.RepositoryIndex)
 	r.Get("/inkdrop/index.php", repository.RepositoryIndex)
 	r.Get("/api/repos", repository.RepositoryListAPI)
