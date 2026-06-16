@@ -6,3 +6,4 @@ inkdrop/database.db
 *dist*/
 inker3/BUILD/windows-x64
 inker3/BUILD/windows-x64/*
+inkdrop/bin/*
