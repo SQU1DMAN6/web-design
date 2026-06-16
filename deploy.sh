@@ -16,7 +16,7 @@ chown -R inkdrop-machine:inkdrop-machine .
 
 echo "Running make..."
 cd inkdrop
-timeout -s INT 5s make update
+timeout -s INT 20s make update
 
 echo "..."
 EOF
