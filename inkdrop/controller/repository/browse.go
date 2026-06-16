@@ -388,15 +388,27 @@ func IndexMainBrowseRepository(w http.ResponseWriter, r *http.Request) {
 		if directoryListing == nil {
 			directoryListing = []string{}
 		}
-		directoryListing = decorateRepositoryListing(directoryListing, requestedPath, userOwnsRepo || repository.HasTrash(userName, repoName), isTrashView)
+		directoryListing = decorateRepositoryListing(directoryListing, requestedPath, userOwnsRepo || repository.HasTrash(userName, repoName))
 	}
 	paramData.RepoList = directoryListing
 
-	// Load drop metadata if present
+	// Load drop metadata if present; lazy-initialise for repos that have no meta yet
 	if meta, err := repository.LoadRepoMeta(userName, repoName); err == nil && meta != nil {
 		paramData.RepoDescription = meta.Description
 		paramData.RepoOwners = strings.Join(meta.Owners, ",")
 		paramData.RepoPublic = meta.Public
+	} else if err == nil && meta == nil {
+		// Lazy-init meta for uninitialised repos (legacy drops)
+		newMeta := &repository.RepoMeta{
+			Owners:      []string{userName},
+			Description: "",
+			Public:      false,
+		}
+		if saveErr := repository.SaveRepoMeta(userName, repoName, newMeta); saveErr == nil {
+			paramData.RepoDescription = ""
+			paramData.RepoOwners = userName
+			paramData.RepoPublic = false
+		}
 	}
 
 	enrichAccountParams(&paramData, name)
@@ -986,7 +998,7 @@ func buildBrowseRoutePath(userName string, repoName string, rawPath string) stri
 	return base + "/" + strings.Join(segments, "/")
 }
 
-func decorateRepositoryListing(entries []string, browserPath string, includeTrash bool, isTrashView bool) []string {
+func decorateRepositoryListing(entries []string, browserPath string, includeTrash bool) []string {
 	cleaned := make([]string, 0, len(entries)+1)
 	for _, entry := range entries {
 		if entry == repository.TrashInternalRoot+"/" || entry == repository.TrashDisplayName+"/" {
@@ -1333,7 +1345,7 @@ func RepositoryIndex(w http.ResponseWriter, r *http.Request) {
 	if apiMode && searchQuery != "" {
 		SS := config.GetSessionManager()
 		currentUser := SS.GetString(r.Context(), "name")
-	matches, err := repository.SearchDrops(searchQuery, currentUser)
+		matches, err := repository.SearchDrops(searchQuery, currentUser)
 		if err != nil {
 			writeJSON(w, http.StatusInternalServerError, map[string]interface{}{"success": false, "error": err.Error()})
 			return

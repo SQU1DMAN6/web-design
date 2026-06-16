@@ -202,6 +202,17 @@ func CreateNewUserDrop(username string, dropname string) error {
 	if err1 != nil || err2 != nil {
 		return fmt.Errorf("%s\n%s", err1, err2)
 	}
+	// Auto-initialise metadata on creation so the drop is NOT world-readable
+	// until the owner explicitly sets permissions. Without this, LoadRepoMeta
+	// returns nil and SearchDrops treats nil-meta drops as public.
+	meta := &RepoMeta{
+		Owners:      []string{username},
+		Description: "",
+		Public:      false,
+	}
+	if err := SaveRepoMeta(username, dropname, meta); err != nil {
+		return fmt.Errorf("drop directory created but meta init failed: %w", err)
+	}
 	return nil
 }
 
@@ -286,7 +297,7 @@ func SearchDrops(query string, currentUser string) ([]map[string]string, error) 
 				continue
 			}
 
-			isPublic := meta == nil || meta.Public
+			isPublic := meta != nil && meta.Public
 			isOwnDrop := currentUser != "" && currentUser == userName
 			isShared := false
 			if currentUser != "" && meta != nil {
@@ -357,12 +368,8 @@ func ListPublicDrops() ([]map[string]string, error) {
 			if err != nil {
 				continue
 			}
-			if meta != nil {
-				if meta.Public {
-					results = append(results, map[string]string{"user": userName, "repo": dropName, "description": meta.Description})
-				}
-			} else {
-				results = append(results, map[string]string{"user": userName, "repo": dropName, "description": ""})
+			if meta != nil && meta.Public {
+				results = append(results, map[string]string{"user": userName, "repo": dropName, "description": meta.Description})
 			}
 		}
 	}

@@ -383,16 +383,13 @@
 
     <main class="page app-page">
         <section class="app-shell">
-            <aside class="left-panel" aria-label="Repository navigation">
-                <nav class="left-panel-tabs" aria-label="Repository sections">
+            <aside class="left-panel" aria-label="Drop navigation">
+                <nav class="left-panel-tabs" aria-label="Drop sections">
                     <a class="left-panel-tab" href="/">Workspace</a>
-                    <a class="left-panel-tab active" href="/browse/{{.Message2}}/{{.Message3}}">Current Repository</a>
+                    <a class="left-panel-tab active" href="/browse/{{.Message2}}/{{.Message3}}">Current Drop</a>
                     <a class="left-panel-tab" href="/browse/{{.Message2}}/{{.Message3}}/Trash">Trash</a>
                     <button type="button" class="left-panel-tab" id="openCommunityPanel">Community</button>
                 </nav>
-                <div class="left-panel-toggle">
-                    <button type="button" class="button-link small" id="panelModeBtn" aria-pressed="true">Expand panel</button>
-                </div>
                 <div class="left-panel-section">
                     <h2>Contacts</h2>
                     <div class="left-repo-list">
@@ -408,7 +405,7 @@
             </aside>
             <div class="repo-workspace">
         <section class="shell stack-lg">
-            <div class="panel dark stack">
+            <div class="panel stack">
                 <h1 class="intro">{{ .Title }}</h1>
                 <p class="subtle light">{{ .Message }}</p>
                 <div class="row">
@@ -427,7 +424,7 @@
 
             <div class="panel stack" id="filePanel" tabindex="0" aria-label="Repository browser">
                 <div style="display: flex; flex-direction: column; gap: 10px;">
-                    <h2 class="section">Repository Manager</h2>
+                    <h2 class="section">Drop Browser</h2>
                     <div class="row">
                         {{if .IsTrashView}}
                         <form method="post" action="/trash/empty" id="emptyTrashTopForm">
@@ -440,7 +437,7 @@
                         <button type="button" class="button-link small" id="newFileBtnInline">New File</button>
                         <button type="button" class="button-link small" id="newFolderBtnInline">New Folder</button>
                         <button type="button" class="button-link small" id="uploadFileBtnInline">Upload Files</button>
-                        <a href="/downloadrepo/{{.Message2}}/{{.Message3}}"><button type="button" class="button-link small" id="downloadRepoInline">Download Repository</button></a>
+                        <a href="/downloadrepo/{{.Message2}}/{{.Message3}}"><button type="button" class="button-link small" id="downloadRepoInline">Download Drop</button></a>
                         {{end}}
                     </div>
                 </div>
@@ -522,6 +519,7 @@
                     <form method="post" action="/new/dir" class="stack">
                         <h3 class="section">Create New Folder</h3>
                         <input
+                            class="details"
                             type="text"
                             name="folderName"
                             placeholder="Folder name"
@@ -544,6 +542,7 @@
                         <h3 class="section">Create New File</h3>
                         <label class="field-label" for="newFileName">File Name</label>
                         <input
+                            class="details"
                             type="text"
                             name="fileName"
                             id="newFileName"
@@ -559,6 +558,7 @@
 
                         <label class="field-label" for="newFileExtension">Extension</label>
                         <input
+                            class="details"
                             type="text"
                             name="fileExtension"
                             id="newFileExtension"
@@ -582,6 +582,7 @@
                         <h3 class="section">Rename / Move Folder</h3>
                         <p class="subtle">You can move a folder by entering a destination path, for example: <code>archive/project_a</code>.</p>
                         <input
+                            class="details"
                             type="text"
                             name="newName"
                             id="renameInput"
@@ -602,7 +603,7 @@
 
                 <dialog class="settings-modal center popup" id="settingsDialog">
                     <form id="settingsForm" method="post" action="/repo/settings" class="stack">
-                        <h3 class="section">Repository Settings</h3>
+                        <h3 class="section">Drop Settings</h3>
                         <label class="field-label">Description</label>
                         <textarea name="description" rows="3" class="details" style="resize: none; padding: 8px; border-radius: 7px;">{{.RepoDescription}}</textarea>
 
@@ -637,10 +638,10 @@
 
                         <div class="danger-zone">
                             <h4>Danger Zone</h4>
-                            <p>Deleting this repository will permanently remove all files and metadata. This action cannot be undone.</p>
+                            <p>Deleting this Drop will permanently remove all files and metadata. This action cannot be undone.</p>
                             <div class="row">
                                 <button type="button" id="cancelDeleteSettings" class="button-link" style="width: 100%;">Cancel</button>
-                                <button type="button" id="confirmDeleteRepo" class="danger-item menu-item button-link" style="width: 100%;">Delete Repository</button>
+                                <button type="button" id="confirmDeleteRepo" class="danger-item menu-item button-link" style="width: 100%;">Delete Drop</button>
                             </div>
                         </div>
                     </form>
@@ -727,6 +728,8 @@
             function setTheme(theme) {
                 var value = theme === "dark" ? "dark" : "light";
                 document.documentElement.setAttribute("data-theme", value);
+                var themeSwitch = document.querySelector(".theme-switch");
+                if (themeSwitch) themeSwitch.classList.toggle("is-dark", value === "dark");
                 document.querySelectorAll("[data-theme-set]").forEach(function (button) {
                     button.setAttribute("aria-pressed", String(button.getAttribute("data-theme-set") === value));
                 });
@@ -755,10 +758,34 @@
                 });
             }
 
+            function filterFiles() {
+                var searchValue = (globalSearch && globalSearch.value || "").toLowerCase().trim();
+                var entries = getAllEntries();
+                var visibleCount = 0;
+                entries.forEach(function (entry) {
+                    var name = (entry.getAttribute("data-name") || "").toLowerCase();
+                    var match = !searchValue || name.indexOf(searchValue) !== -1;
+                    entry.style.display = match ? "" : "none";
+                    if (match) visibleCount++;
+                });
+                // Update file count
+                var countEl = document.getElementById("fileCount");
+                if (countEl) countEl.textContent = "Showing " + visibleCount + " of " + entries.length + " items";
+            }
+
+            var globalSearch = document.getElementById("globalSearch");
+            if (globalSearch) {
+                globalSearch.addEventListener("input", filterFiles);
+            }
+
             if (document.readyState === "loading") {
-                document.addEventListener("DOMContentLoaded", initTheme);
+                document.addEventListener("DOMContentLoaded", function () {
+                    initTheme();
+                    filterFiles();
+                });
             } else {
                 initTheme();
+                filterFiles();
             }
 
             var profileButton = document.getElementById("profileMenuButton");
@@ -950,7 +977,6 @@
             var cancelSettings = document.getElementById("cancelSettings")
             var cancelDeleteSettings = document.getElementById("cancelDeleteSettings")
             var liveEditBtn = document.getElementById("liveEditBtn")
-            var panelModeBtn = document.getElementById("panelModeBtn")
             var restoreTrashBtn = document.getElementById("restoreTrashBtn")
             var emptyTrashBtn = document.getElementById("emptyTrashBtn")
             var restoreTrashTopBtn = document.getElementById("restoreTrashTopBtn")
@@ -1005,30 +1031,6 @@
                     .map(encodeURIComponent)
                     .join("/");
                 return base + "/" + encodedPath;
-            }
-
-            function setPanelMode(compact) {
-                if (!appShell || !leftPanel || !panelModeBtn) return;
-                if (compact) {
-                    appShell.classList.add("compact");
-                    leftPanel.classList.add("compact");
-                    panelModeBtn.textContent = "Expand panel";
-                    panelModeBtn.setAttribute("aria-pressed", "true");
-                } else {
-                    appShell.classList.remove("compact");
-                    leftPanel.classList.remove("compact");
-                    panelModeBtn.textContent = "Compact panel";
-                    panelModeBtn.setAttribute("aria-pressed", "false");
-                }
-                localStorage.setItem("inkdrop-left-panel-compact", compact ? "1" : "0");
-            }
-
-            function initializePanelMode() {
-                var stored = localStorage.getItem("inkdrop-left-panel-compact");
-                if (stored === null) {
-                    stored = "1";
-                }
-                setPanelMode(stored === "1");
             }
 
             function buildEditURL(fileName, pathValue) {
@@ -1781,9 +1783,8 @@
             function ensureSelectionBox() {
                 if (selectionBox) return selectionBox;
                 selectionBox = document.createElement("div");
+                selectionBox.className = "selection-box";
                 selectionBox.style.position = "absolute";
-                selectionBox.style.border = "1px solid rgba(37, 99, 235, 0.9)";
-                selectionBox.style.background = "rgba(59, 130, 246, 0.18)";
                 selectionBox.style.pointerEvents = "none";
                 selectionBox.style.zIndex = "25";
                 selectionBox.hidden = true;
@@ -1950,12 +1951,6 @@
                     if (settingsDialog) settingsDialog.showModal();
                 });
             }
-            if (panelModeBtn) {
-                panelModeBtn.addEventListener("click", function () {
-                    var compact = !(leftPanel && leftPanel.classList.contains("compact"));
-                    setPanelMode(compact);
-                });
-            }
             if (uploadFileBtnInline) uploadFileBtnInline.addEventListener("click", openUploadDialog);
             if (renameBtn) renameBtn.addEventListener("click", openRenameDialog);
             if (deleteBtn) deleteBtn.addEventListener("click", deleteSelectedFolder);
@@ -2015,7 +2010,7 @@
             var deleteRepoFormElem = document.getElementById("deleteRepoForm");
             if (confirmDeleteRepoBtn && deleteRepoFormElem) {
                 confirmDeleteRepoBtn.addEventListener("click", function () {
-                    if (window.confirm("Delete repository '{{.Message2}}/{{.Message3}}'? This cannot be undone.")) {
+                    if (window.confirm("Delete Drop '{{.Message2}}/{{.Message3}}'? This cannot be undone.")) {
                         deleteRepoFormElem.submit();
                     }
                 });
@@ -2048,7 +2043,6 @@
             });
 
             updateNewFilePreview();
-            initializePanelMode();
 
             // Owners widget: render tokens, allow add/remove, and populate hidden owners field on submit
             (function () {

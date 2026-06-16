@@ -9,6 +9,7 @@ type FrontEndParams struct {
 	Message2                  string
 	Message3                  string
 	Path                      string
+	StarredSet                map[string]bool
 	UserData                  interface{}
 	SessionData               map[string]string
 	CurrentURL                string
