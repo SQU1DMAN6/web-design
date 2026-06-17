@@ -377,6 +377,7 @@
                         <p class="menu-label">Signed in as</p>
                         <p class="menu-user">{{.Name}}</p>
                         <button type="button" class="button-link small" id="openAccountSettings" role="menuitem">Open Settings</button>
+                        <button type="button" class="button-link small" id="shareBtn" role="menuitem">Share</button>
                     </div>
                 </div>
             </div>
@@ -1939,6 +1940,13 @@
                 openSettingsBtnMenu.addEventListener("click", function () {
                     hideContextMenu();
                     if (settingsDialog) settingsDialog.showModal();
+                });
+            }
+            var shareBtn = document.getElementById("shareBtn");
+            if (shareBtn) {
+                shareBtn.addEventListener("click", function () {
+                    communityDialog.showModal();
+                    loadCommunity();
                 });
             }
             if (uploadFileBtnInline) uploadFileBtnInline.addEventListener("click", openUploadDialog);
