@@ -170,6 +170,8 @@ func handleLiveEditGet(w http.ResponseWriter, r *http.Request, sessionUser strin
 		EditorFilePath:          target.DisplayPath,
 		EditorDropOwner:         target.RepoOwner,
 		EditorDropName:          target.RepoName,
+		EditorRepoOwner:         target.RepoOwner,
+		EditorRepoName:          target.RepoName,
 		EditorBackURL:           target.BackURL,
 		EditorLoadURL:           target.LoadURL,
 		EditorSyncURL:           target.EditURL,

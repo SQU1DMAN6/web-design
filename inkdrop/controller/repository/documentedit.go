@@ -104,6 +104,8 @@ func handleDocumentEditGet(w http.ResponseWriter, r *http.Request, target *liveE
 		EditorFilePath:            target.DisplayPath,
 		EditorDropOwner:           target.RepoOwner,
 		EditorDropName:            target.RepoName,
+		EditorRepoOwner:           target.RepoOwner,
+		EditorRepoName:            target.RepoName,
 		EditorBackURL:             target.BackURL,
 		EditorEditable:            err == nil && snapshotErr == nil && target.FileSize <= documentEditMaxFileSize,
 		DocumentEditorFileURL:     initialFileURL,

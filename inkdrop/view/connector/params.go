@@ -34,6 +34,8 @@ type FrontEndParams struct {
 	EditorFilePath            string
 	EditorDropOwner           string
 	EditorDropName            string
+	EditorRepoOwner           string
+	EditorRepoName            string
 	EditorBackURL             string
 	EditorLoadURL             string
 	EditorSyncURL             string
