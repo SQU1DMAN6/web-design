@@ -1113,6 +1113,9 @@
                 function setTheme(theme) {
                     var value = theme === "dark" ? "dark" : "light";
                     document.documentElement.setAttribute("data-theme", value);
+                    var themeSwitch = document.querySelector(".theme-switch");
+                    if (themeSwitch)
+                        themeSwitch.classList.toggle("is-dark", value === "dark");
                     document
                         .querySelectorAll("[data-theme-set]")
                         .forEach(function (button) {
