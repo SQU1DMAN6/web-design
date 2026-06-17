@@ -19,7 +19,8 @@
                     <path d="M21 21l-4.3-4.3"></path>
                 </svg>
                 <input id="globalSearch" class="global-search" type="search"
-                    aria-label="Search Drops, contacts" autocomplete="off" />
+                    aria-label="Search Drops, contacts" autocomplete="off"
+                    placeholder="Search Drops..." title="Search your Drops by name" />
             </div>
 
             <div class="topbar-right">
@@ -116,7 +117,8 @@
                         <label for="reponame">Create a new Drop</label>
                         <form name="newrepo" method="POST" action="/" class="inline-create-form">
                             <input id="reponame" name="reponame" type="text" class="details" aria-label="Drop name" autocomplete="off"
-                                minlength="1" maxlength="64" pattern="[A-Za-z0-9_- ]+" required />
+                                minlength="1" maxlength="64" pattern="[A-Za-z0-9_- ]+" required
+                                placeholder="My new Drop" title="Letters, numbers, spaces, hyphens and underscores only" />
                             <button type="submit" class="redirect">Create</button>
                         </form>
                     </div>
@@ -208,6 +210,7 @@
                         <span>Try another filter or search term.</span>
                     </div>
 
+                    <div id="dropPagination" class="pagination-controls"></div>
                     <div id="footerNote" class="footer-note">Showing Drops</div>
                 </div>
             </section>
@@ -242,13 +245,14 @@
                         </div>
                         {{end}}
                     </div>
+                </div>
 
-                    <div id="outgoingRequests" class="compact-stack" style="margin-top: 10px;">
+                <div class="right-panel-section">
+                    <div id="outgoingRequestsSection" class="compact-stack">
                         {{if .PendingOutgoingContacts}}
                         <h3 class="small-heading">Sent Requests</h3>
                         {{range $i, $c := .PendingOutgoingContacts}}
-                        <div class="contact-request contact-card" data-recipient="{{$c.recipient}}"
-                            data-searchable="{{$c.recipient}} outgoing contact request">
+                        <div class="contact-request contact-card outgoing-card" data-searchable="{{$c.recipient}} outgoing">
                             <div class="contact-row">
                                 <img class="avatar" src="/pfp/default.png" alt="" />
                                 <div class="contact-info">
@@ -264,11 +268,13 @@
                         {{end}}
                         {{end}}
                     </div>
+                    <div id="outgoingPagination" class="pagination-controls"></div>
                 </div>
 
                 <div class="right-panel-section">
                     <h2>Find People</h2>
-                    <input type="search" class="compact-input" id="communitySearch" aria-label="Find people" autocomplete="off" />
+                    <input type="search" class="compact-input" id="communitySearch" aria-label="Find people" autocomplete="off"
+                        placeholder="Search by name..." title="Find InkDrop users by name to add as contacts" />
                     <div id="communityResults" class="community-results" style="margin-top: 10px;"></div>
                     <div id="communityPagination" class="pagination-controls"></div>
                 </div>
@@ -309,44 +315,18 @@
 
     <script>
         (function () {
-            var themeKey = "inkdrop-theme";
             var ITEMS_PER_PAGE = 5;
 
-            function qs(selector, root) {
-                return (root || document).querySelector(selector);
-            }
+            function qs(s, r) { return (r || document).querySelector(s); }
+            function qsa(s, r) { return Array.prototype.slice.call((r || document).querySelectorAll(s)); }
 
-            function qsa(selector, root) {
-                return Array.prototype.slice.call((root || document).querySelectorAll(selector));
-            }
-
-            function setTheme(theme) {
-                var value = theme === "dark" ? "dark" : "light";
-                document.documentElement.setAttribute("data-theme", value);
-                var themeSwitch = qs(".theme-switch");
-                if (themeSwitch) themeSwitch.classList.toggle("is-dark", value === "dark");
-                qsa("[data-theme-set]").forEach(function (button) {
-                    button.setAttribute("aria-pressed", String(button.getAttribute("data-theme-set") === value));
-                });
-            }
-
-            function getSavedTheme() {
-                var stored = localStorage.getItem(themeKey);
-                if (stored === "dark" || stored === "light") return stored;
-                if (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches) return "dark";
-                return "light";
-            }
-
-            function initTheme() {
-                setTheme(getSavedTheme());
-                qsa("[data-theme-set]").forEach(function (button) {
-                    button.type = "button";
-                    button.addEventListener("click", function () {
-                        var theme = button.getAttribute("data-theme-set");
-                        setTheme(theme);
-                        localStorage.setItem(themeKey, theme);
-                    });
-                });
+            function postForm(url, values) {
+                var form = new URLSearchParams(values);
+                return fetch(url, {
+                    method: "POST", credentials: "same-origin",
+                    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+                    body: form.toString()
+                }).then(function (r) { return r.json(); });
             }
 
             var profileButton = qs("#profileMenuButton");
@@ -372,47 +352,33 @@
             }
 
             if (profileButton && profileMenu) {
-                profileButton.addEventListener("click", function (event) {
-                    event.stopPropagation();
-                    var isHidden = profileMenu.hidden;
-                    profileMenu.hidden = !isHidden;
-                    profileButton.setAttribute("aria-expanded", String(isHidden));
+                profileButton.addEventListener("click", function (e) {
+                    e.stopPropagation();
+                    profileMenu.hidden = !profileMenu.hidden;
+                    profileButton.setAttribute("aria-expanded", String(!profileMenu.hidden));
                 });
             }
 
             if (qs("#openAccountSettings")) {
-                qs("#openAccountSettings").addEventListener("click", function () {
-                    closeMenu();
-                    settingsDialog.showModal();
-                });
+                qs("#openAccountSettings").addEventListener("click", function () { closeMenu(); settingsDialog.showModal(); });
             }
-
             if (qs("#cancelAccountSettings")) {
-                qs("#cancelAccountSettings").addEventListener("click", function () {
-                    settingsDialog.close();
-                });
+                qs("#cancelAccountSettings").addEventListener("click", function () { settingsDialog.close(); });
             }
 
-            // Share button wiring: opens the drop settings page in the browser
-            document.addEventListener("click", function (event) {
-                var shareBtn = event.target.closest("[data-share]");
+            document.addEventListener("click", function (e) {
+                var shareBtn = e.target.closest("[data-share]");
                 if (shareBtn) {
-                    event.preventDefault();
+                    e.preventDefault();
                     var dropName = shareBtn.getAttribute("data-share");
                     var currentUser = "{{.Name}}";
-                    if (currentUser && dropName) {
-                        window.location.href = "/browse/" + encodeURIComponent(currentUser) + "/" + encodeURIComponent(dropName);
-                    }
+                    if (currentUser && dropName) window.location.href = "/browse/" + encodeURIComponent(currentUser) + "/" + encodeURIComponent(dropName);
                     return;
                 }
-                if (profileMenu && !profileMenu.hidden && !event.target.closest(".profile-menu")) closeMenu();
+                if (profileMenu && !profileMenu.hidden && !e.target.closest(".profile-menu")) closeMenu();
             });
 
-            document.addEventListener("keydown", function (event) {
-                if (event.key === "Escape") {
-                    closeMenu();
-                }
-            });
+            document.addEventListener("keydown", function (e) { if (e.key === "Escape") closeMenu(); });
 
             qsa("[data-tab-target='contactsPanel']").forEach(function (button) {
                 button.addEventListener("click", function () {
@@ -423,375 +389,230 @@
                 });
             });
 
-            function postForm(url, values) {
-                var form = new URLSearchParams(values);
-                return fetch(url, {
-                    method: "POST",
-                    credentials: "same-origin",
-                    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-                    body: form.toString()
-                }).then(function (response) { return response.json(); });
-            }
+            qsa("[data-contact-action]").forEach(function (button) {
+                button.addEventListener("click", function () {
+                    var card = button.closest("[data-request-id]");
+                    postForm("/contacts/respond", { id: card.getAttribute("data-request-id"), action: button.getAttribute("data-contact-action") }).then(function () { window.location.reload(); });
+                });
+            });
 
-            // ── Pagination helper ──────────────────────────────────────────
-            function paginate(items, containerId, perPage, renderFn) {
-                var container = qs("#" + containerId);
-                if (!container) return;
-                var page = 0;
-                var totalPages = Math.max(1, Math.ceil(items.length / perPage));
-
-                function render() {
-                    container.innerHTML = "";
-                    var start = page * perPage;
-                    var end = start + perPage;
-                    var visibleItems = items.slice(start, end);
-
-                    visibleItems.forEach(function (item, idx) {
-                        renderFn(item, start + idx, container);
-                    });
-
-                    if (totalPages <= 1) return;
-
-                    var controls = document.createElement("div");
-                    controls.className = "pagination-inner";
-
-                    var prevBtn = document.createElement("button");
-                    prevBtn.type = "button";
-                    prevBtn.className = "pagination-btn";
-                    prevBtn.textContent = "\u2190 Prev";
-                    prevBtn.disabled = page === 0;
-                    prevBtn.addEventListener("click", function () { page--; render(); });
-
-                    var info = document.createElement("span");
-                    info.className = "pagination-info";
-                    info.textContent = "Page " + (page + 1) + " of " + totalPages;
-
-                    var nextBtn = document.createElement("button");
-                    nextBtn.type = "button";
-                    nextBtn.className = "pagination-btn";
-                    nextBtn.textContent = "Next \u2192";
-                    nextBtn.disabled = page >= totalPages - 1;
-                    nextBtn.addEventListener("click", function () { page++; render(); });
-
-                    controls.appendChild(prevBtn);
-                    controls.appendChild(info);
-                    controls.appendChild(nextBtn);
-                    container.appendChild(controls);
-                }
-
-                render();
-            }
-
-            // ── Cancel outgoing contact request ───────────────────────────
-            document.addEventListener("click", function (event) {
-                var btn = event.target.closest("[data-cancel-request]");
+            document.addEventListener("click", function (e) {
+                var btn = e.target.closest("[data-cancel-request]");
                 if (!btn) return;
                 var recipient = btn.getAttribute("data-cancel-request");
                 btn.disabled = true;
                 btn.textContent = "Canceling...";
                 postForm("/contacts/cancel", { recipient: recipient }).then(function (resp) {
-                    if (resp && resp.success) {
-                        var card = btn.closest(".contact-card");
-                        if (card) card.remove();
-                    } else {
-                        btn.textContent = "Failed";
-                        btn.disabled = false;
-                    }
-                }).catch(function () {
-                    btn.textContent = "Failed";
-                    btn.disabled = false;
-                });
+                    if (resp && resp.success) { window.location.reload(); } else { btn.textContent = "Failed"; btn.disabled = false; }
+                }).catch(function () { btn.textContent = "Failed"; btn.disabled = false; });
             });
 
-            // ── Respond to incoming contact request ───────────────────────
-            function respondToContact(id, action) {
-                postForm("/contacts/respond", { id: id, action: action }).then(function () {
-                    window.location.reload();
-                });
+            document.addEventListener("click", function (e) {
+                var btn = e.target.closest("[data-remove-contact]");
+                if (!btn) return;
+                var contactName = btn.getAttribute("data-remove-contact");
+                btn.disabled = true;
+                btn.textContent = "Removing...";
+                postForm("/contacts/remove", { contact: contactName }).then(function (resp) {
+                    if (resp && resp.success) { window.location.reload(); } else { btn.textContent = "Failed"; btn.disabled = false; }
+                }).catch(function () { btn.textContent = "Failed"; btn.disabled = false; });
+            });
+
+            function renderPagination(container, page, totalPages, onChange) {
+                if (!container) return;
+                container.innerHTML = "";
+                if (totalPages <= 1) return;
+                var inner = document.createElement("div");
+                inner.className = "pagination-inner";
+                var prev = document.createElement("button");
+                prev.type = "button"; prev.className = "pagination-btn"; prev.textContent = "\u2190 Prev";
+                prev.disabled = page === 0;
+                prev.addEventListener("click", function () { onChange(page - 1); });
+                var info = document.createElement("span");
+                info.className = "pagination-info";
+                info.textContent = "Page " + (page + 1) + " of " + totalPages;
+                var next = document.createElement("button");
+                next.type = "button"; next.className = "pagination-btn"; next.textContent = "Next \u2192";
+                next.disabled = page >= totalPages - 1;
+                next.addEventListener("click", function () { onChange(page + 1); });
+                inner.appendChild(prev); inner.appendChild(info); inner.appendChild(next);
+                container.appendChild(inner);
             }
 
-            qsa("[data-contact-action]").forEach(function (button) {
-                button.addEventListener("click", function () {
-                    var card = button.closest("[data-request-id]");
-                    respondToContact(card.getAttribute("data-request-id"), button.getAttribute("data-contact-action"));
-                });
-            });
-
-            // ── Find People (Community) ───────────────────────────────────
-            var communityFocusedIdx = -1;
+            var communityPage = 0;
+            var communityData = [];
 
             function loadCommunity() {
                 if (!communityResults) return;
                 var query = communitySearch ? communitySearch.value : "";
                 communityResults.innerHTML = '<div class="small-muted">Loading people...</div>';
-                communityFocusedIdx = -1;
+                communityPage = 0;
 
                 fetch("/api/community?q=" + encodeURIComponent(query), { credentials: "same-origin" })
-                    .then(function (response) { return response.json(); })
+                    .then(function (r) { return r.json(); })
                     .then(function (data) {
-                        communityResults.innerHTML = "";
-                        if (!data.success || !Array.isArray(data.users) || data.users.length === 0) {
-                            communityResults.innerHTML = '<div class="empty-state"><strong>No people found.</strong><span>Try a different search.</span></div>';
-                            qs("#communityPagination").innerHTML = "";
-                            updateStats();
-                            return;
-                        }
-
-                        paginate(data.users, "communityPagination", ITEMS_PER_PAGE, function (user) {
-                            var row = document.createElement("div");
-                            row.className = "community-card contact-card";
-                            row.setAttribute("data-searchable", [user.name, user.bio, user.status].join(" "));
-                            row.setAttribute("tabindex", "-1");
-
-                            var status = user.status || "";
-                            var action;
-
-                            if (status === "pending") {
-                                action = document.createElement("span");
-                                action.className = "status-pill";
-                                action.textContent = "Pending";
-                            } else if (status === "accepted") {
-                                action = document.createElement("span");
-                                action.className = "status-pill";
-                                action.textContent = "Contact";
-                            } else {
-                                action = document.createElement("button");
-                                action.type = "button";
-                                action.className = "button-link small";
-                                action.setAttribute("data-request-contact", user.name);
-                                action.textContent = "Add Contact";
-                            }
-
-                            var person = document.createElement("div");
-                            person.className = "community-person";
-
-                            var img = document.createElement("img");
-                            img.src = user.pfp || "/pfp/default.png";
-                            img.alt = "";
-
-                            var text = document.createElement("div");
-                            var name = document.createElement("strong");
-                            name.textContent = user.name;
-                            var bio = document.createElement("span");
-                            bio.textContent = user.bio || "InkDrop user";
-
-                            text.appendChild(name);
-                            text.appendChild(bio);
-                            person.appendChild(img);
-                            person.appendChild(text);
-                            row.appendChild(person);
-                            row.appendChild(action);
-                            communityResults.appendChild(row);
-                        });
-
-                        // Wire up add-contact buttons
-                        var resultButtons = qsa("[data-request-contact]", communityResults);
-                        resultButtons.forEach(function (button) {
-                            button.addEventListener("click", function () {
-                                var userName = button.getAttribute("data-request-contact");
-                                button.disabled = true;
-                                button.textContent = "Sending...";
-                                postForm("/contacts/request", { recipient: userName }).then(function (resp) {
-                                    if (resp && resp.success) {
-                                        button.textContent = "Sent!";
-                                        window.setTimeout(function () { button.textContent = "Sent"; }, 2000);
-                                    } else {
-                                        button.textContent = "Failed";
-                                        button.disabled = false;
-                                    }
-                                }).catch(function () {
-                                    button.textContent = "Failed";
-                                    button.disabled = false;
-                                });
-                            });
-                        });
-
-                        filterPage();
-                        updateStats();
+                        communityData = (data.success && Array.isArray(data.users)) ? data.users : [];
+                        renderCommunityPage();
                     })
                     .catch(function () {
-                        communityResults.innerHTML = '<div class="empty-state"><strong>Could not load people.</strong><span>Please try again.</span></div>';
+                        communityResults.innerHTML = '<div class="empty-state"><strong>Could not load people.</strong></div>';
+                        qs("#communityPagination").innerHTML = "";
                     });
+            }
+
+            function renderCommunityPage() {
+                communityResults.innerHTML = "";
+                if (communityData.length === 0) {
+                    communityResults.innerHTML = '<div class="empty-state"><strong>No people found.</strong><span>Try a different search.</span></div>';
+                    qs("#communityPagination").innerHTML = "";
+                    return;
+                }
+                var start = communityPage * ITEMS_PER_PAGE;
+                var pageItems = communityData.slice(start, start + ITEMS_PER_PAGE);
+
+                pageItems.forEach(function (user) {
+                    var row = document.createElement("div");
+                    row.className = "community-card contact-card";
+                    var status = user.status || "";
+                    var action;
+                    if (status === "pending") { action = document.createElement("span"); action.className = "status-pill"; action.textContent = "Pending"; }
+                    else if (status === "accepted") { action = document.createElement("span"); action.className = "status-pill"; action.textContent = "Contact"; }
+                    else { action = document.createElement("button"); action.type = "button"; action.className = "button-link small"; action.setAttribute("data-request-contact", user.name); action.textContent = "Add Contact"; }
+                    var person = document.createElement("div"); person.className = "community-person";
+                    var img = document.createElement("img"); img.src = user.pfp || "/pfp/default.png"; img.alt = "";
+                    var text = document.createElement("div");
+                    var name = document.createElement("strong"); name.textContent = user.name;
+                    var bio = document.createElement("span"); bio.textContent = user.bio || "InkDrop user";
+                    text.appendChild(name); text.appendChild(bio);
+                    person.appendChild(img); person.appendChild(text);
+                    row.appendChild(person); row.appendChild(action);
+                    communityResults.appendChild(row);
+                });
+
+                qsa("[data-request-contact]", communityResults).forEach(function (btn) {
+                    btn.addEventListener("click", function () {
+                        var userName = btn.getAttribute("data-request-contact");
+                        btn.disabled = true; btn.textContent = "Sending...";
+                        postForm("/contacts/request", { recipient: userName }).then(function (resp) {
+                            if (resp && resp.success) { btn.textContent = "Sent!"; setTimeout(function () { btn.textContent = "Sent"; }, 2000); }
+                            else { btn.textContent = "Failed"; btn.disabled = false; }
+                        }).catch(function () { btn.textContent = "Failed"; btn.disabled = false; });
+                    });
+                });
+
+                var totalPages = Math.ceil(communityData.length / ITEMS_PER_PAGE);
+                renderPagination(qs("#communityPagination"), communityPage, totalPages, function (p) { communityPage = p; renderCommunityPage(); });
             }
 
             if (communitySearch) {
                 communitySearch.addEventListener("input", function () {
-                    window.clearTimeout(communitySearch._timer);
-                    communitySearch._timer = window.setTimeout(loadCommunity, 180);
-                });
-
-                communitySearch.addEventListener("keydown", function (e) {
-                    var items = qsa(".community-card", communityResults);
-                    if (items.length === 0) return;
-                    if (e.key === "ArrowDown") {
-                        e.preventDefault();
-                        communityFocusedIdx = Math.min(communityFocusedIdx + 1, items.length - 1);
-                        items[communityFocusedIdx].focus();
-                        items[communityFocusedIdx].scrollIntoView({ block: "nearest" });
-                    } else if (e.key === "ArrowUp") {
-                        e.preventDefault();
-                        communityFocusedIdx = Math.max(communityFocusedIdx - 1, 0);
-                        items[communityFocusedIdx].focus();
-                        items[communityFocusedIdx].scrollIntoView({ block: "nearest" });
-                    }
+                    clearTimeout(communitySearch._timer);
+                    communitySearch._timer = setTimeout(loadCommunity, 180);
                 });
             }
 
-            // ── My Contacts ───────────────────────────────────────────────
+            var contactsData = [];
+            var contactsPage = 0;
+
             function loadMyContacts() {
                 var listContainer = qs("#myContactsList");
                 if (!listContainer) return;
-
                 fetch("/api/contacts", { credentials: "same-origin" })
                     .then(function (r) { return r.json(); })
                     .then(function (data) {
-                        listContainer.innerHTML = "";
-                        if (!data.success || !Array.isArray(data.contacts) || data.contacts.length === 0) {
-                            listContainer.innerHTML = '<div class="empty-state"><strong>No contacts yet.</strong><span>Add people from Find People.</span></div>';
-                            qs("#contactsPagination").innerHTML = "";
-                            return;
-                        }
-
-                        paginate(data.contacts, "contactsPagination", ITEMS_PER_PAGE, function (contactName) {
-                            var card = document.createElement("div");
-                            card.className = "contact-card";
-
-                            var row = document.createElement("div");
-                            row.className = "contact-row";
-
-                            var img = document.createElement("img");
-                            img.className = "avatar";
-                            img.src = "/pfp/default.png";
-                            img.alt = "";
-
-                            var info = document.createElement("div");
-                            info.className = "contact-info";
-
-                            var nameDiv = document.createElement("div");
-                            nameDiv.className = "contact-name";
-                            nameDiv.textContent = contactName;
-
-                            info.appendChild(nameDiv);
-                            row.appendChild(img);
-                            row.appendChild(info);
-
-                            var actions = document.createElement("div");
-                            actions.className = "contact-actions";
-
-                            var removeBtn = document.createElement("button");
-                            removeBtn.type = "button";
-                            removeBtn.className = "button-link small danger";
-                            removeBtn.setAttribute("data-remove-contact", contactName);
-                            removeBtn.textContent = "Remove";
-
-                            actions.appendChild(removeBtn);
-                            card.appendChild(row);
-                            card.appendChild(actions);
-                            listContainer.appendChild(card);
-                        });
-
-                        // Wire up remove buttons
-                        qsa("[data-remove-contact]", listContainer).forEach(function (btn) {
-                            btn.addEventListener("click", function () {
-                                var contactName = btn.getAttribute("data-remove-contact");
-                                btn.disabled = true;
-                                btn.textContent = "Removing...";
-                                postForm("/contacts/remove", { contact: contactName }).then(function (resp) {
-                                    if (resp && resp.success) {
-                                        btn.textContent = "Removed";
-                                        var card = btn.closest(".contact-card");
-                                        if (card) {
-                                            card.style.opacity = "0.5";
-                                            window.setTimeout(function () { loadMyContacts(); }, 500);
-                                        }
-                                    } else {
-                                        btn.textContent = "Failed";
-                                        btn.disabled = false;
-                                    }
-                                }).catch(function () {
-                                    btn.textContent = "Failed";
-                                    btn.disabled = false;
-                                });
-                            });
-                        });
+                        contactsData = (data.success && Array.isArray(data.contacts)) ? data.contacts : [];
+                        contactsPage = 0;
+                        renderContactsPage();
                     })
-                    .catch(function () {
-                        listContainer.innerHTML = '<div class="empty-state"><strong>Could not load contacts.</strong></div>';
-                    });
+                    .catch(function () { listContainer.innerHTML = '<div class="empty-state"><strong>Could not load contacts.</strong></div>'; });
             }
 
-            // ── Drops list pagination ─────────────────────────────────────
+            function renderContactsPage() {
+                var listContainer = qs("#myContactsList");
+                if (!listContainer) return;
+                listContainer.innerHTML = "";
+                if (contactsData.length === 0) {
+                    listContainer.innerHTML = '<div class="empty-state"><strong>No contacts yet.</strong><span>Add people from Find People.</span></div>';
+                    qs("#contactsPagination").innerHTML = "";
+                    return;
+                }
+                var start = contactsPage * ITEMS_PER_PAGE;
+                var pageItems = contactsData.slice(start, start + ITEMS_PER_PAGE);
+                pageItems.forEach(function (contactName) {
+                    var card = document.createElement("div"); card.className = "contact-card";
+                    var row = document.createElement("div"); row.className = "contact-row";
+                    var img = document.createElement("img"); img.className = "avatar"; img.src = "/pfp/default.png"; img.alt = "";
+                    var info = document.createElement("div"); info.className = "contact-info";
+                    var nameDiv = document.createElement("div"); nameDiv.className = "contact-name"; nameDiv.textContent = contactName;
+                    info.appendChild(nameDiv); row.appendChild(img); row.appendChild(info);
+                    var actions = document.createElement("div"); actions.className = "contact-actions";
+                    var removeBtn = document.createElement("button"); removeBtn.type = "button"; removeBtn.className = "button-link small danger";
+                    removeBtn.setAttribute("data-remove-contact", contactName); removeBtn.textContent = "Remove";
+                    actions.appendChild(removeBtn);
+                    card.appendChild(row); card.appendChild(actions);
+                    listContainer.appendChild(card);
+                });
+                var totalPages = Math.ceil(contactsData.length / ITEMS_PER_PAGE);
+                renderPagination(qs("#contactsPagination"), contactsPage, totalPages, function (p) { contactsPage = p; renderContactsPage(); });
+            }
+
+            var outgoingPage = 0;
+            var outgoingSection = qs("#outgoingRequestsSection");
+
+            function initOutgoingPagination() {
+                if (!outgoingSection) return;
+                var cards = qsa(".outgoing-card", outgoingSection);
+                if (cards.length === 0) { qs("#outgoingPagination").innerHTML = ""; return; }
+                renderOutgoingPage();
+            }
+
+            function renderOutgoingPage() {
+                if (!outgoingSection) return;
+                var cards = qsa(".outgoing-card", outgoingSection);
+                if (cards.length === 0) { qs("#outgoingPagination").innerHTML = ""; return; }
+                var totalPages = Math.ceil(cards.length / ITEMS_PER_PAGE);
+                if (outgoingPage >= totalPages) outgoingPage = totalPages - 1;
+                cards.forEach(function (c) { c.style.display = "none"; });
+                var start = outgoingPage * ITEMS_PER_PAGE;
+                for (var i = start; i < start + ITEMS_PER_PAGE && i < cards.length; i++) { cards[i].style.display = ""; }
+                renderPagination(qs("#outgoingPagination"), outgoingPage, totalPages, function (p) { outgoingPage = p; renderOutgoingPage(); });
+            }
+
+            var dropPage = 0;
+            var dropPaginationDiv;
+
             function initDropPagination() {
                 var rows = qsa(".drop-row");
                 if (rows.length === 0) return;
-
-                var dropListEl = qs("#dropList");
-                var emptyState = qs("#serverEmptyState");
-
-                // Wrap drop rows in a pagination container
-                var paginationDiv = document.createElement("div");
-                paginationDiv.id = "dropPagination";
-                paginationDiv.className = "pagination-controls";
-                dropListEl.parentNode.insertBefore(paginationDiv, dropListEl.nextSibling);
-
-                // Track all rows and manage visibility
-                var allRows = rows.slice();
-                var page = 0;
-                var totalPages = Math.max(1, Math.ceil(allRows.length / ITEMS_PER_PAGE));
-
-                function renderDropPage() {
-                    allRows.forEach(function (row) { row.style.display = "none"; });
-                    var start = page * ITEMS_PER_PAGE;
-                    var end = start + ITEMS_PER_PAGE;
-                    for (var i = start; i < end && i < allRows.length; i++) {
-                        allRows[i].style.display = "grid";
-                    }
-
-                    // Update footer
-                    if (footerNote) {
-                        footerNote.textContent = "Showing " + Math.min(end, allRows.length) + " of " + allRows.length + " Drops";
-                    }
-
-                    // Render pagination controls
-                    paginationDiv.innerHTML = "";
-                    if (totalPages <= 1) return;
-
-                    var inner = document.createElement("div");
-                    inner.className = "pagination-inner";
-
-                    var prevBtn = document.createElement("button");
-                    prevBtn.type = "button";
-                    prevBtn.className = "pagination-btn";
-                    prevBtn.textContent = "\u2190 Prev";
-                    prevBtn.disabled = page === 0;
-                    prevBtn.addEventListener("click", function () { page--; renderDropPage(); });
-
-                    var info = document.createElement("span");
-                    info.className = "pagination-info";
-                    info.textContent = "Page " + (page + 1) + " of " + totalPages;
-
-                    var nextBtn = document.createElement("button");
-                    nextBtn.type = "button";
-                    nextBtn.className = "pagination-btn";
-                    nextBtn.textContent = "Next \u2192";
-                    nextBtn.disabled = page >= totalPages - 1;
-                    nextBtn.addEventListener("click", function () { page++; renderDropPage(); });
-
-                    inner.appendChild(prevBtn);
-                    inner.appendChild(info);
-                    inner.appendChild(nextBtn);
-                    paginationDiv.appendChild(inner);
-                }
-
+                dropPaginationDiv = qs("#dropPagination");
                 renderDropPage();
             }
 
-            // ── Stats & Filter ────────────────────────────────────────────
+            function renderDropPage() {
+                var rows = qsa(".drop-row");
+                if (rows.length === 0) return;
+                var totalPages = Math.ceil(rows.length / ITEMS_PER_PAGE);
+                if (dropPage >= totalPages) dropPage = totalPages - 1;
+                if (dropPage < 0) dropPage = 0;
+
+                rows.forEach(function (row) { row.style.display = "none"; });
+                var start = dropPage * ITEMS_PER_PAGE;
+                var end = start + ITEMS_PER_PAGE;
+                var visibleCount = 0;
+                for (var i = 0; i < rows.length; i++) {
+                    var isMatch = rows[i].style.display !== "none" || !rows[i].getAttribute("_filtered");
+                    if (isMatch) {
+                        if (visibleCount >= start && visibleCount < end) { rows[i].style.display = "grid"; }
+                        visibleCount++;
+                    }
+                }
+                if (footerNote) footerNote.textContent = "Showing " + Math.min(end, visibleCount) + " of " + visibleCount + " Drops";
+                renderPagination(dropPaginationDiv, dropPage, totalPages, function (p) { dropPage = p; renderDropPage(); });
+            }
+
             function updateStats() {
                 var rows = qsa(".drop-row");
-                var sharedRows = rows.filter(function (row) {
-                    return (row.getAttribute("data-filter") || "").indexOf("shared") !== -1;
-                });
+                var sharedRows = rows.filter(function (r) { return (r.getAttribute("data-filter") || "").indexOf("shared") !== -1; });
                 if (qs("#dropCount")) qs("#dropCount").textContent = rows.length;
                 if (qs("#sharedCount")) qs("#sharedCount").textContent = sharedRows.length;
             }
@@ -803,17 +624,10 @@
 
                 rows.forEach(function (row) {
                     var name = (row.getAttribute("data-name") || row.textContent || "").toLowerCase();
-                    var searchMatch = !searchValue || name.indexOf(searchValue) !== -1;
-                    if (!searchMatch) {
-                        row.style.display = "none";
-                    } else {
-                        visibleCount++;
-                    }
-                });
-
-                qsa("[data-searchable]").forEach(function (item) {
-                    var text = (item.getAttribute("data-searchable") || item.textContent || "").toLowerCase();
-                    item.style.display = !searchValue || text.indexOf(searchValue) !== -1 ? "" : "none";
+                    var match = !searchValue || name.indexOf(searchValue) !== -1;
+                    row.setAttribute("_filtered", match ? "0" : "1");
+                    row.style.display = match ? "" : "none";
+                    if (match) visibleCount++;
                 });
 
                 if (clientEmptyState && dropList) {
@@ -824,31 +638,22 @@
                     if (serverEmpty && !hasRows) clientEmptyState.classList.add("hidden-empty");
                 }
 
-                if (footerNote) footerNote.textContent = "Showing " + visibleCount + " of " + rows.length + " Drops";
+                dropPage = 0;
+                renderDropPage();
                 updateStats();
             }
 
             if (globalSearch) globalSearch.addEventListener("input", filterPage);
 
-            // ── Misc UI ───────────────────────────────────────────────────
             function pulseCreateArea() {
-                if (createWrap) {
-                    createWrap.classList.add("is-highlighted");
-                    window.setTimeout(function () { createWrap.classList.remove("is-highlighted"); }, 1500);
-                }
-                if (fabNewDrop) {
-                    fabNewDrop.classList.add("is-glowing");
-                    window.setTimeout(function () { fabNewDrop.classList.remove("is-glowing"); }, 1200);
-                }
+                if (createWrap) { createWrap.classList.add("is-highlighted"); setTimeout(function () { createWrap.classList.remove("is-highlighted"); }, 1500); }
+                if (fabNewDrop) { fabNewDrop.classList.add("is-glowing"); setTimeout(function () { fabNewDrop.classList.remove("is-glowing"); }, 1200); }
             }
 
             function focusNewDrop() {
-                if (!reponame) {
-                    window.location.href = "/";
-                    return;
-                }
+                if (!reponame) { window.location.href = "/"; return; }
                 reponame.scrollIntoView({ behavior: "smooth", block: "center" });
-                window.setTimeout(function () { reponame.focus(); }, 260);
+                setTimeout(function () { reponame.focus(); }, 260);
                 pulseCreateArea();
             }
 
@@ -857,28 +662,16 @@
                 var name = reponame.value.trim();
                 if (!name) return;
                 try { sessionStorage.setItem("inkdrop-recent-drop", name.toLowerCase()); } catch (e) {}
-                if (createButton) {
-                    createButton.classList.add("is-loading");
-                    createButton.setAttribute("aria-busy", "true");
-                }
+                if (createButton) { createButton.classList.add("is-loading"); createButton.setAttribute("aria-busy", "true"); }
             }
 
             function revealRecentDrop() {
                 var name = "";
                 try { name = sessionStorage.getItem("inkdrop-recent-drop") || ""; } catch (e) {}
                 if (!name) return;
-
                 var rows = qsa(".drop-row");
-                var target = rows.find(function (row) {
-                    return (row.getAttribute("data-name") || "").toLowerCase() === name;
-                }) || rows[0];
-
-                if (target) {
-                    target.classList.add("drop-created");
-                    target.scrollIntoView({ behavior: "smooth", block: "center" });
-                    window.setTimeout(function () { target.classList.remove("drop-created"); }, 1900);
-                }
-
+                var target = rows.find(function (r) { return (r.getAttribute("data-name") || "").toLowerCase() === name; }) || rows[0];
+                if (target) { target.classList.add("drop-created"); target.scrollIntoView({ behavior: "smooth", block: "center" }); setTimeout(function () { target.classList.remove("drop-created"); }, 1900); }
                 try { sessionStorage.removeItem("inkdrop-recent-drop"); } catch (e) {}
             }
 
@@ -887,27 +680,35 @@
             if (quickNewDrop) quickNewDrop.addEventListener("click", focusNewDrop);
 
             if (window.location.hash === "#contacts") {
-                var contactsPanel = qs("#contactsPanel");
-                if (contactsPanel) contactsPanel.scrollIntoView({ behavior: "smooth", block: "start" });
+                var cp = qs("#contactsPanel");
+                if (cp) cp.scrollIntoView({ behavior: "smooth", block: "start" });
             }
 
-            if (document.readyState === "loading") {
-                document.addEventListener("DOMContentLoaded", function () {
-                    initTheme();
-                    loadCommunity();
-                    loadMyContacts();
-                    filterPage();
-                    initDropPagination();
-                    revealRecentDrop();
+            function init() {
+                var themeKey = "inkdrop-theme";
+                function setTheme(v) {
+                    document.documentElement.setAttribute("data-theme", v);
+                    var ts = qs(".theme-switch");
+                    if (ts) ts.classList.toggle("is-dark", v === "dark");
+                    qsa("[data-theme-set]").forEach(function (b) { b.setAttribute("aria-pressed", String(b.getAttribute("data-theme-set") === v)); });
+                }
+                var stored = localStorage.getItem(themeKey);
+                var theme = (stored === "dark" || stored === "light") ? stored : (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+                setTheme(theme);
+                qsa("[data-theme-set]").forEach(function (b) {
+                    b.type = "button";
+                    b.addEventListener("click", function () { var t = b.getAttribute("data-theme-set"); setTheme(t); localStorage.setItem(themeKey, t); });
                 });
-            } else {
-                initTheme();
+
                 loadCommunity();
                 loadMyContacts();
+                initOutgoingPagination();
                 filterPage();
                 initDropPagination();
                 revealRecentDrop();
             }
+
+            if (document.readyState === "loading") { document.addEventListener("DOMContentLoaded", init); } else { init(); }
         })();
     </script>
 </body>

@@ -355,7 +355,8 @@
                     <path d="M21 21l-4.3-4.3"></path>
                 </svg>
                 <input id="globalSearch" class="global-search" type="search"
-                    aria-label="Search files" autocomplete="off" />
+                    aria-label="Search files" autocomplete="off"
+                    placeholder="Search files..." title="Search files in this Drop" />
             </div>
 
             <div class="topbar-right">
@@ -391,18 +392,6 @@
                     <a class="left-panel-tab" href="/browse/{{.Message2}}/{{.Message3}}/Trash">Trash</a>
                     <button type="button" class="left-panel-tab" id="openCommunityPanel">Community</button>
                 </nav>
-                <div class="left-panel-section">
-                    <h2>Contacts</h2>
-                    <div class="left-repo-list">
-                        {{if .AcceptedContacts}}
-                        {{range $i, $contact := .AcceptedContacts}}
-                        <span>{{$contact}}</span>
-                        {{end}}
-                        {{else}}
-                        <p class="subtle">No contacts yet.</p>
-                        {{end}}
-                    </div>
-                </div>
             </aside>
             <div class="repo-workspace">
         <section class="shell stack-lg">
