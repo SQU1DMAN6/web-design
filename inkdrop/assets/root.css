@@ -1150,7 +1150,7 @@ h2.section,
 /* ===== FAB (Floating Action Button) ===== */
 .fab {
     position: fixed;
-    right: 24px;
+    left: 24px;
     bottom: 24px;
     height: 52px;
     border: 0;
