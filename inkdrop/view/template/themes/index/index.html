@@ -581,32 +581,37 @@
             var dropPage = 0;
             var dropPaginationDiv;
 
+            function getMatchingDropRows() {
+                return qsa(".drop-row").filter(function (row) {
+                    return !row.hasAttribute("_excluded");
+                });
+            }
+
             function initDropPagination() {
-                var rows = qsa(".drop-row");
-                if (rows.length === 0) return;
                 dropPaginationDiv = qs("#dropPagination");
+                if (qsa(".drop-row").length === 0) return;
                 renderDropPage();
             }
 
             function renderDropPage() {
-                var rows = qsa(".drop-row");
-                if (rows.length === 0) return;
-                var totalPages = Math.ceil(rows.length / ITEMS_PER_PAGE);
+                var matching = getMatchingDropRows();
+                var totalPages = Math.max(1, Math.ceil(matching.length / ITEMS_PER_PAGE));
                 if (dropPage >= totalPages) dropPage = totalPages - 1;
                 if (dropPage < 0) dropPage = 0;
 
-                rows.forEach(function (row) { row.style.display = "none"; });
+                qsa(".drop-row").forEach(function (row) { row.style.display = "none"; });
                 var start = dropPage * ITEMS_PER_PAGE;
-                var end = start + ITEMS_PER_PAGE;
-                var visibleCount = 0;
-                for (var i = 0; i < rows.length; i++) {
-                    var isMatch = rows[i].style.display !== "none" || !rows[i].getAttribute("_filtered");
-                    if (isMatch) {
-                        if (visibleCount >= start && visibleCount < end) { rows[i].style.display = "grid"; }
-                        visibleCount++;
-                    }
+                for (var i = start; i < start + ITEMS_PER_PAGE && i < matching.length; i++) {
+                    matching[i].style.display = "grid";
                 }
-                if (footerNote) footerNote.textContent = "Showing " + Math.min(end, visibleCount) + " of " + visibleCount + " Drops";
+
+                var allRows = qsa(".drop-row");
+                var emptyState = qs("#serverEmptyState");
+                if (clientEmptyState) clientEmptyState.classList.add("hidden-empty");
+                if (dropList) dropList.style.display = (allRows.length > 0 || matching.length > 0) ? "" : "none";
+                if (emptyState && allRows.length === 0) clientEmptyState.classList.remove("hidden-empty");
+
+                if (footerNote) footerNote.textContent = "Showing " + matching.length + " of " + allRows.length + " Drops";
                 renderPagination(dropPaginationDiv, dropPage, totalPages, function (p) { dropPage = p; renderDropPage(); });
             }
 
@@ -620,22 +625,20 @@
             function filterPage() {
                 var searchValue = (globalSearch && globalSearch.value || "").toLowerCase().trim();
                 var rows = qsa(".drop-row");
-                var visibleCount = 0;
+                var matchCount = 0;
 
                 rows.forEach(function (row) {
                     var name = (row.getAttribute("data-name") || row.textContent || "").toLowerCase();
                     var match = !searchValue || name.indexOf(searchValue) !== -1;
-                    row.setAttribute("_filtered", match ? "0" : "1");
-                    row.style.display = match ? "" : "none";
-                    if (match) visibleCount++;
+                    if (match) { row.removeAttribute("_excluded"); matchCount++; }
+                    else { row.setAttribute("_excluded", "1"); }
                 });
 
                 if (clientEmptyState && dropList) {
                     var serverEmpty = qs("#serverEmptyState");
-                    var hasRows = rows.length > 0;
-                    clientEmptyState.classList.toggle("hidden-empty", !hasRows || visibleCount > 0);
-                    dropList.style.display = hasRows && visibleCount === 0 ? "none" : "";
-                    if (serverEmpty && !hasRows) clientEmptyState.classList.add("hidden-empty");
+                    clientEmptyState.classList.toggle("hidden-empty", rows.length === 0 || matchCount > 0);
+                    dropList.style.display = rows.length > 0 ? "" : "none";
+                    if (serverEmpty && rows.length === 0) clientEmptyState.classList.add("hidden-empty");
                 }
 
                 dropPage = 0;
