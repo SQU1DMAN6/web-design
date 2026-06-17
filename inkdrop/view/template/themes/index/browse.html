@@ -403,8 +403,7 @@
                     <p class="subtle light">Current path: <strong>{{.Message2}}/{{.Message3}}{{.Path}}</strong></p>
                 </div>
                 <div>
-                    <button type="button" class="menu-item settings-trigger small" id="openSettingsBtnMenu" style="width: max-content">Open Settings</button>
-                    <button type="button" class="menu-item settings-trigger small" id="shareBtn" style="width: max-content">Share</button>
+                    <button type="button" class="menu-item settings-trigger small" id="openSettingsBtnMenu" style="width: max-content">Share And Manage Drop</button>
                 </div>
                 {{if .RepoDescription}}
                 <div class="panel stack">
@@ -599,7 +598,7 @@
                         <textarea name="description" rows="3" class="details" style="resize: none; padding: 8px; border-radius: 7px;">{{.RepoDescription}}</textarea>
 
                         <label class="field-label">Owners</label>
-                        <div id="ownersWidget" class="stack">
+                        <div id="osettingsDialogwnersWidget" class="stack">
                             <div id="ownersList" class="owners-list" aria-live="polite" aria-label="Repository owners list">
                                 <!-- owner tokens are rendered by JS -->
                             </div>
@@ -618,6 +617,8 @@
                         <label class="field-label">Public</label>
                         <div>
                             <label><input type="checkbox" name="public" value="1" {{if .RepoPublic}}checked{{end}} /> Allow read access to all users</label>
+                            <br>
+                            <small class="helper">Avoid sharing private data, such as personal information and passwords.</small>
                         </div>
 
                         <input type="hidden" name="repository" value="{{.Message3}}" />
@@ -1940,13 +1941,6 @@
                 openSettingsBtnMenu.addEventListener("click", function () {
                     hideContextMenu();
                     if (settingsDialog) settingsDialog.showModal();
-                });
-            }
-            var shareBtn = document.getElementById("shareBtn");
-            if (shareBtn) {
-                shareBtn.addEventListener("click", function () {
-                    communityDialog.showModal();
-                    loadCommunity();
                 });
             }
             if (uploadFileBtnInline) uploadFileBtnInline.addEventListener("click", openUploadDialog);
