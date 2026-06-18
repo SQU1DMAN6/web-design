@@ -29,13 +29,9 @@ const (
 )
 
 var (
-	// Shared FtR storage root. Override with FTR_ROOT_DIR when needed.
 	GlobalInkDropRootDir = "/srv/ftr"
-
-	// macOS fallback uses the same shared layout by default.
 	GlobalInkDropRootDirMac = "/srv/ftr"
 
-	// Resolved at startup based on OS.
 	RootDir     string
 	DropDir     string
 	DropMetaDir string
@@ -56,7 +52,6 @@ func init() {
 
 	RootDir = filepath.Clean(rootDir)
 	DropDir = filepath.Join(RootDir, "userRepositories")
-	// DropMetaDir stores per-drop metadata (meta.json files)
 	DropMetaDir = filepath.Join(DropDir, "_meta")
 	TempDir = filepath.Join(RootDir, "tmp")
 	SessionDir = filepath.Join(RootDir, "sessions")
@@ -202,9 +197,6 @@ func CreateNewUserDrop(username string, dropname string) error {
 	if err1 != nil || err2 != nil {
 		return fmt.Errorf("%s\n%s", err1, err2)
 	}
-	// Auto-initialise metadata on creation so the drop is NOT world-readable
-	// until the owner explicitly sets permissions. Without this, LoadRepoMeta
-	// returns nil and SearchDrops treats nil-meta drops as public.
 	meta := &RepoMeta{
 		Owners:      []string{username},
 		Description: "",
@@ -217,7 +209,7 @@ func CreateNewUserDrop(username string, dropname string) error {
 }
 
 func CreateNewDirectory(userName, dropName, workingDir, folderName string) error {
-	root := repositoryRoot(userName, dropName)
+	root := RepositoryRoot(userName, dropName)
 	target, err := resolvePathInRepo(root, workingDir, folderName)
 	if err != nil {
 		return err
@@ -226,7 +218,6 @@ func CreateNewDirectory(userName, dropName, workingDir, folderName string) error
 	if err != nil {
 		return err
 	}
-
 	return nil
 }
 
@@ -237,13 +228,11 @@ func ListUserDrops(userName string) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-
 	for _, entry := range entries {
 		if entry.IsDir() {
 			clean = append(clean, entry.Name())
 		}
 	}
-
 	return clean, nil
 }
 
@@ -252,7 +241,6 @@ func SearchDrops(query string, currentUser string) ([]map[string]string, error) 
 	if q == "" {
 		return nil, nil
 	}
-
 	all := q == "/" || q == "*"
 	q = strings.ToLower(q)
 	searchUser := ""
@@ -263,14 +251,11 @@ func SearchDrops(query string, currentUser string) ([]map[string]string, error) 
 		searchDrop = strings.TrimSpace(parts[1])
 		searchDrop = strings.TrimSuffix(searchDrop, "/")
 	}
-
 	var results []map[string]string
-
 	users, err := os.ReadDir(DropDir)
 	if err != nil {
 		return nil, err
 	}
-
 	for _, userDir := range users {
 		if !userDir.IsDir() {
 			continue
@@ -296,7 +281,6 @@ func SearchDrops(query string, currentUser string) ([]map[string]string, error) 
 			if err != nil {
 				continue
 			}
-
 			isPublic := meta != nil && meta.Public
 			isOwnDrop := currentUser != "" && currentUser == userName
 			isShared := false
@@ -311,12 +295,10 @@ func SearchDrops(query string, currentUser string) ([]map[string]string, error) 
 			if !isPublic && !isOwnDrop && !isShared {
 				continue
 			}
-
 			desc := ""
 			if meta != nil {
 				desc = meta.Description
 			}
-
 			matches := all || strings.Contains(strings.ToLower(userName), q) || strings.Contains(strings.ToLower(dropName), q) || strings.Contains(strings.ToLower(desc), q)
 			if searchUser != "" {
 				if searchDrop != "" {
@@ -330,20 +312,15 @@ func SearchDrops(query string, currentUser string) ([]map[string]string, error) 
 			}
 		}
 	}
-
 	return results, nil
 }
 
-// ListPublicDrops returns a list of drops that have their
-// metadata Public flag set. Each item contains 'user', 'repo' and 'description'.
 func ListPublicDrops() ([]map[string]string, error) {
 	var results []map[string]string
-
 	users, err := os.ReadDir(DropDir)
 	if err != nil {
 		return nil, err
 	}
-
 	for _, u := range users {
 		if !u.IsDir() {
 			continue
@@ -373,12 +350,9 @@ func ListPublicDrops() ([]map[string]string, error) {
 			}
 		}
 	}
-
 	return results, nil
 }
 
-// ListSharedDrops returns drops where the given username is
-// listed as an owner in the drop metadata. Returns items with 'user', 'repo', 'description'.
 func ListSharedDrops(username string) ([]map[string]string, error) {
 	var results []map[string]string
 	seen := map[string]bool{}
@@ -391,7 +365,6 @@ func ListSharedDrops(username string) ([]map[string]string, error) {
 	for _, owner := range contactOwners {
 		contactOwnerSet[owner] = true
 	}
-
 	for _, u := range users {
 		if !u.IsDir() {
 			continue
@@ -436,16 +409,14 @@ func ListSharedDrops(username string) ([]map[string]string, error) {
 			}
 		}
 	}
-
 	return results, nil
 }
 
 func ListDropFilesRecursive(userName, dropName string) ([]map[string]interface{}, error) {
-	root := repositoryRoot(userName, dropName)
+	root := RepositoryRoot(userName, dropName)
 	if ok, err := DirExists(root); err != nil || !ok {
 		return nil, fmt.Errorf("drop %s/%s not found", userName, dropName)
 	}
-
 	var files []map[string]interface{}
 	walkErr := filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
@@ -468,16 +439,14 @@ func ListDropFilesRecursive(userName, dropName string) ([]map[string]interface{}
 	if walkErr != nil {
 		return nil, walkErr
 	}
-
 	return files, nil
 }
 
 func ListDropEntriesRecursive(userName, dropName string) ([]map[string]interface{}, error) {
-	root := repositoryRoot(userName, dropName)
+	root := RepositoryRoot(userName, dropName)
 	if ok, err := DirExists(root); err != nil || !ok {
 		return nil, fmt.Errorf("drop %s/%s not found", userName, dropName)
 	}
-
 	var entries []map[string]interface{}
 	walkErr := filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
@@ -515,8 +484,50 @@ func ListDropEntriesRecursive(userName, dropName string) ([]map[string]interface
 	if walkErr != nil {
 		return nil, walkErr
 	}
-
 	return entries, nil
+}
+
+// RepositoryRoot returns the absolute filesystem path for a drop.
+func RepositoryRoot(userName, dropName string) string {
+	return filepath.Clean(filepath.Join(DropDir, userName, dropName))
+}
+
+// StatDropEntry returns metadata for a single file/directory within a drop.
+// Returns nil without error if the path does not exist.
+func StatDropEntry(userName, dropName, itemPath string) (map[string]interface{}, error) {
+	root := RepositoryRoot(userName, dropName)
+	fullPath, err := GetItemPath(userName, dropName, "/", itemPath)
+	if err != nil {
+		return nil, err
+	}
+	info, err := os.Stat(fullPath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	rel, err := filepath.Rel(root, fullPath)
+	if err != nil {
+		return nil, err
+	}
+	kind := "file"
+	if info.IsDir() {
+		kind = "dir"
+	}
+	entry := map[string]interface{}{
+		"path":     filepath.ToSlash(rel),
+		"type":     kind,
+		"size":     info.Size(),
+		"modified": info.ModTime().Unix(),
+		"name":     info.Name(),
+	}
+	if !info.IsDir() {
+		if hash, err := CalculateFileHash(fullPath); err == nil {
+			entry["hash"] = hash
+		}
+	}
+	return entry, nil
 }
 
 func CreateDirectoryAtDropPath(userName, dropName, dropPath string) (string, error) {
@@ -524,13 +535,11 @@ func CreateDirectoryAtDropPath(userName, dropName, dropPath string) (string, err
 	if rawPath == "" || rawPath == "/" {
 		return "", errors.New("invalid directory path")
 	}
-
 	cleanDropPath := normalizeWorkingDir(rawPath)
 	relativePath := strings.TrimPrefix(cleanDropPath, "/")
 	if relativePath == "" {
 		return "", errors.New("invalid directory path")
 	}
-
 	targetPath, err := GetItemPath(userName, dropName, "/", relativePath)
 	if err != nil {
 		return "", err
@@ -547,28 +556,24 @@ func CalculateFileHash(filePath string) (string, error) {
 		return "", err
 	}
 	defer file.Close()
-
 	hasher := sha256.New()
 	if _, err := io.Copy(hasher, file); err != nil {
 		return "", err
 	}
-
 	return hex.EncodeToString(hasher.Sum(nil)), nil
 }
 
 func GetDirectoryListing(userName string, dropName string, path string) ([]string, error) {
-	root := repositoryRoot(userName, dropName)
+	root := RepositoryRoot(userName, dropName)
 	directoryToList, err := resolvePathInRepo(root, path, ".")
 	if err != nil {
 		return nil, err
 	}
-
 	entries, err := os.ReadDir(directoryToList)
 	if err != nil {
 		return nil, err
 	}
 	var clean []string
-
 	for _, entry := range entries {
 		name := entry.Name()
 		if entry.IsDir() {
@@ -576,14 +581,12 @@ func GetDirectoryListing(userName string, dropName string, path string) ([]strin
 		}
 		clean = append(clean, name)
 	}
-
 	sort.Strings(clean)
-
 	return clean, nil
 }
 
 func RenameItem(userName, dropName, workingDir, oldName, newName string) error {
-	root := repositoryRoot(userName, dropName)
+	root := RepositoryRoot(userName, dropName)
 	oldPath, err := resolvePathInRepo(root, workingDir, oldName)
 	if err != nil {
 		return err
@@ -592,28 +595,23 @@ func RenameItem(userName, dropName, workingDir, oldName, newName string) error {
 	if err != nil {
 		return err
 	}
-
 	if oldPath == root || newPath == root {
 		return errors.New("invalid path")
 	}
-
 	if _, err := os.Stat(oldPath); err != nil {
 		return err
 	}
 	if _, err := os.Stat(newPath); err == nil {
 		return nil
 	}
-
 	err = os.MkdirAll(filepath.Dir(newPath), 0755)
 	if err != nil {
 		return err
 	}
-
 	err = os.Rename(oldPath, newPath)
 	if err != nil {
 		return err
 	}
-
 	return nil
 }
 
@@ -621,7 +619,7 @@ func DeleteItem(userName, dropName, workingDir, name string) error {
 	if IsProtectedTrashTarget(workingDir, name) {
 		return errors.New("trash cannot be deleted; empty it instead")
 	}
-	root := repositoryRoot(userName, dropName)
+	root := RepositoryRoot(userName, dropName)
 	target, err := resolvePathInRepo(root, workingDir, name)
 	if err != nil {
 		return err
@@ -629,15 +627,12 @@ func DeleteItem(userName, dropName, workingDir, name string) error {
 	if target == root {
 		return errors.New("cannot delete drop root")
 	}
-
 	if repositoryPathContainsTrash(root, target) {
 		return os.RemoveAll(target)
 	}
-
 	if err := EnsureTrash(userName, dropName); err != nil {
 		return err
 	}
-
 	trashPath, err := nextAvailableTrashPath(root, filepath.Base(target))
 	if err != nil {
 		return err
@@ -648,7 +643,6 @@ func DeleteItem(userName, dropName, workingDir, name string) error {
 	if err := os.Rename(target, trashPath); err != nil {
 		return err
 	}
-
 	infoPath := filepath.Join(root, filepath.FromSlash(TrashInfoPath), filepath.Base(trashPath)+".trashinfo")
 	originalPath := normalizeWorkingDir(filepath.ToSlash(filepath.Join(workingDir, name)))
 	originalPath = strings.TrimPrefix(originalPath, "/")
@@ -656,7 +650,6 @@ func DeleteItem(userName, dropName, workingDir, name string) error {
 	if err := os.WriteFile(infoPath, []byte(trashInfo), 0644); err != nil {
 		return err
 	}
-
 	return nil
 }
 
@@ -710,13 +703,13 @@ func IsProtectedTrashTarget(workingDir, name string) bool {
 }
 
 func HasTrash(userName, dropName string) bool {
-	filesDir := filepath.Join(repositoryRoot(userName, dropName), filepath.FromSlash(TrashFilesPath))
+	filesDir := filepath.Join(RepositoryRoot(userName, dropName), filepath.FromSlash(TrashFilesPath))
 	ok, err := DirExists(filesDir)
 	return err == nil && ok
 }
 
 func EnsureTrash(userName, dropName string) error {
-	root := repositoryRoot(userName, dropName)
+	root := RepositoryRoot(userName, dropName)
 	if ok, err := DirExists(root); err != nil || !ok {
 		return fmt.Errorf("drop %s/%s not found", userName, dropName)
 	}
@@ -727,7 +720,7 @@ func EnsureTrash(userName, dropName string) error {
 }
 
 func EmptyTrash(userName, dropName string) error {
-	root := repositoryRoot(userName, dropName)
+	root := RepositoryRoot(userName, dropName)
 	for _, trashPath := range []string{TrashFilesPath, TrashInfoPath} {
 		target := filepath.Join(root, filepath.FromSlash(trashPath))
 		if !isWithinRoot(root, target) {
@@ -746,8 +739,7 @@ func RestoreTrashItem(userName, dropName, itemName string) (string, error) {
 	if cleanName == "" || cleanName == "." || cleanName == ".." || strings.Contains(cleanName, "../") {
 		return "", errors.New("invalid trash item")
 	}
-
-	root := repositoryRoot(userName, dropName)
+	root := RepositoryRoot(userName, dropName)
 	source, err := resolvePathInRepo(root, "/"+TrashFilesPath, cleanName)
 	if err != nil {
 		return "", err
@@ -758,7 +750,6 @@ func RestoreTrashItem(userName, dropName, itemName string) (string, error) {
 	if _, err := os.Stat(source); err != nil {
 		return "", err
 	}
-
 	originalPath := readTrashOriginalPath(root, cleanName)
 	if originalPath == "" || IsTrashStoragePath(originalPath) {
 		originalPath = "/" + filepath.Base(cleanName)
@@ -842,8 +833,10 @@ func pruneEmptyDirs(start, stop string) error {
 	return nil
 }
 
+// repositoryRoot is a private wrapper kept for internal backward compatibility.
+// New code should use RepositoryRoot instead.
 func repositoryRoot(userName, dropName string) string {
-	return filepath.Clean(filepath.Join(DropDir, userName, dropName))
+	return RepositoryRoot(userName, dropName)
 }
 
 func normalizeWorkingDir(path string) string {
@@ -859,27 +852,22 @@ func normalizeWorkingDir(path string) string {
 
 func resolvePathInRepo(root, workingDir, name string) (string, error) {
 	rootClean := filepath.Clean(root)
-
 	wd := normalizeWorkingDir(workingDir)
 	workingAbs := filepath.Clean(filepath.Join(rootClean, strings.TrimPrefix(wd, "/")))
 	if !isWithinRoot(rootClean, workingAbs) {
 		return "", errors.New("working directory is outside drop root")
 	}
-
 	if name == "" || name == "." {
 		return workingAbs, nil
 	}
-
 	name = filepath.ToSlash(strings.TrimSpace(name))
 	if name == "." || name == ".." || strings.HasPrefix(name, "/") {
 		return "", errors.New("invalid target path")
 	}
-
 	target := filepath.Clean(filepath.Join(workingAbs, name))
 	if !isWithinRoot(rootClean, target) {
 		return "", errors.New("target path is outside drop root")
 	}
-
 	return target, nil
 }
 
@@ -887,7 +875,7 @@ func GetItemPath(userName, dropName, workingDir, itemName string) (string, error
 	if itemName == "" || itemName == "." || itemName == ".." {
 		return "", errors.New("invalid file name")
 	}
-	root := repositoryRoot(userName, dropName)
+	root := RepositoryRoot(userName, dropName)
 	return resolvePathInRepo(root, workingDir, itemName)
 }
 
@@ -915,13 +903,11 @@ func WriteFileAtDropPath(userName, dropName, dropPath string, data []byte, overw
 	if rawPath == "" || strings.HasSuffix(rawPath, "/") {
 		return "", errors.New("invalid file path")
 	}
-
 	cleanDropPath := normalizeWorkingDir(rawPath)
 	relativePath := strings.TrimPrefix(cleanDropPath, "/")
 	if relativePath == "" {
 		return "", errors.New("invalid file path")
 	}
-
 	targetPath, err := GetItemPath(userName, dropName, "/", relativePath)
 	if err != nil {
 		return "", err
@@ -946,11 +932,9 @@ func writeFileAtomic(targetPath string, data []byte, overwrite bool) error {
 	} else if !errors.Is(err, os.ErrNotExist) {
 		return err
 	}
-
 	if err := os.MkdirAll(filepath.Dir(targetPath), 0755); err != nil {
 		return err
 	}
-
 	tempFile, err := os.CreateTemp(filepath.Dir(targetPath), ".inkdrop-live-*")
 	if err != nil {
 		return err
@@ -960,7 +944,6 @@ func writeFileAtomic(targetPath string, data []byte, overwrite bool) error {
 		tempFile.Close()
 		os.Remove(tempPath)
 	}
-
 	if _, err := tempFile.Write(data); err != nil {
 		cleanup()
 		return err
@@ -981,7 +964,6 @@ func writeFileAtomic(targetPath string, data []byte, overwrite bool) error {
 		os.Remove(tempPath)
 		return err
 	}
-
 	return nil
 }
 
@@ -993,54 +975,38 @@ func isWithinRoot(root, target string) bool {
 	return rel == "." || (rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator)))
 }
 
-// MoveUploadedFile moves a TUS-uploaded file into the user's drop at the
-// given working directory, using the original filename. It validates that the
-// destination stays within the drop root and cleans up the TUS .info sidecar.
 func MoveUploadedFile(userName, dropName, workingDir, filename, tusFilePath string) error {
-	root := repositoryRoot(userName, dropName)
-
-	// Ensure root exists
+	root := RepositoryRoot(userName, dropName)
 	if ok, _ := DirExists(root); !ok {
 		return fmt.Errorf("drop %s/%s does not exist", userName, dropName)
 	}
-
 	destDir, err := resolvePathInRepo(root, workingDir, ".")
 	if err != nil {
 		return fmt.Errorf("invalid working directory: %w", err)
 	}
-
 	if err := os.MkdirAll(destDir, 0755); err != nil {
 		return fmt.Errorf("failed to create destination directory: %w", err)
 	}
-
 	destPath := filepath.Join(destDir, filepath.Base(filename))
 	if !isWithinRoot(root, destPath) {
 		return fmt.Errorf("destination path escapes drop root")
 	}
-
-	// Move (rename) the uploaded blob to the final destination
 	if err := os.Rename(tusFilePath, destPath); err != nil {
 		return fmt.Errorf("failed to move uploaded file: %w", err)
 	}
-
-	// Clean up the TUS .info sidecar file
 	infoFile := tusFilePath + ".info"
 	os.Remove(infoFile)
-
 	return nil
 }
 
 func DeleteUserDrop(userName string, dropName string) error {
 	var mainDirToRemove string = fmt.Sprintf("%s/%s/%s", DropDir, userName, dropName)
 	var metaDirToRemove string = fmt.Sprintf("%s/%s/%s", DropMetaDir, userName, dropName)
-
 	err1 := os.RemoveAll(mainDirToRemove)
 	err2 := os.RemoveAll(metaDirToRemove)
-
 	if err1 != nil || err2 != nil {
 		return fmt.Errorf("%s\n%s", err1, err2)
 	}
-
 	return nil
 }
 
@@ -1066,12 +1032,9 @@ func PackSQAR(in, user, out string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-
-	// Test if archive exists
 	_, err = os.Stat(fullArchivePath)
 	if err != nil {
 		return "", err
 	}
-
 	return fullArchivePath, nil
 }
