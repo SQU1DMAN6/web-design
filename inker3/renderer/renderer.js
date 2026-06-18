@@ -11,17 +11,12 @@ const registerLink = document.getElementById("register-link");
 const navBtns = document.querySelectorAll(".nav-btn");
 const logoutBtn = document.getElementById("logout-btn");
 const dropsScreen = document.getElementById("drops-screen");
-const autoMountScreen = document.getElementById("auto-mount-screen");
 const searchScreen = document.getElementById("search-screen");
 const logScreen = document.getElementById("log-screen");
 
 // ====== Drops Panel ======
 const dropsList = document.getElementById("drops-list");
 const noDropsMsg = document.getElementById("no-drops-message");
-
-// ====== Auto-Mount Panel ======
-const autoMountList = document.getElementById("auto-mount-list");
-const noAutoMountMsg = document.getElementById("no-auto-mount-message");
 
 // ====== Search Panel ======
 const searchInput = document.getElementById("search-input");
@@ -41,67 +36,22 @@ const minBtn = document.getElementById("min-btn");
 const maxBtn = document.getElementById("max-btn");
 const closeBtn = document.getElementById("close-btn");
 
-// ====== Context Menu ======
-const dropMenu = document.getElementById("drop-menu");
-const menuOpen = document.getElementById("menu-open");
-const menuAddAuto = document.getElementById("menu-add-automount");
-const menuRemoveAuto = document.getElementById("menu-remove-automount");
-const menuRemove = document.getElementById("menu-remove");
-
-// ====== Cache ======
-const cacheInfo = document.getElementById("cache-info");
-const clearCacheBtn = document.getElementById("clear-cache-btn");
-
 // ====== State ======
-var activeContextDrop = null;
 var authData = null;
 var sessionCheckDone = false;
 
 // ====== Log Helper ======
 function appendLog(message) {
-    var log = authScreen.classList.contains("active") ? document.getElementById("event-log-auth") : eventLog;
-    if (!log) log = eventLog;
-    if (!log) return;
+    if (!eventLog) return;
     var entry = document.createElement("div");
     entry.className = "log-entry";
     var ts = new Date().toISOString().replace("T", " ").slice(0, 19);
     entry.textContent = ts + " " + message;
-    log.prepend(entry);
-    if (log.children.length > 500) {
-        log.removeChild(log.lastChild);
+    eventLog.prepend(entry);
+    if (eventLog.children.length > 500) {
+        eventLog.removeChild(eventLog.lastChild);
     }
     console.log("[Inker] " + message);
-}
-
-// ====== File Icon Helper ======
-function getFileIcon(filename) {
-    if (!filename) return "\uD83D\uDCC4";
-    var ext = filename.split(".").pop().toLowerCase();
-    var icons = {
-        "mp3":"\uD83C\uDFB5","wav":"\uD83C\uDFB5","flac":"\uD83C\uDFB5","ogg":"\uD83C\uDFB5","aac":"\uD83C\uDFB5","m4a":"\uD83C\uDFB5",
-        "mp4":"\uD83C\uDFAC","avi":"\uD83C\uDFAC","mkv":"\uD83C\uDFAC","mov":"\uD83C\uDFAC","webm":"\uD83C\uDFAC",
-        "jpg":"\uD83D\uDDBC","jpeg":"\uD83D\uDDBC","png":"\uD83D\uDDBC","gif":"\uD83D\uDDBC","bmp":"\uD83D\uDDBC","webp":"\uD83D\uDDBC","svg":"\uD83D\uDDBC",
-        "pdf":"\uD83D\uDCC4","doc":"\uD83D\uDCDD","docx":"\uD83D\uDCDD","xls":"\uD83D\uDCCA","xlsx":"\uD83D\uDCCA","ppt":"\uD83D\uDCC8","pptx":"\uD83D\uDCC8",
-        "zip":"\uD83D\uDCE6","rar":"\uD83D\uDCE6","7z":"\uD83D\uDCE6","tar":"\uD83D\uDCE6","gz":"\uD83D\uDCE6",
-        "txt":"\uD83D\uDCDD","md":"\uD83D\uDCDD","json":"\uD83D\uDCCB","xml":"\uD83D\uDCCB",
-        "exe":"\u2699","msi":"\u2699","dll":"\u2699",
-        "js":"\uD83D\uDCD8","ts":"\uD83D\uDCD8","py":"\uD83D\uDCD8","go":"\uD83D\uDCD8","c":"\uD83D\uDCD8","cpp":"\uD83D\uDCD8","java":"\uD83D\uDCD8",
-        "html":"\uD83C\uDF10","css":"\uD83C\uDFA8","scss":"\uD83C\uDFA8","less":"\uD83C\uDFA8",
-        "folder":"\uD83D\uDCC1","directory":"\uD83D\uDCC1"
-    };
-    return icons[ext] || "\uD83D\uDCC4";
-}
-
-function formatSize(bytes) {
-    if (!bytes || bytes === 0) return "0 B";
-    var units = ["B", "KB", "MB", "GB"];
-    var i = 0;
-    var size = bytes;
-    while (size >= 1024 && i < units.length - 1) {
-        size /= 1024;
-        i++;
-    }
-    return Math.round(size * 10) / 10 + " " + units[i];
 }
 
 // ====== Screen Transitions ======
@@ -120,8 +70,6 @@ function showMainScreen(user) {
     document.getElementById("sidebar-username").textContent = user.username || user.email;
     document.getElementById("sidebar-email").textContent = user.email;
     refreshDropsList();
-    refreshAutoMountList();
-    refreshCacheInfo();
 }
 
 // ====== Navigation ======
@@ -135,7 +83,6 @@ if (navBtns.length > 0) {
                 s.classList.remove("active");
             });
             if (screen === "drops" && dropsScreen) { dropsScreen.classList.add("active"); refreshDropsList(); }
-            if (screen === "auto-mount" && autoMountScreen) { autoMountScreen.classList.add("active"); refreshAutoMountList(); }
             if (screen === "search" && searchScreen) { searchScreen.classList.add("active"); }
             if (screen === "log" && logScreen) { logScreen.classList.add("active"); }
         });
@@ -182,34 +129,22 @@ if (logoutBtn) {
     });
 }
 
-// ====== Cache Info ======
-async function refreshCacheInfo() {
-    if (!cacheInfo) return;
-    try {
-        var info = await window.inker.getCacheInfo();
-        if (info && info.size > 0) {
-            cacheInfo.textContent = "Cached files: " + formatSize(info.size);
-        } else {
-            cacheInfo.textContent = "No cached files";
-        }
-    } catch (e) {
-        cacheInfo.textContent = "Cache: unknown";
-    }
+// Build HTML-safe replacement strings (using hex escapes to avoid auto-formatting issues)
+var _AMP = String.fromCharCode(38) + "amp;";
+var _LT = String.fromCharCode(38) + "lt;";
+var _GT = String.fromCharCode(38) + "gt;";
+var _QUOT = String.fromCharCode(38) + "quot;";
+
+function escapeHtml(str) {
+    if (!str) return "";
+    return String(str)
+        .replace(/&/g, _AMP)
+        .replace(/</g, _LT)
+        .replace(/>/g, _GT)
+        .replace(/"/g, _QUOT);
 }
 
-if (clearCacheBtn) {
-    clearCacheBtn.addEventListener("click", async function () {
-        try {
-            await window.inker.clearCache();
-            appendLog("Cache cleared");
-            refreshCacheInfo();
-        } catch (err) {
-            appendLog("Clear cache error: " + err.message);
-        }
-    });
-}
-
-// ====== Drops List (no file browser — just mount cards) ======
+// ====== Drops List ======
 async function refreshDropsList() {
     try {
         var mounts = await window.inker.getActiveMounts();
@@ -218,9 +153,13 @@ async function refreshDropsList() {
 
         for (var i = 0; i < mounts.length; i++) {
             var mount = mounts[i];
-            var parts = mount.dropPath.split("/");
-            var user = parts[0];
-            var drop = parts[1];
+            var parts = mount.dropKey ? mount.dropKey.split("/") : [];
+            var user = parts[0] || mount.user;
+            var drop = parts[1] || mount.drop;
+
+            var safeUser = escapeHtml(user);
+            var safeDrop = escapeHtml(drop);
+            var safeMountPath = escapeHtml(mount.mountPath || "Q:\\");
 
             var section = document.createElement("div");
             section.className = "mount-section";
@@ -229,157 +168,46 @@ async function refreshDropsList() {
             card.className = "drop-card";
             card.innerHTML =
                 '<div class="drop-info">' +
-                    '<h3>' + user + '/' + drop + '</h3>' +
-                    '<p class="mount-path">' + mount.mountPoint + '</p>' +
+                    '<h3>' + safeUser + '/' + safeDrop + '</h3>' +
+                    '<p class="mount-path">' + safeMountPath + '</p>' +
                 '</div>' +
                 '<div class="drop-actions">' +
-                    '<button class="btn btn-small open-folder-btn" data-user="' + user + '" data-drop="' + drop + '">Open</button>' +
-                    '<button class="btn btn-small menu-btn" data-user="' + user + '" data-drop="' + drop + '">...</button>' +
+                    '<button class="btn btn-small open-folder-btn" data-path="' + safeMountPath + '">Open</button>' +
+                    '<button class="btn btn-small btn-danger unmount-btn" data-user="' + safeUser + '" data-drop="' + safeDrop + '">Unmount</button>' +
                 '</div>';
             section.appendChild(card);
             dropsList.appendChild(section);
         }
+
+        document.querySelectorAll(".unmount-btn").forEach(function (btn) {
+            btn.addEventListener("click", async function () {
+                var user = btn.dataset.user;
+                var drop = btn.dataset.drop;
+                appendLog("Unmounting " + user + "/" + drop + "...");
+                try {
+                    await window.inker.unmountDrop(user, drop);
+                    appendLog("Unmounted " + user + "/" + drop);
+                    refreshDropsList();
+                } catch (err) { appendLog("Unmount error: " + err.message); }
+            });
+        });
     } catch (err) {
         appendLog("refreshDropsList error: " + err.message);
     }
 }
 
-function escapeHtml(str) {
-    if (!str) return "";
-    return String(str).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
-}
-
-// ====== Auto-Mount List ======
-async function refreshAutoMountList() {
-    try {
-        var saved = await window.inker.getSavedMounts();
-        if (autoMountList) autoMountList.innerHTML = "";
-        var autoMounts = saved.filter(function (m) { return m.auto_mount; });
-        if (noAutoMountMsg) noAutoMountMsg.style.display = autoMounts.length === 0 ? "block" : "none";
-
-        for (var i = 0; i < autoMounts.length; i++) {
-            var m = autoMounts[i];
-            var item = document.createElement("div");
-            item.className = "auto-mount-item";
-            item.innerHTML =
-                '<span class="auto-mount-path">' + m.drop_path + '</span>' +
-                '<button class="btn btn-small btn-ghost disable-auto-btn" data-drop-path="' + m.drop_path + '">Disable</button>';
-            autoMountList.appendChild(item);
-        }
-
-        document.querySelectorAll(".disable-auto-btn").forEach(function (btn) {
-            btn.addEventListener("click", async function () {
-                var dropPath = btn.dataset.dropPath;
-                var parts = dropPath.split("/");
-                try {
-                    await window.inker.setAutoMount(parts[0], parts[1], false);
-                    refreshAutoMountList();
-                    refreshDropsList();
-                    appendLog("Auto-add disabled for " + dropPath);
-                } catch (err) { appendLog("Disable auto-add error: " + err.message); }
-            });
-        });
-    } catch (err) { appendLog("refreshAutoMountList error: " + err.message); }
-}
-
-// ====== Context Menu ======
+// Open folder - uses the actual mount path from the button's data-path attribute
 document.addEventListener("click", function (e) {
-    if (e.target.classList.contains("menu-btn")) {
-        e.stopPropagation();
-        var user = e.target.dataset.user;
-        var drop = e.target.dataset.drop;
-        activeContextDrop = { user: user, drop: drop };
-
-        (async function () {
-            try {
-                var saved = await window.inker.getSavedMounts();
-                var mount = saved.find(function (m) { return m.drop_path === user + "/" + drop; });
-                if (mount && mount.auto_mount) {
-                    if (menuAddAuto) menuAddAuto.style.display = "none";
-                    if (menuRemoveAuto) menuRemoveAuto.style.display = "block";
-                } else {
-                    if (menuAddAuto) menuAddAuto.style.display = "block";
-                    if (menuRemoveAuto) menuRemoveAuto.style.display = "none";
-                }
-            } catch (e) {
-                if (menuAddAuto) menuAddAuto.style.display = "block";
-                if (menuRemoveAuto) menuRemoveAuto.style.display = "none";
-            }
-        })();
-
-        var rect = e.target.getBoundingClientRect();
-        if (dropMenu) {
-            dropMenu.classList.remove("hidden");
-            dropMenu.style.left = Math.max(10, rect.left - 150) + "px";
-            dropMenu.style.top = Math.max(10, rect.bottom + 6) + "px";
-        }
-        return;
-    }
-
     var openBtn = e.target.closest(".open-folder-btn");
     if (openBtn) {
         e.stopPropagation();
-        activeContextDrop = { user: openBtn.dataset.user, drop: openBtn.dataset.drop };
-        openDropFolder();
+        var mountPath = openBtn.dataset.path;
+        if (mountPath) {
+            window.inker.openPath(mountPath);
+        }
         return;
     }
-
-    if (dropMenu && !dropMenu.contains(e.target)) {
-        dropMenu.classList.add("hidden");
-    }
 });
-
-async function openDropFolder() {
-    if (!activeContextDrop) return;
-    try {
-        var mounts = await window.inker.getActiveMounts();
-        var mount = mounts.find(function (m) {
-            return m.dropPath === activeContextDrop.user + "/" + activeContextDrop.drop;
-        });
-        if (mount) {
-            appendLog("Opening folder: " + mount.mountPoint);
-            await window.inker.openPath(mount.mountPoint);
-        }
-    } catch (err) { appendLog("Open folder error: " + err.message); }
-    if (dropMenu) dropMenu.classList.add("hidden");
-}
-
-if (menuOpen) { menuOpen.addEventListener("click", openDropFolder); }
-if (menuAddAuto) {
-    menuAddAuto.addEventListener("click", async function () {
-        if (!activeContextDrop) return;
-        try {
-            await window.inker.setAutoMount(activeContextDrop.user, activeContextDrop.drop, true);
-            appendLog("Auto-add enabled for " + activeContextDrop.user + "/" + activeContextDrop.drop);
-            if (dropMenu) dropMenu.classList.add("hidden");
-            refreshAutoMountList();
-        } catch (err) { appendLog("Auto-add error: " + err.message); }
-    });
-}
-if (menuRemoveAuto) {
-    menuRemoveAuto.addEventListener("click", async function () {
-        if (!activeContextDrop) return;
-        try {
-            await window.inker.setAutoMount(activeContextDrop.user, activeContextDrop.drop, false);
-            appendLog("Auto-add disabled for " + activeContextDrop.user + "/" + activeContextDrop.drop);
-            if (dropMenu) dropMenu.classList.add("hidden");
-            refreshAutoMountList();
-        } catch (err) { appendLog("Auto-add disable error: " + err.message); }
-    });
-}
-if (menuRemove) {
-    menuRemove.addEventListener("click", async function () {
-        if (!activeContextDrop) return;
-        appendLog("Removing " + activeContextDrop.user + "/" + activeContextDrop.drop + "...");
-        try {
-            await window.inker.unmountDrop(activeContextDrop.user, activeContextDrop.drop);
-            appendLog("Removed " + activeContextDrop.user + "/" + activeContextDrop.drop);
-            if (dropMenu) dropMenu.classList.add("hidden");
-            refreshDropsList();
-            refreshAutoMountList();
-        } catch (err) { appendLog("Remove error: " + err.message); }
-    });
-}
 
 // ====== Search ======
 if (searchBtn && searchInput) {
@@ -402,15 +230,19 @@ if (searchBtn && searchInput) {
                 return;
             }
             results.forEach(function (drop) {
+                var safeUser = escapeHtml(drop.user);
+                var safeName = escapeHtml(drop.name);
+                var safeDesc = escapeHtml(drop.description || "No description");
+
                 var item = document.createElement("div");
                 item.className = "drop-card search-result-card";
                 item.innerHTML =
                     '<div class="drop-info">' +
-                        '<h3>' + (drop.user || "?") + '/' + (drop.name || "?") + '</h3>' +
-                        '<p class="drop-desc">' + (drop.description || "No description") + '</p>' +
+                        '<h3>' + safeUser + '/' + safeName + '</h3>' +
+                        '<p class="drop-desc">' + safeDesc + '</p>' +
                     '</div>' +
                     '<div class="drop-actions">' +
-                        '<button class="btn btn-primary btn-small add-from-search" data-user="' + drop.user + '" data-drop="' + drop.name + '">Add</button>' +
+                        '<button class="btn btn-primary btn-small mount-from-search" data-user="' + safeUser + '" data-drop="' + safeName + '">Mount</button>' +
                     '</div>';
                 if (searchResults) searchResults.appendChild(item);
             });
@@ -430,32 +262,31 @@ if (searchBtn && searchInput) {
     }
 }
 
-// Add from search results
+// Mount from search results
 document.addEventListener("click", function (e) {
-    var addBtn = e.target.closest(".add-from-search");
-    if (addBtn) {
-        addBtn.textContent = "Adding...";
-        addBtn.disabled = true;
-        addDrop(addBtn.dataset.user, addBtn.dataset.drop, addBtn);
+    var mountBtn = e.target.closest(".mount-from-search");
+    if (mountBtn) {
+        mountBtn.textContent = "Mounting...";
+        mountBtn.disabled = true;
+        mountDrop(mountBtn.dataset.user, mountBtn.dataset.drop, mountBtn);
     }
 });
 
-// ====== Add Drop (Mount) ======
-async function addDrop(user, drop, button) {
-    appendLog("Adding " + user + "/" + drop + "...");
+// ====== Mount Drop ======
+async function mountDrop(user, drop, button) {
+    appendLog("Mounting " + user + "/" + drop + "...");
     try {
-        await window.inker.mountDrop(user, drop, null);
-        appendLog("Added " + user + "/" + drop);
+        await window.inker.mountDrop(user, drop);
+        appendLog("Mounted " + user + "/" + drop + " on Q:\\");
         if (button) {
-            button.textContent = "Added";
+            button.textContent = "Mounted";
             button.className = "btn btn-small btn-added";
             button.disabled = false;
         }
         refreshDropsList();
-        refreshAutoMountList();
     } catch (err) {
-        appendLog("Add error: " + err.message);
-        if (button) { button.textContent = "Add"; button.disabled = false; }
+        appendLog("Mount error: " + err.message);
+        if (button) { button.textContent = "Mount"; button.disabled = false; }
     }
 }
 
@@ -469,11 +300,11 @@ if (addByPathBtn && addByPathInput) {
             appendLog("Invalid drop path: " + pathInput);
             return;
         }
-        appendLog("Adding by path: " + parts[0] + "/" + parts[1]);
-        addByPathBtn.textContent = "Adding...";
+        appendLog("Mounting by path: " + parts[0] + "/" + parts[1]);
+        addByPathBtn.textContent = "Mounting...";
         addByPathBtn.disabled = true;
-        await addDrop(parts[0], parts[1], addByPathBtn);
-        addByPathBtn.textContent = "Add";
+        await mountDrop(parts[0], parts[1], addByPathBtn);
+        addByPathBtn.textContent = "Mount";
         addByPathBtn.disabled = false;
         addByPathInput.value = "";
     });
@@ -497,7 +328,6 @@ if (clearLogBtn) {
 }
 
 // ====== App Initialization ======
-// We ONLY use onReady — no fallback getSession() race condition
 if (window.inker) {
     window.inker.onLog(function (message) {
         appendLog(message);
@@ -512,7 +342,6 @@ if (window.inker) {
         }
     });
 
-    // Fallback: check session directly as a safety net
     (async function () {
         try {
             var session = await window.inker.getSession();
@@ -521,15 +350,12 @@ if (window.inker) {
                 showMainScreen(session);
                 appendLog("Session restored for " + session.username);
             }
-        } catch (e) {
-            // onReady will handle it
-        }
+        } catch (e) {}
     })();
 
-    // Backup timeout: if nothing has happened within 30s, show login
     setTimeout(function () {
         if (!sessionCheckDone) {
-            appendLog("[App] Session check timeout — showing login");
+            appendLog("[App] Session check timeout --- showing login");
             showLoginScreen();
         }
     }, 30000);

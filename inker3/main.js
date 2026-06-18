@@ -3,15 +3,17 @@ const path = require("path");
 const os = require("os");
 const fs = require("fs");
 
-const apiClient = require("./lib/api-client");
-const MountManager = require("./lib/mount-manager");
-const SyncManager = require("./lib/sync-manager");
+const apiClient = require("./lib/api-client-v2");
+const VirtualFS = require("./lib/virtual-fs");
+const Hydrator = require("./lib/hydrator");
+const WinFspBridge = require("./lib/winfsp-bridge");
 const settings = require("./lib/settings");
 
 let win;
 let tray;
-let mountManager;
-let syncManager;
+let hydrator;
+let virtualFs;
+let winfspBridge;
 let appReady = false;
 let isQuitting = false;
 
@@ -20,21 +22,12 @@ if (!gotTheLock) {
     app.quit();
 }
 
-// Register inker:// protocol handler
-if (process.defaultApp) {
-    if (process.argv.length >= 2) {
-        app.setAsDefaultProtocolClient("inker", process.execPath, [path.resolve(process.argv[1])]);
-    }
-} else {
-    app.setAsDefaultProtocolClient("inker");
-}
-
 function createWindow() {
     win = new BrowserWindow({
-        width: 1000,
-        height: 700,
-        minWidth: 800,
-        minHeight: 600,
+        width: 900,
+        height: 650,
+        minWidth: 750,
+        minHeight: 500,
         frame: false,
         transparent: true,
         backgroundColor: "#00000000",
@@ -49,24 +42,14 @@ function createWindow() {
     win.loadFile("renderer/index.html");
 
     win.once("ready-to-show", function () {
-        // Only show if not launched for a protocol URL
-        var isProtocolLaunch = false;
-        for (var ai = 0; ai < process.argv.length; ai++) {
-            if (typeof process.argv[ai] === "string" && process.argv[ai].startsWith("inker://")) {
-                isProtocolLaunch = true;
-                break;
-            }
-        }
-        if (!isProtocolLaunch) {
-            win.show();
-        }
+        win.show();
     });
 
     win.on("close", function (e) {
         if (!isQuitting) {
             e.preventDefault();
             win.hide();
-            logToRenderer("Window hidden to tray (background sync continues)");
+            logToRenderer("Window hidden to tray (filesystem mounts continue)");
         }
     });
 }
@@ -75,40 +58,17 @@ function createTray() {
     var iconPath = path.join(__dirname, "icon.ico");
     var trayIcon = nativeImage.createFromPath(iconPath);
     tray = new Tray(trayIcon);
-    tray.setToolTip("FtR Inker");
+    tray.setToolTip("FtR Inker — InkDrop Drive");
 
-    var contextMenu = Menu.buildFromTemplate([
-        {
-            label: "Open FtR Inker",
-            click: function () {
-                if (win) {
-                    if (win.isMinimized()) win.restore();
-                    win.show();
-                    win.focus();
-                }
-            }
-        },
-        {
-            label: "Open FtR Folder",
-            click: function () {
-                var ftrDir = path.join(os.homedir(), "FtR");
-                if (!fs.existsSync(ftrDir)) {
-                    fs.mkdirSync(ftrDir, { recursive: true });
-                }
-                shell.openPath(ftrDir);
-            }
-        },
+    // Initial placeholder menu — no mounts yet
+    var placeholderMenu = Menu.buildFromTemplate([
+        { label: "Open FtR Inker", click: function () { if (win) { if (win.isMinimized()) win.restore(); win.show(); win.focus(); } } },
+        { label: "Open InkDrop Drive", enabled: false },
         { type: "separator" },
-        {
-            label: "Exit FtR Inker",
-            click: function () {
-                isQuitting = true;
-                app.quit();
-            }
-        }
+        { label: "Exit FtR Inker", click: function () { isQuitting = true; app.quit(); } }
     ]);
+    tray.setContextMenu(placeholderMenu);
 
-    tray.setContextMenu(contextMenu);
     tray.on("double-click", function () {
         if (win) {
             if (win.isMinimized()) win.restore();
@@ -116,6 +76,66 @@ function createTray() {
             win.focus();
         }
     });
+}
+
+/** Call this AFTER winfspBridge is initialized to wire up dynamic tray menu */
+function setupTrayMenuRebuild() {
+    if (!winfspBridge || !tray) return;
+
+    function rebuildTrayMenu() {
+        var template = [
+            {
+                label: "Open FtR Inker",
+                click: function () {
+                    if (win) {
+                        if (win.isMinimized()) win.restore();
+                        win.show();
+                        win.focus();
+                    }
+                }
+            }
+        ];
+
+        var mountPaths = [];
+        try {
+            var mounts = winfspBridge.getActiveMounts();
+            for (var mi = 0; mi < mounts.length; mi++) {
+                var mp = (mounts[mi].mountPath || "").trim();
+                if (mp && mountPaths.indexOf(mp) === -1) {
+                    mountPaths.push(mp);
+                }
+            }
+        } catch (e) {
+            // Bridge not fully ready
+        }
+
+        if (mountPaths.length > 0) {
+            for (var pi = 0; pi < mountPaths.length; pi++) {
+                (function (p) {
+                    template.push({
+                        label: "Open " + p,
+                        click: function () { shell.openPath(p); }
+                    });
+                })(mountPaths[pi]);
+            }
+        } else {
+            template.push({ label: "Open InkDrop Drive", enabled: false });
+        }
+
+        template.push({ type: "separator" });
+        template.push({
+            label: "Exit FtR Inker",
+            click: function () { isQuitting = true; app.quit(); }
+        });
+
+        try { tray.setContextMenu(Menu.buildFromTemplate(template)); } catch (e) {}
+    }
+
+    winfspBridge.on("mounted", rebuildTrayMenu);
+    winfspBridge.on("unmounted", rebuildTrayMenu);
+
+    // Initial rebuild after events are wired
+    rebuildTrayMenu();
 }
 
 function logToRenderer(message) {
@@ -127,78 +147,24 @@ function logToRenderer(message) {
     }
 }
 
-// Handle inker:// protocol URLs — WITHOUT showing the window
-function handleInkerUrl(url) {
-    logToRenderer("Protocol URL: " + url);
-    var parsed = url.replace("inker://", "").split("/");
-    if (parsed.length >= 3) {
-        var user = decodeURIComponent(parsed[0]);
-        var drop = decodeURIComponent(parsed[1]);
-        var filePath = parsed.slice(2).map(function (p) { return decodeURIComponent(p); }).join("/");
-        logToRenderer("Opening remote file: " + user + "/" + drop + "/" + filePath);
-        openRemoteFileAndLaunch(user, drop, filePath);
-    }
-}
-
-app.on("second-instance", function (event, argv) {
-    for (var ai = 0; ai < argv.length; ai++) {
-        if (typeof argv[ai] === "string" && argv[ai].startsWith("inker://")) {
-            handleInkerUrl(argv[ai]);
-            return;
-        }
-    }
-    // Show window if not a protocol URL
-    if (win) {
-        if (win.isMinimized()) win.restore();
-        win.show();
-        win.focus();
-    }
-});
-
-app.on("open-url", function (event, url) {
-    event.preventDefault();
-    handleInkerUrl(url);
-});
-
-async function openRemoteFileAndLaunch(user, drop, filePath) {
-    try {
-        if (!mountManager) {
-            logToRenderer("Cannot open file: mount manager not ready");
-            return;
-        }
-        var localPath = await mountManager.openCachedFile(user, drop, filePath);
-        logToRenderer("Opening downloaded file: " + localPath);
-        await shell.openPath(localPath);
-    } catch (err) {
-        logToRenderer("Failed to open remote file: " + err.message);
-    }
-}
-
 async function initializeApp() {
-    logToRenderer("Initializing application...");
+    logToRenderer("Initializing Inker 3.2 — InkDrop Drive...");
     try {
-        mountManager = new MountManager(apiClient);
-        syncManager = new SyncManager(apiClient);
+        hydrator = new Hydrator(apiClient);
+        virtualFs = new VirtualFS(hydrator);
+        winfspBridge = new WinFspBridge(virtualFs);
 
-        mountManager.on("mounted", function (data) {
-            logToRenderer("Added " + data.dropPath + " at " + data.mountPoint);
-            syncManager.startSync(data.dropPath, data.mountPoint);
+        winfspBridge.on("mounted", function (data) {
+            logToRenderer("Mounted " + data.dropKey + " at " + data.mountPath);
         });
 
-        mountManager.on("unmounted", function (data) {
-            logToRenderer("Removed " + data.dropPath);
-            syncManager.stopSync(data.dropPath);
+        winfspBridge.on("unmounted", function (data) {
+            logToRenderer("Unmounted " + data.dropKey);
         });
 
-        syncManager.on("file-synced", function (data) {
-            logToRenderer("[sync] " + data.type.toUpperCase() + " " + data.dropPath + "/" + data.file);
-        });
+        // Wire up dynamic tray menu now that winfspBridge exists
+        setupTrayMenuRebuild();
 
-        syncManager.on("sync-error", function (data) {
-            logToRenderer("[sync error] " + data.dropPath + "/" + data.file + ": " + data.error);
-        });
-
-        // Check saved session
         var auth = await settings.getAuth();
         if (auth) {
             apiClient.setSession(auth.email, auth.username, auth.session_id);
@@ -211,41 +177,16 @@ async function initializeApp() {
                     await settings.saveAuth(auth.email, sessionResult.username, apiClient.sessionId);
                 }
 
-                // Auto-mount ALL saved drops (not just auto_mount)
                 var savedMounts = await settings.getMounts();
                 logToRenderer("Found " + savedMounts.length + " saved mount(s)");
                 for (var mi = 0; mi < savedMounts.length; mi++) {
                     var mount = savedMounts[mi];
                     try {
-                        // Check if mount point exists already (might still be mounted from last session)
-                        if (fs.existsSync(mount.mount_point)) {
-                            // Check if index file exists to verify it was mounted here
-                            var indexPath = path.join(mount.mount_point, ".ftr_index.json");
-                            if (fs.existsSync(indexPath)) {
-                                logToRenderer("Drop " + mount.drop_path + " appears already mounted at " + mount.mount_point);
-                                // Load it into our state
-                                try {
-                                    var raw = fs.readFileSync(indexPath, "utf8");
-                                    var data = JSON.parse(raw);
-                                    mountManager.activeMounts.set(mount.drop_path, {
-                                        user: mount.user,
-                                        drop: mount.drop,
-                                        mountPoint: mount.mount_point,
-                                        syncing: false,
-                                        index: data.entries || [],
-                                        remoteEntries: []
-                                    });
-                                    syncManager.startSync(mount.drop_path, mount.mount_point);
-                                    continue;
-                                } catch (e) {
-                                    logToRenderer("Index parse failed, re-mounting: " + e.message);
-                                }
-                            }
-                        }
-                        logToRenderer("Mounting " + mount.drop_path + " at " + mount.mount_point);
-                        await mountManager.mount(mount.user, mount.drop, mount.mount_point);
+                        var dropKey = mount.user + "/" + mount.drop;
+                        logToRenderer("Mounting " + dropKey + " on InkDrop Drive");
+                        await winfspBridge.mount(dropKey, mount.user, mount.drop, "Q:\\");
                     } catch (err) {
-                        logToRenderer("Failed to mount " + mount.drop_path + ": " + err.message);
+                        logToRenderer("Failed to mount " + mount.user + "/" + mount.drop + ": " + err.message);
                     }
                 }
 
@@ -267,15 +208,7 @@ async function initializeApp() {
             if (win && !win.isDestroyed()) win.webContents.send("inker:ready", { valid: false });
         }
 
-        // Handle any inker:// protocol URL from argv
-        for (var ai = 0; ai < process.argv.length; ai++) {
-            if (typeof process.argv[ai] === "string" && process.argv[ai].startsWith("inker://")) {
-                setTimeout(function (url) { handleInkerUrl(url); }, 1500, process.argv[ai]);
-                break;
-            }
-        }
-
-        logToRenderer("Application initialized successfully");
+        logToRenderer("Inker 3.2 initialized successfully");
     } catch (err) {
         logToRenderer("Initialization error: " + err.message);
         appReady = true;
@@ -290,12 +223,7 @@ ipcMain.handle("inker:login", async function (event, email, password) {
         logToRenderer("Attempting login for " + email);
         var result = await apiClient.login(email, password);
         await settings.saveAuth(email, result.username, apiClient.sessionId);
-
-        var sessionResult = await apiClient.sessionConfirm();
-        if (sessionResult.valid) {
-            logToRenderer("Login confirmed: " + result.username);
-            return { success: true, username: result.username, email: email };
-        }
+        logToRenderer("Login confirmed: " + result.username);
         return { success: true, username: result.username, email: email };
     } catch (err) {
         logToRenderer("Login failed: " + err.message);
@@ -306,8 +234,7 @@ ipcMain.handle("inker:login", async function (event, email, password) {
 ipcMain.handle("inker:logout", async function () {
     try {
         logToRenderer("Logging out...");
-        if (mountManager) mountManager.closeAll();
-        if (syncManager) syncManager.stopAllSync();
+        if (winfspBridge) await winfspBridge.unmountAll();
         await settings.clearAuth();
         apiClient.sessionId = null;
         apiClient.email = null;
@@ -346,107 +273,73 @@ ipcMain.handle("inker:search-drops", async function (event, query) {
     }
 });
 
-ipcMain.handle("inker:get-file-index", async function (event, user, drop) {
+ipcMain.handle("inker:mount-drop", async function (event, user, drop) {
     try {
-        if (!mountManager) return [];
-        var index = mountManager.getIndex(user + "/" + drop);
-        if (!index) return [];
-        return index.filter(function (e) { return e.kind !== "directory"; });
-    } catch (err) {
-        logToRenderer("Get file index error: " + err.message);
-        return [];
-    }
-});
-
-ipcMain.handle("inker:open-file", async function (event, user, drop, filePath) {
-    try {
-        logToRenderer("Opening file: " + user + "/" + drop + "/" + filePath);
-        // Try cache first, fall back to download
-        var localPath = await mountManager.openCachedFile(user, drop, filePath);
-        logToRenderer("Using cached file: " + localPath);
-        var result = await shell.openPath(localPath);
-        logToRenderer("Shell open result: " + result);
-        return { path: localPath, openResult: result };
-    } catch (err) {
-        logToRenderer("Open file error: " + err.message);
-        throw err;
-    }
-});
-
-ipcMain.handle("inker:mount-drop", async function (event, user, drop, mountPoint) {
-    try {
-        if (!mountPoint) {
-            mountPoint = path.join(os.homedir(), "FtR", user, drop);
+        if (!winfspBridge) {
+            throw new Error("Filesystem engine not ready yet");
         }
 
-        fs.mkdirSync(mountPoint, { recursive: true });
-        logToRenderer("Adding " + user + "/" + drop + " at " + mountPoint);
+        var dropKey = user + "/" + drop;
+        logToRenderer("Mounting " + dropKey + " on InkDrop Drive");
 
-        var dropPath = user + "/" + drop;
-        if (mountManager.isMounted(dropPath)) {
-            logToRenderer(user + "/" + drop + " already added, reloading...");
-            await mountManager.unmount(dropPath);
-            syncManager.stopSync(dropPath);
+        var activeMounts = winfspBridge.getActiveMounts();
+        var alreadyMounted = false;
+        for (var i = 0; i < activeMounts.length; i++) {
+            if (activeMounts[i].dropKey === dropKey) {
+                alreadyMounted = true;
+                break;
+            }
         }
 
-        var result = await mountManager.mount(user, drop, mountPoint);
-        // Save with auto_mount=true by default so it restores on next start
-        await settings.addMount(user, drop, mountPoint, true);
-        logToRenderer("Added " + user + "/" + drop);
-        return result;
+        if (alreadyMounted) {
+            logToRenderer(dropKey + " already mounted");
+            return { dropKey: dropKey, mountPath: "Q:\\" };
+        }
+
+        var mountPath = await winfspBridge.mount(dropKey, user, drop, "Q:\\");
+        await settings.addMount(user, drop, mountPath, true);
+        logToRenderer("Mounted " + dropKey);
+        return { dropKey: dropKey, mountPath: mountPath };
     } catch (err) {
-        logToRenderer("Add failed: " + err.message);
+        logToRenderer("Mount failed: " + err.message);
         throw err;
     }
 });
 
 ipcMain.handle("inker:unmount-drop", async function (event, user, drop) {
     try {
-        var dropPath = user + "/" + drop;
-        logToRenderer("Removing " + dropPath);
-
-        if (!mountManager.isMounted(dropPath)) {
-            throw new Error(dropPath + " is not currently added");
+        if (!winfspBridge) {
+            throw new Error("Filesystem engine not ready yet");
         }
 
-        var state = mountManager.getMount(dropPath);
-        var result = await mountManager.unmount(dropPath);
-        syncManager.stopSync(dropPath);
-        await settings.removeMount(dropPath);
+        var dropKey = user + "/" + drop;
+        logToRenderer("Unmounting " + dropKey);
 
-        if (state && state.mountPoint) {
-            var mp = state.mountPoint;
-            logToRenderer("Cleaning up files at " + mp);
-            if (fs.existsSync(mp)) {
-                fs.rmSync(mp, { recursive: true, force: true });
-                logToRenderer("Deleted " + mp);
-                var dirs = mp.split(path.sep);
-                for (var di = dirs.length - 1; di >= 2; di--) {
-                    var parent = dirs.slice(0, di).join(path.sep);
-                    if (parent.length < 4) break;
-                    try {
-                        if (fs.existsSync(parent) && fs.readdirSync(parent).length === 0) {
-                            fs.rmdirSync(parent);
-                            logToRenderer("Removed empty parent: " + parent);
-                        } else {
-                            break;
-                        }
-                    } catch (e) { break; }
-                }
+        var activeMounts = winfspBridge.getActiveMounts();
+        var found = false;
+        for (var i = 0; i < activeMounts.length; i++) {
+            if (activeMounts[i].dropKey === dropKey) {
+                found = true;
+                break;
             }
         }
+        if (!found) {
+            throw new Error(dropKey + " is not mounted");
+        }
 
-        logToRenderer("Removed " + dropPath);
-        return result;
+        await winfspBridge.unmount(dropKey);
+        await settings.removeMount(dropKey);
+        logToRenderer("Unmounted " + dropKey);
+        return { success: true };
     } catch (err) {
-        logToRenderer("Remove failed: " + err.message);
+        logToRenderer("Unmount failed: " + err.message);
         throw err;
     }
 });
 
 ipcMain.handle("inker:get-mounts", async function () {
     try {
-        return mountManager ? mountManager.getActiveMounts() : [];
+        return winfspBridge ? winfspBridge.getActiveMounts() : [];
     } catch (err) {
         logToRenderer("Get mounts error: " + err.message);
         throw err;
@@ -466,10 +359,10 @@ ipcMain.handle("inker:set-auto-mount", async function (event, user, drop, enable
     try {
         var dropPath = user + "/" + drop;
         await settings.setAutoMount(dropPath, enabled);
-        logToRenderer("Auto add " + (enabled ? "enabled" : "disabled") + " for " + dropPath);
+        logToRenderer("Auto-mount " + (enabled ? "enabled" : "disabled") + " for " + dropPath);
         return { success: true };
     } catch (err) {
-        logToRenderer("Set auto add error: " + err.message);
+        logToRenderer("Set auto-mount error: " + err.message);
         throw err;
     }
 });
@@ -498,22 +391,16 @@ ipcMain.handle("inker:open-external", async function (event, url) {
 
 ipcMain.handle("inker:get-cache-info", async function () {
     try {
-        if (!mountManager) return { size: 0, path: "" };
-        var size = mountManager.getCacheSize();
-        return {
-            size: size,
-            path: path.join(os.homedir(), ".inker", "cache")
-        };
+        if (!hydrator) return { size: 0, entries: 0 };
+        return hydrator.getCacheStats();
     } catch (err) {
-        logToRenderer("Get cache info error: " + err.message);
-        return { size: 0, path: "" };
+        return { size: 0, entries: 0 };
     }
 });
 
 ipcMain.handle("inker:clear-cache", async function () {
     try {
-        if (!mountManager) return { success: false };
-        mountManager.clearCache();
+        if (hydrator) hydrator.clearCaches();
         logToRenderer("Cache cleared");
         return { success: true };
     } catch (err) {
@@ -551,7 +438,7 @@ ipcMain.on("window:maximize", function () {
 });
 
 ipcMain.on("window:close", function () {
-    if (win) win.hide(); // Close button sends to tray
+    if (win) win.hide();
 });
 
 app.whenReady().then(function () {
@@ -566,26 +453,9 @@ app.on("before-quit", function () {
         win.removeAllListeners("close");
     }
     logToRenderer("Shutting down...");
-    if (syncManager) {
-        syncManager.stopAllSync();
+    if (winfspBridge) {
+        winfspBridge.unmountAll();
     }
-    if (mountManager) {
-        // Unmount all drops and clean up
-        var mounts = mountManager.getActiveMounts();
-        mounts.forEach(function (m) {
-            var mp = m.mountPoint;
-            try {
-                if (fs.existsSync(mp)) {
-                    fs.rmSync(mp, { recursive: true, force: true });
-                    logToRenderer("Cleaned up " + mp);
-                }
-            } catch (e) {
-                logToRenderer("Cleanup error: " + e.message);
-            }
-        });
-        mountManager.closeAll();
-    }
-    if (settings) settings.close();
     if (tray) tray.destroy();
 });
 
