@@ -69,6 +69,7 @@ func RegisterRoutes(r chi.Router) {
 	r.Post("/repo/settings", repository.RepositorySettings)
 	r.Post("/download", repository.RepositoryDownloadFile)
 	r.Get("/preview", repository.RepositoryPreviewFile)
+	r.Head("/preview", repository.RepositoryPreviewFile)
 	r.Get("/downloadrepo/{user}/{reponame}", repository.RepositoryDownloadRepositoryAsSQAR)
 	r.Get("/edit/{filename}/{user}/{reponame}", repository.RepositoryLiveEditTextFile)
 	r.Get("/edit/{filename}/{user}/{reponame}/*", repository.RepositoryLiveEditTextFile)
