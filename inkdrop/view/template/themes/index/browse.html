@@ -1211,22 +1211,35 @@
                 pre.textContent = text.length > 32768 ? text.slice(0, 32768) + "\n\n…preview truncated" : text;
             }
 
-            function renderPreviewBlob(blob, mime, fileName) {
+            function buildStreamURL() {
+                var params = new URLSearchParams({
+                    repository: currentRepo,
+                    user: currentUser,
+                    "working-directory": currentPath,
+                    itemName: selectedEntry ? selectedEntry.getAttribute("data-name") : "",
+                });
+                return "/preview?" + params.toString();
+            }
+
+            function renderPreviewBlob(blob, mime, fileName, streamUrl) {
                 if (!previewContent) return;
                 if (previewBlobUrl) {
                     URL.revokeObjectURL(previewBlobUrl);
                     previewBlobUrl = null;
                 }
-                previewBlobUrl = URL.createObjectURL(blob);
                 var markup = "";
                 if (mime.startsWith("image/")) {
+                    previewBlobUrl = URL.createObjectURL(blob);
                     markup = '<img class="preview-image" src="' + previewBlobUrl + '" alt="Preview of ' + fileName + '">';
                 } else if (mime.startsWith("video/")) {
-                    markup = '<video controls class="preview-video"><source src="' + previewBlobUrl + '" type="' + mime + '">Your browser cannot play this preview.</video>';
+                    var src = streamUrl || buildStreamURL();
+                    markup = '<video controls class="preview-video" preload="metadata"><source src="' + src + '" type="' + mime + '">Your browser cannot play this preview.</video>';
                 } else if (mime.startsWith("audio/")) {
-                    markup = '<audio controls class="preview-audio"><source src="' + previewBlobUrl + '" type="' + mime + '">Your browser cannot play this preview.</audio>';
+                    var src = streamUrl || buildStreamURL();
+                    markup = '<audio controls class="preview-audio" preload="metadata"><source src="' + src + '" type="' + mime + '">Your browser cannot play this preview.</audio>';
                 } else if (mime === "application/pdf") {
-                    markup = '<object class="preview-pdf" data="' + previewBlobUrl + '" type="application/pdf">Preview unavailable. <a href="' + previewBlobUrl + '">Open PDF</a></object>';
+                    var src = streamUrl || buildStreamURL();
+                    markup = '<object class="preview-pdf" data="' + src + '" type="application/pdf">Preview unavailable. <a href="' + src + '">Open PDF</a></object>';
                 } else {
                     markup = '<div class="preview-placeholder"><p class="subtle">This file cannot be previewed in-browser, but it is available for secure download.</p></div>';
                 }
@@ -1250,37 +1263,45 @@
                     "working-directory": currentPath,
                     itemName: file,
                 });
-                fetch("/preview?" + params.toString(), { credentials: "same-origin" })
+                var streamUrl = "/preview?" + params.toString();
+                fetch(streamUrl, { method: "HEAD", credentials: "same-origin" })
                     .then(function (response) {
                         if (!response.ok) {
-                            // Try to display server-provided error details
-                            return response.text().then(function (bodyText) {
-                                var message = bodyText || (response.status + " " + response.statusText);
-                                setPreviewStatus(message);
-                                if (previewMeta) previewMeta.textContent = "";
-                                if (previewRefreshBtn) previewRefreshBtn.disabled = false;
-                                throw new Error(message);
-                            });
+                            setPreviewStatus(response.status + " " + response.statusText);
+                            if (previewMeta) previewMeta.textContent = "";
+                            if (previewRefreshBtn) previewRefreshBtn.disabled = false;
+                            return;
                         }
                         var contentType = response.headers.get("content-type") || "application/octet-stream";
                         var mime = contentType.split(";")[0].trim();
                         var contentLength = response.headers.get("content-length");
                         setPreviewMeta(file, mime, contentLength ? formatBytes(Number(contentLength)) : "");
+                        // Streamable types — use direct URL so the browser handles Range requests natively
+                        if (mime.startsWith("video/") || mime.startsWith("audio/") || mime === "application/pdf") {
+                            var dummyBlob = new Blob();
+                            renderPreviewBlob(dummyBlob, mime, file, streamUrl);
+                            previewRefreshBtn.disabled = false;
+                            return;
+                        }
+                        // Text-like types — fetch content (truncated for display)
                         if (mime.startsWith("text/") || mime === "application/json" || mime === "application/xml" || mime === "application/javascript") {
-                            return response.text().then(function (text) {
-                                renderPreviewText(text, mime);
-                                previewRefreshBtn.disabled = false;
+                            return fetch(streamUrl, { credentials: "same-origin" }).then(function (res) {
+                                return res.text().then(function (text) {
+                                    renderPreviewText(text, mime);
+                                    previewRefreshBtn.disabled = false;
+                                });
                             });
                         }
-                        return response.blob().then(function (blob) {
-                            renderPreviewBlob(blob, mime, file);
-                            previewRefreshBtn.disabled = false;
+                        // Images and other binary types — fetch full blob
+                        return fetch(streamUrl, { credentials: "same-origin" }).then(function (res) {
+                            return res.blob().then(function (blob) {
+                                renderPreviewBlob(blob, mime, file);
+                                previewRefreshBtn.disabled = false;
+                            });
                         });
                     })
                     .catch(function (error) {
-                        if (!error || !error.message) {
-                            setPreviewStatus("Preview unavailable.");
-                        }
+                        setPreviewStatus("Preview unavailable.");
                         if (previewMeta && !previewMeta.textContent) previewMeta.textContent = "";
                         if (previewRefreshBtn) previewRefreshBtn.disabled = false;
                         console.warn("Preview failed:", error);
