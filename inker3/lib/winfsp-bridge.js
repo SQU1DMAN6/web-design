@@ -117,8 +117,17 @@ class WinFspBridge extends EventEmitter {
         } catch (err) { console.log("[Bridge:sync] Error:", err.message); }
     }
 
+    // Helper: skip hidden/trash files from API listing
+    _shouldSkip(path) {
+        if (!path) return true;
+        if (path.startsWith(".")) return true;
+        if (path.indexOf("/.") !== -1) return true;
+        if (path.indexOf(".Trash") !== -1) return true;
+        return false;
+    }
+
     async _refreshListing() {
-        if (!this._user || !this._drop || !this.virtualFs || !native || !native.updateEntries) return;
+        if (!this._user || !this._drop || !this.virtualFs || !native || !native.updateEntries || !native.removeEntries) return;
         try {
             console.log("[Bridge:refresh] Checking for remote changes...");
             var entries = await this.virtualFs.hydrator.refreshListing(this._user, this._drop);
@@ -126,20 +135,23 @@ class WinFspBridge extends EventEmitter {
 
             var hasChanges = false;
             var updatedEntries = [];
+            var remotePaths = new Set();
 
             for (var i = 0; i < entries.length; i++) {
                 var e = entries[i];
+                if (this._shouldSkip(e.path)) continue;
+                if (e.type === "dir") continue;
+
+                remotePaths.add(e.path);
+
                 var lastMod = this._lastModified.get(e.path) || 0;
                 var remoteMod = e.modified || 0;
-
-                if (e.type === "dir") continue;
 
                 if (remoteMod !== lastMod && remoteMod > 0) {
                     console.log("[Bridge:refresh] Changed: " + e.path + " (local=" + lastMod + " remote=" + remoteMod + ")");
                     hasChanges = true;
                     try {
                         var buf = await this.virtualFs.hydrator.readFullFile(this._user, this._drop, e.path);
-                        // Add to updated entries with content + prefix path
                         var fe = { path: this._dropKey + "/" + e.path, size: e.size, modified: remoteMod, type: "file", content: buf.toString('base64') };
                         updatedEntries.push(fe);
                         this._contentHashes.set(e.path, crypto.createHash('md5').update(buf).digest('hex'));
@@ -148,6 +160,26 @@ class WinFspBridge extends EventEmitter {
                     } catch (err) {
                         console.log("[Bridge:refresh] Download failed for " + e.path + ": " + err.message);
                     }
+                }
+            }
+
+            // Compute stale entries: exist in _lastModified but not in remotePaths
+            var stalePaths = [];
+            var self = this;
+            this._lastModified.forEach(function(mod, path) {
+                if (!remotePaths.has(path) && !self._shouldSkip(path)) {
+                    stalePaths.push(path);
+                }
+            });
+
+            if (stalePaths.length > 0) {
+                // Prepend dropKey prefix for C++ map keys
+                var prefixedStale = stalePaths.map(function(p){ return this._dropKey + "/" + p; }.bind(this));
+                console.log("[Bridge:refresh] Stale entries (removed on remote): " + stalePaths.join(", "));
+                native.removeEntries(prefixedStale);
+                for (var s = 0; s < stalePaths.length; s++) {
+                    this._lastModified.delete(stalePaths[s]);
+                    this._contentHashes.delete(stalePaths[s]);
                 }
             }
 

@@ -383,9 +383,41 @@ Napi::Value Unmount(const Napi::CallbackInfo &info) {
 }
 
 /**
+ * removeEntries(pathsArray) → void
+ * Removes entries from the in-memory map. Called when files are deleted on InkDrop.
+ * Also removes from dirty_keys if present so stale dirty markers don't linger.
+ */
+Napi::Value RemoveEntries(const Napi::CallbackInfo &info) {
+    Napi::Env env = info.Env();
+    if (info.Length() < 1 || !info[0].IsArray()) return env.Undefined();
+    MountState *state = nullptr;
+    { std::lock_guard<std::mutex> lock(g_mounts_mutex); for (auto &kv : g_mounts) { state = kv.second; break; } }
+    if (!state) return env.Undefined();
+    Napi::Array paths = info[0].As<Napi::Array>();
+    uint32_t len = paths.Length();
+    printf("[NATIVE:removeEntries] %u paths\n", len);
+    for (uint32_t i = 0; i < len; i++) {
+        Napi::Value val = paths.Get(i);
+        if (!val.IsString()) continue;
+        std::string path = val.As<Napi::String>().Utf8Value();
+        {
+            std::lock_guard<std::mutex> lock(state->entries_mutex);
+            state->entries.erase(path);
+        }
+        {
+            std::lock_guard<std::mutex> lock(state->dirty_mutex);
+            state->dirty_keys.erase(path);
+            state->dirty_keys.erase("!" + path);
+        }
+    }
+    printf("[NATIVE:removeEntries] %zu entries remain\n", state->entries.size());
+    return env.Undefined();
+}
+
+/**
  * updateEntries(entriesArray) → void
  * Called from JS refresh loop. Updates the in-memory file map with the
- * latest state from InkDrop. Removes entries that no longer exist on remote.
+ * latest state from InkDrop.
  * Does NOT mark as dirty (remote is truth).
  */
 Napi::Value UpdateEntries(const Napi::CallbackInfo &info) {
@@ -413,10 +445,10 @@ Napi::Value UpdateEntries(const Napi::CallbackInfo &info) {
         // Check if entry exists locally
         std::lock_guard<std::mutex> lock(state->entries_mutex);
         auto it = state->entries.find(path);
+        bool isDirty = false;
+        { std::lock_guard<std::mutex> dl(state->dirty_mutex); isDirty = state->dirty_keys.count(path) > 0; }
+        
         if (it != state->entries.end()) {
-            // Entry exists — only update content if remote is newer AND not dirty
-            bool isDirty = false;
-            { std::lock_guard<std::mutex> dl(state->dirty_mutex); isDirty = state->dirty_keys.count(path) > 0; }
             if (!isDirty) {
                 if (obj.Has("content") && obj.Get("content").IsString()) {
                     std::string b64 = obj.Get("content").As<Napi::String>().Utf8Value();
@@ -428,17 +460,18 @@ Napi::Value UpdateEntries(const Napi::CallbackInfo &info) {
                 if (obj.Has("type")) { std::string t = obj.Get("type").As<Napi::String>().Utf8Value(); it->second.is_dir = (t == "dir"); }
             }
         } else {
-            // New entry from remote — add it
-            FileEntry fe;
-            fe.name = path;
-            fe.size = obj.Has("size") ? obj.Get("size").As<Napi::Number>().Int64Value() : 0;
-            fe.mtime = obj.Has("modified") ? (long long)obj.Get("modified").As<Napi::Number>().DoubleValue() : 0;
-            if (obj.Has("type")) { std::string t = obj.Get("type").As<Napi::String>().Utf8Value(); fe.is_dir = (t == "dir"); }
-            if (obj.Has("content") && obj.Get("content").IsString() && !fe.is_dir) {
-                fe.content = base64_decode(obj.Get("content").As<Napi::String>().Utf8Value());
+            // NEW entry from remote — add if not dirty
+            if (!isDirty) {
+                FileEntry fe;
+                fe.name = path;
+                fe.size = obj.Has("size") ? obj.Get("size").As<Napi::Number>().Int64Value() : 0;
+                fe.mtime = obj.Has("modified") ? (long long)obj.Get("modified").As<Napi::Number>().DoubleValue() : 0;
+                if (obj.Has("type")) { std::string t = obj.Get("type").As<Napi::String>().Utf8Value(); fe.is_dir = (t == "dir"); }
+                if (obj.Has("content") && obj.Get("content").IsString() && !fe.is_dir) {
+                    fe.content = base64_decode(obj.Get("content").As<Napi::String>().Utf8Value());
+                }
+                state->entries[path] = fe;
             }
-            std::lock_guard<std::mutex> lock(state->entries_mutex);
-            state->entries[path] = fe;
         }
     }
     
@@ -521,6 +554,7 @@ Napi::Value GetVersion(const Napi::CallbackInfo &info) { return Napi::String::Ne
 Napi::Object Init(Napi::Env env, Napi::Object exports) {
     exports.Set("mount", Napi::Function::New(env, Mount));
     exports.Set("unmount", Napi::Function::New(env, Unmount));
+    exports.Set("removeEntries", Napi::Function::New(env, RemoveEntries));
     exports.Set("updateEntries", Napi::Function::New(env, UpdateEntries));
     exports.Set("getDirty", Napi::Function::New(env, GetDirty));
     exports.Set("getCacheStats", Napi::Function::New(env, GetCacheStats));
