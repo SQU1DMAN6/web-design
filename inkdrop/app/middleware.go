@@ -80,12 +80,12 @@ func SecureHeaders(next http.Handler) http.Handler {
 			"worker-src 'self' blob:;",
 			"object-src 'self' blob:;",
 			"frame-src 'self' blob:;",
-			"frame-ancestors 'none';",
+			"frame-ancestors 'self';",
 			"base-uri 'self';",
 		}, " ")
 
 		w.Header().Set("X-Content-Type-Options", "nosniff")
-		w.Header().Set("X-Frame-Options", "DENY")
+		w.Header().Set("X-Frame-Options", "SAMEORIGIN")
 		w.Header().Set("Referrer-Policy", "strict-origin-when-cross-origin")
 		w.Header().Set("Permissions-Policy", "geolocation=(), microphone=(), camera=()")
 		w.Header().Set("Content-Security-Policy", csp)

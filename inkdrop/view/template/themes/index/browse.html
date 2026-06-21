@@ -1276,13 +1276,29 @@
                         var mime = contentType.split(";")[0].trim();
                         var contentLength = response.headers.get("content-length");
                         setPreviewMeta(file, mime, contentLength ? formatBytes(Number(contentLength)) : "");
-                        // Streamable types — use direct URL so the browser handles Range requests natively
-                        if (mime.startsWith("video/") || mime.startsWith("audio/") || mime === "application/pdf") {
-                            var dummyBlob = new Blob();
-                            renderPreviewBlob(dummyBlob, mime, file, streamUrl);
+                // Video/audio — use direct URL so the browser handles Range requests natively
+                if (mime.startsWith("video/") || mime.startsWith("audio/")) {
+                    var dummyBlob = new Blob();
+                    renderPreviewBlob(dummyBlob, mime, file, streamUrl);
+                    previewRefreshBtn.disabled = false;
+                    return;
+                }
+                // PDF — fetch as blob to embed securely (avoids auth issues with object tag)
+                if (mime === "application/pdf") {
+                    return fetch(streamUrl, { credentials: "same-origin" }).then(function (res) {
+                        return res.blob().then(function (blob) {
+                            var pdfUrl = URL.createObjectURL(blob);
+                            if (previewBlobUrl) URL.revokeObjectURL(previewBlobUrl);
+                            previewBlobUrl = pdfUrl;
+                            var markup = '<object class="preview-pdf" data="' + pdfUrl + '" type="application/pdf" style="width:100%;height:600px;">Preview unavailable. <a href="' + streamUrl + '">Open PDF</a></object>';
+                            previewContent.innerHTML = markup;
                             previewRefreshBtn.disabled = false;
-                            return;
-                        }
+                        });
+                    }).catch(function (err) {
+                        setPreviewStatus("PDF preview unavailable.");
+                        previewRefreshBtn.disabled = false;
+                    });
+                }
                         // Text-like types — fetch content (truncated for display)
                         if (mime.startsWith("text/") || mime === "application/json" || mime === "application/xml" || mime === "application/javascript") {
                             return fetch(streamUrl, { credentials: "same-origin" }).then(function (res) {

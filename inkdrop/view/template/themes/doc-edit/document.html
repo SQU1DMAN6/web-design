@@ -595,17 +595,46 @@
 
             #docEditorSurface .doc-editor-mount {
                 font-family: Calibri, "Segoe UI", Arial, sans-serif;
+                line-height: 1.15;
+            }
+
+            #docEditorSurface .doc-editor-mount p {
+                margin: 0 0 8pt 0;
+                line-height: 1.15;
+            }
+            
+            #docEditorSurface .doc-editor-mount p:empty {
+                margin: 0;
+                min-height: 11pt;
             }
 
             #docEditorSurface .doc-editor-mount ul,
             #docEditorSurface .doc-editor-mount ol {
-                margin: 0.45em 0 0.85em;
+                margin: 0.25em 0 0.5em;
                 padding-inline-start: 1.5em;
             }
 
             #docEditorSurface .doc-editor-mount li {
-                margin: 0.08em 0;
+                margin: 0.04em 0;
                 padding-left: 0.08em;
+            }
+            
+            #docEditorSurface .doc-editor-mount h1 {
+                margin: 18pt 0 6pt 0;
+                line-height: 1.2;
+            }
+            
+            #docEditorSurface .doc-editor-mount h2 {
+                margin: 14pt 0 6pt 0;
+                line-height: 1.25;
+            }
+            
+            #docEditorSurface.click-to-focus {
+                cursor: text;
+            }
+            
+            #docEditorSurface.click-to-focus .doc-editor-mount {
+                min-height: 11in;
             }
 
             #docEditorSurface table {
@@ -3782,7 +3811,7 @@
                         paragraphStyleMap["line-height"] ||
                         getSelectedLineHeightValue() ||
                         lineHeightInput.value ||
-                        "1.5";
+                        "1.15";
                     lineHeightInput.value = String(activeLineHeight);
                     lineHeightInput.disabled = !ready;
                 }
@@ -3882,6 +3911,12 @@
                                             <button type="button" class="doc-toolbar-button" data-doc-action="apply-line-height" title="Apply line height">Apply LH</button>
                                         </div>
                                         <div class="doc-toolbar-group">
+                                            <button type="button" class="doc-toolbar-button" data-doc-action="para-space-before" title="Add space before paragraph">▴ Space</button>
+                                            <button type="button" class="doc-toolbar-button" data-doc-action="para-space-after" title="Add space after paragraph">Space ▾</button>
+                                            <button type="button" class="doc-toolbar-button" data-doc-action="para-space-remove-before" title="Remove space before paragraph">▴ NoSp</button>
+                                            <button type="button" class="doc-toolbar-button" data-doc-action="para-space-remove-after" title="Remove space after paragraph">NoSp ▾</button>
+                                        </div>
+                                        <div class="doc-toolbar-group">
                                             <label class="doc-toolbar-field doc-toolbar-field-size">
                                                 <span class="doc-toolbar-label">Left Margin</span>
                                                 <input type="number" class="doc-toolbar-input" id="docToolbarMarginLeft" min="0" max="4" step="0.1" value="1">
@@ -3901,6 +3936,11 @@
                                     </div>
                                 </div>
                                 <button type="button" class="doc-toolbar-toggle" id="docToolbarToggle" aria-expanded="false" title="Expand toolbar">▾</button>
+                            </div>
+                            <div id="docWordCountBar" style="margin-top:6px;display:flex;gap:12px;font-size:0.72rem;color:var(--doc-muted);padding:4px 8px;border-radius:10px;">
+                                <span id="docWordCountDisplay">Words: 0</span>
+                                <span id="docCharCountDisplay">Chars: 0</span>
+                                <span id="docWordCountSelection" style="display:none;"></span>
                             </div>
                         `;
 
@@ -4015,6 +4055,26 @@
                                 });
                                 applyVisibleLineHeightPreview(value);
                                 return result;
+                            }
+                            if (actionName === "para-space-before") {
+                                return updateActiveTextBlockStyles({
+                                    "margin-top": "12pt",
+                                });
+                            }
+                            if (actionName === "para-space-after") {
+                                return updateActiveTextBlockStyles({
+                                    "margin-bottom": "12pt",
+                                });
+                            }
+                            if (actionName === "para-space-remove-before") {
+                                return updateActiveTextBlockStyles({
+                                    "margin-top": "0",
+                                });
+                            }
+                            if (actionName === "para-space-remove-after") {
+                                return updateActiveTextBlockStyles({
+                                    "margin-bottom": "0",
+                                });
                             }
 
                             const commandName =
@@ -7933,6 +7993,7 @@
                     return;
                 }
                 captureSelectionState();
+                updateWordCount();
             });
 
             menuTriggers.forEach((trigger) => {
@@ -8219,6 +8280,7 @@
                         }, 10000);
                         connectStream();
                         startSnapshotPolling();
+                        setTimeout(() => focusActiveEditor({ restoreSelection: false }), 300);
                     })
                     .catch((error) => {
                         console.error("InkDrop document editor failed", error);
