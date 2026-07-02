@@ -414,30 +414,18 @@ func CanReadContactDrops(db *bun.DB, requester string, dropOwner string) bool {
 	err := db.NewSelect().
 		Model((*ContactRequest)(nil)).
 		ColumnExpr("count(*)").
-		Where("requester = ?", requester).
-		Where("recipient = ?", dropOwner).
+		Where("((requester = ? AND recipient = ?) OR (requester = ? AND recipient = ?))", requester, dropOwner, dropOwner, requester).
 		Where("status = ?", "accepted").
 		Scan(ctx, &count)
 	return err == nil && count > 0
 }
 
-func ListAcceptedContactOwners(db *bun.DB, requester string) ([]string, error) {
-	var contacts []ContactRequest
-	ctx := context.Background()
-	err := db.NewSelect().
-		Model(&contacts).
-		Where("requester = ?", requester).
-		Where("status = ?", "accepted").
-		OrderExpr("recipient ASC").
-		Scan(ctx)
+func ListAcceptedContactOwners(db *bun.DB, username string) ([]string, error) {
+	contacts, err := ListMutualContacts(db, username)
 	if err != nil {
 		return nil, err
 	}
-	owners := make([]string, 0, len(contacts))
-	for _, contact := range contacts {
-		owners = append(owners, contact.Recipient)
-	}
-	return owners, nil
+	return contacts, nil
 }
 
 func ListMutualContacts(db *bun.DB, username string) ([]string, error) {

@@ -360,11 +360,6 @@ func ListSharedDrops(username string) ([]map[string]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	contactOwners, _ := userModel.ListAcceptedContactOwners(config.GetDB(), username)
-	contactOwnerSet := map[string]bool{}
-	for _, owner := range contactOwners {
-		contactOwnerSet[owner] = true
-	}
 	for _, u := range users {
 		if !u.IsDir() {
 			continue
@@ -386,26 +381,25 @@ func ListSharedDrops(username string) ([]map[string]string, error) {
 				continue
 			}
 			key := userName + "/" + dropName
-			if contactOwnerSet[userName] {
-				desc := ""
-				if meta, err := LoadRepoMeta(userName, dropName); err == nil && meta != nil {
-					desc = meta.Description
-				}
-				results = append(results, map[string]string{"user": userName, "repo": dropName, "description": desc})
-				seen[key] = true
+			if seen[key] {
 				continue
 			}
-			if meta, err := LoadRepoMeta(userName, dropName); err == nil && meta != nil {
-				for _, o := range meta.Owners {
-					if o == username {
-						if seen[key] {
-							break
-						}
-						results = append(results, map[string]string{"user": userName, "repo": dropName, "description": meta.Description})
-						seen[key] = true
-						break
-					}
+			meta, err := LoadRepoMeta(userName, dropName)
+			if err != nil || meta == nil {
+				continue
+			}
+			// Only show drops where the user is explicitly listed as an owner
+			// or the drop is public. Contact relationship alone is insufficient.
+			isOwner := false
+			for _, o := range meta.Owners {
+				if o == username {
+					isOwner = true
+					break
 				}
+			}
+			if isOwner || meta.Public {
+				results = append(results, map[string]string{"user": userName, "repo": dropName, "description": meta.Description})
+				seen[key] = true
 			}
 		}
 	}
