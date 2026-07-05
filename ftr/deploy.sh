@@ -1,3 +1,4 @@
+go build -o BUILD/linux-x64/ftr .
 go run . pack . -C ftr-manager
 go run . up ftr-manager*.sqar JFtR/ftr-manager
 rm ftr-manager*.sqar

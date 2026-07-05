@@ -156,6 +156,9 @@ Writes are uploaded back to the remote Drop when file handles are closed.
 		mountOpts := []fuse.MountOption{
 			fuse.FSName("ftr"),
 			fuse.Subtype("ftrfs"),
+			fuse.AllowOther(),
+			fuse.AllowSUID(),
+			fuse.DefaultPermissions(),
 		}
 		if mountReadOnly {
 			mountOpts = append(mountOpts, fuse.ReadOnly())
@@ -226,6 +229,18 @@ func NewRemoteFS(client *api.Client, user, repo string, fileList []api.RepoEntry
 
 func (rfs *RemoteFS) Root() (fs.Node, error) {
 	return rfs.root, nil
+}
+
+func (rfs *RemoteFS) Statfs(ctx context.Context, req *fuse.StatfsRequest, resp *fuse.StatfsResponse) error {
+	resp.Blocks = 1024 * 1024 * 1024
+	resp.Bfree = 4 * 1024 * 1024 * 1024
+	resp.Bavail = 4 * 1024 * 1024 * 1024
+	resp.Files = 1 << 20
+	resp.Ffree = 1 << 20
+	resp.Bsize = 4096
+	resp.Namelen = 255
+	resp.Frsize = 4096
+	return nil
 }
 
 func (rfs *RemoteFS) cacheTTL() time.Duration {
@@ -725,6 +740,43 @@ func (d *RemoteDir) Getattr(ctx context.Context, req *fuse.GetattrRequest, resp 
 		return err
 	}
 	resp.Attr.Valid = d.fsys.cacheTTL()
+	return nil
+}
+
+func (d *RemoteDir) Setattr(ctx context.Context, req *fuse.SetattrRequest, resp *fuse.SetattrResponse) error {
+	if d.fsys.readOnly {
+		return fuse.Errno(syscall.EROFS)
+	}
+
+	// Handle mode changes (e.g., chmod)
+	if req.Valid.Mode() {
+		d.mode = req.Mode
+	}
+
+	// Handle uid/gid changes (chown)
+	if req.Valid.Uid() {
+		d.uid = req.Uid
+	}
+	if req.Valid.Gid() {
+		d.gid = req.Gid
+	}
+
+	if err := d.Attr(ctx, &resp.Attr); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (d *RemoteDir) Open(ctx context.Context, req *fuse.OpenRequest, resp *fuse.OpenResponse) error {
+	// Directories can always be opened for reading
+	if req.Flags&fuse.OpenTruncate != 0 {
+		return fuse.Errno(syscall.EISDIR)
+	}
+	if req.Flags.IsWriteOnly() || req.Flags.IsReadWrite() {
+		if d.fsys.readOnly {
+			return fuse.Errno(syscall.EROFS)
+		}
+	}
 	return nil
 }
 

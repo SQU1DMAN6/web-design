@@ -9,7 +9,8 @@ inker3/BUILD/*.exe
 inker3/BUILD/windows-x64
 inker3/BUILD/windows-x64/*
 inkdrop/bin/*
-
+*/BUILD/linux*
+*/BUILD/linux*/*
 inker3/lib/winfsp_native.node
 inker3/native/build/
 inker3/native/node_modules/
