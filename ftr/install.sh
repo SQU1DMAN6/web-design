@@ -17,10 +17,22 @@ cd /tmp/fsdl
 echo "Creating share directory at /usr/local/share/ftr..."
 sudo mkdir -p "/usr/local/share/ftr"
 
-echo "Building FtR..."
-go build -buildvcs=false -o ftr .
-echo "Making binary executable..."
-chmod 755 ./ftr
+read -p "Do you want to build ftr from source? This requires the Go compiler to be installed. [y/N]" response
+
+case "$response" in
+	[yY][eE][sS]|[yY])
+		echo "Building FtR..."
+		go build -buildvcs=false -o ftr .
+		echo "Making binary executable..."
+		chmod 755 ./ftr
+		;;
+	*)
+		echo "Using pre-compiled x86_64 ELF binary..."
+		cp ./BUILD/linux-x64/ftr ./ftr
+		echo "Making binary executable..."
+		chmod 755 ./ftr
+		;;
+esac
 
 if [ -f "/usr/local/bin/ftr" ]; then
 	echo "Renaming busy application file..."

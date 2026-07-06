@@ -8,22 +8,28 @@ sudo rm -rf /tmp/fsdl/
 mkdir -p /tmp/fsdl/
 cd /tmp/fsdl/
 
-echo "Extracting source code..."
-curl --silent https://quanthai.net/ftr-manager-3.0.0-all-linux.fsdl -o ftr-manager.fsdl
+echo "Fetching source code..."
+curl -sSL https://quanthai.net/ftr-manager-3.2.0-all-linux.fsdl -o ftr-manager.fsdl
 sudo unzip -qq ftr-manager.fsdl
 sudo chown -R $(whoami):$(whoami) /tmp/fsdl
 
 if ! command -v go >/dev/null 2>&1; then
-	"Error: Please install Golang to use the 'go' command necessary to install FtR."
-	exit 1
+	if [ "$(uname -m)" = "x86_64" ]; then
+		echo "Architecture is x86_64"
+		echo "Go is not installed, will proceed to use pre-compiled binary."
+		./BUILD/linux-x64/ftr get JFtR/ftr-manager
+	else
+		echo "Architecture is not x86_64. If you want to use FtR, please consider installing Go."
+		exit 1
+	fi
+else
+	echo "Go is installed, proceeding to build FtR from source..."
+	go run . get JFtR/ftr-manager
 fi
-
-echo "Please sign in to your InkDrop account to use FtR."
-go run . get JFtR/ftr-manager
 
 echo "FtR package manager has been installed successfully. Use 'ftr' as shell command to use it."
 echo "ftr --help"
 ftr --help
 
-echo "Removing evidence..."
+echo "Removing evidence (A.K.A. Cleaning up)..."
 sudo ftr clear
