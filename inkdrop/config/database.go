@@ -24,7 +24,11 @@ func ConnectDatabase() {
 	fmt.Println("Database connected.")
 	db = bun.NewDB(sqldb, sqlitedialect.New())
 
+	// Initialize all models (tables created if not exist)
 	model.ModelUser(db)
+	model.ModelDrop(db)
+	model.ModelFile(db)
+	model.ModelActivity(db)
 }
 
 func GetDB() *bun.DB {

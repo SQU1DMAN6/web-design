@@ -2,8 +2,11 @@ package app
 
 import (
 	routes "inkdrop"
+	"inkdrop/api"
 	"inkdrop/config"
 	"inkdrop/repository"
+	"inkdrop/service"
+	"inkdrop/storage/filesystem"
 	"log"
 	"net/http"
 	"strings"
@@ -29,7 +32,20 @@ func BootApp() {
 
 	RegisterMiddleWares(r)
 	RegisterStatic(r)
+
+	// Register legacy routes (InkDrop 3.x compatibility)
 	routes.RegisterRoutes(r)
+
+	// Initialize v4 services
+	inkdropRoot := repository.RootDir
+	store := filesystem.NewStore(inkdropRoot)
+	dropSvc := service.NewDropService(store)
+	permSvc := service.NewPermissionService()
+	fileSvc := service.NewFileService(store, permSvc)
+	searchSvc := service.NewSearchService(permSvc)
+
+	// Register v4 API routes
+	api.RegisterV4Routes(r, dropSvc, fileSvc, permSvc, searchSvc)
 
 	// The TUS upload handler is served outside the main chi router
 	// because the TUS protocol requires trailing slashes in URLs,

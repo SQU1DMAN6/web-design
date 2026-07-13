@@ -9,12 +9,13 @@ require (
 	github.com/uptrace/bun v1.2.16
 	github.com/uptrace/bun/dialect/sqlitedialect v1.2.16
 	github.com/uptrace/bun/driver/sqliteshim v1.2.16
-	golang.org/x/crypto v0.48.0
+	golang.org/x/crypto v0.54.0
 )
 
 require (
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/google/uuid v1.6.0 // indirect
+	github.com/gorilla/websocket v1.5.3 // indirect
 	github.com/jinzhu/inflection v1.0.0 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/mattn/go-sqlite3 v1.14.32 // indirect
@@ -27,7 +28,8 @@ require (
 	github.com/vmihailenco/msgpack/v5 v5.4.1 // indirect
 	github.com/vmihailenco/tagparser/v2 v2.0.0 // indirect
 	golang.org/x/exp v0.0.0-20251113190631-e25ba8c21ef6 // indirect
-	golang.org/x/sys v0.41.0 // indirect
+	golang.org/x/net v0.57.0 // indirect
+	golang.org/x/sys v0.47.0 // indirect
 	modernc.org/libc v1.67.0 // indirect
 	modernc.org/mathutil v1.7.1 // indirect
 	modernc.org/memory v1.11.0 // indirect
