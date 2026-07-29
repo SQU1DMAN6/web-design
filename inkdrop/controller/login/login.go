@@ -2,13 +2,14 @@ package login
 
 import (
 	"fmt"
+	"net/http"
+	"strings"
+	"time"
+
 	"inkdrop/config"
 	"inkdrop/controller/auth"
 	userModel "inkdrop/model"
 	viewBackend "inkdrop/view/connector"
-	"net/http"
-	"strings"
-	"time"
 )
 
 func LoginMain(w http.ResponseWriter, r *http.Request) {
@@ -27,7 +28,6 @@ func LoginMain(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := viewBackend.LoginMain(w, p); err != nil {
-		// if the template fails, propagate a generic error
 		http.Error(w, "Failed to render page", http.StatusInternalServerError)
 	}
 }
@@ -75,15 +75,11 @@ func LoginMainPost(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	//future work: csrf https://github.com/gorilla/csrf
-
-	fmt.Println("User tried to log in:", userEmail)
-
 	db := config.GetDB()
 
 	user, err := userModel.CheckPassword(db, userEmail, userPassword)
 	if err != nil {
-		fmt.Println("Error:", err)
+		fmt.Println("Login lookup failed:", err)
 		paramData := viewBackend.FrontEndParams{
 			Title:   "Login",
 			Message: "Log into an existing FtR account",
@@ -99,9 +95,7 @@ func LoginMainPost(w http.ResponseWriter, r *http.Request) {
 	}
 	auth.ClearAttempts(r, "login")
 
-	fmt.Printf("\nUser: %v | ID: %v | Email: %v\n", user.Name, user.ID, user.Email)
 	SS := config.GetSessionManager()
-
 	SS.Put(r.Context(), "email", user.Email)
 	SS.Put(r.Context(), "name", user.Name)
 	SS.Put(r.Context(), "isLoggedIn", true)

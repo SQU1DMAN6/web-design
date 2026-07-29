@@ -1,0 +1,205 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="stylesheet" href="/assets/root.css" />
+    <link rel="stylesheet" href="/assets/v4.css" />
+    <title>{{ .Title }} — InkDrop</title>
+</head>
+<body>
+    <!-- ===== Top Navigation Bar ===== -->
+    <header class="v4-nav" id="navPanel">
+        <div class="v4-nav-inner">
+            <div class="v4-nav-left">
+                <a href="/" class="v4-brand">InkDrop</a>
+            </div>
+            <div class="v4-nav-center">
+                <div class="v4-search-wrap">
+                    <svg class="v4-search-icon" viewBox="0 0 24 24" width="16" height="16"><circle cx="11" cy="11" r="8" stroke="currentColor" stroke-width="2" fill="none"/><path d="M21 21l-4.3-4.3" stroke="currentColor" stroke-width="2" fill="none"/></svg>
+                    <input type="search" class="v4-search-input" id="globalSearch" placeholder="Search drops, files, people..." autocomplete="off" aria-label="Global search" />
+                </div>
+            </div>
+            <div class="v4-nav-right">
+                <div class="theme-switch" role="group" aria-label="Theme mode">
+                    <button type="button" data-theme-set="light" aria-pressed="false">Light</button>
+                    <button type="button" data-theme-set="dark" aria-pressed="false">Dark</button>
+                </div>
+                <div class="profile-menu">
+                    <button type="button" class="profile-button" id="profileMenuButton" aria-haspopup="menu" aria-expanded="false">
+                        <span class="profile-button-content">
+                            {{if .UserPFP}}<img src="{{.UserPFP}}" alt="" class="profile-chip-image" />{{else}}<img src="/pfp/default.png" alt="" class="profile-chip-image" />{{end}}
+                            <span class="profile-button-name">{{.Name}}</span>
+                            <span class="profile-caret" aria-hidden="true"></span>
+                        </span>
+                    </button>
+                    <div id="profileMenu" class="profile-dropdown" role="menu" hidden>
+                        <p class="menu-label">Signed in as</p>
+                        <p class="menu-user">{{.Name}}</p>
+                        <button type="button" class="button-link small" id="openAccountSettings" role="menuitem">Account Settings</button>
+                        <a href="/logout" class="button-link small" role="menuitem" style="display:block;margin-top:6px;text-align:center;">Log Out</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tab Navigation -->
+        <div class="v4-nav-links" id="mainTabs">
+            <button type="button" class="v4-nav-link active" data-tab="home">My Drops</button>
+            <button type="button" class="v4-nav-link" data-tab="shared">Shared With Me</button>
+            <button type="button" class="v4-nav-link" data-tab="public">Public Drops</button>
+            <button type="button" class="v4-nav-link" data-tab="contacts">Contacts</button>
+        </div>
+    </header>
+
+    <!-- ===== Main 4-Panel Layout ===== -->
+    <main class="v4-main">
+        <!-- Drop Information Panel -->
+        <aside class="v4-drop-panel" id="dropPanel" aria-label="Drop information">
+            <div class="v4-drop-panel-content" id="dropPanelContent">
+                <div class="v4-drop-panel-placeholder">
+                    <svg viewBox="0 0 24 24" width="32" height="32" stroke="var(--muted)" stroke-width="1.5" fill="none"><path d="M6 3h9l4 4v14H6z"/><path d="M15 3v5h5"/></svg>
+                    <p>Select a Drop<br/>to view details</p>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Project Manager Panel -->
+        <aside class="v4-project-panel" id="projectPanel" aria-label="Project manager">
+            <div class="v4-project-header">
+                <h2 class="v4-panel-title">Actions</h2>
+            </div>
+            <div class="v4-project-actions">
+                <button type="button" class="v4-action-btn" data-action="new-drop">
+                    <svg viewBox="0 0 24 24" width="16" height="16"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" fill="none"/></svg>
+                    New Drop
+                </button>
+                <button type="button" class="v4-action-btn" data-action="upload">
+                    <svg viewBox="0 0 24 24" width="16" height="16"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" stroke="currentColor" stroke-width="2" fill="none"/><path d="M17 8l-5-5-5 5M12 3v12" stroke="currentColor" stroke-width="2" fill="none"/></svg>
+                    Upload
+                </button>
+                <button type="button" class="v4-action-btn" data-action="new-folder">
+                    <svg viewBox="0 0 24 24" width="16" height="16"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z" stroke="currentColor" stroke-width="2" fill="none"/></svg>
+                    Folder
+                </button>
+                <button type="button" class="v4-action-btn" data-action="delete-drop" style="color:var(--red);border-color:rgba(239,68,68,0.3);">
+                    <svg viewBox="0 0 24 24" width="16" height="16"><path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2" stroke="currentColor" stroke-width="2" fill="none"/></svg>
+                    Delete
+                </button>
+            </div>
+            <div class="v4-project-tree" id="projectTree">
+                <div class="v4-tree-section">
+                    <h3 class="v4-tree-heading">Files</h3>
+                    <div class="v4-tree-items" id="fileTree"></div>
+                </div>
+                <div class="v4-tree-section">
+                    <h3 class="v4-tree-heading">Documents</h3>
+                    <div class="v4-tree-items" id="docTree"></div>
+                </div>
+                <div class="v4-tree-section">
+                    <h3 class="v4-tree-heading">Trash</h3>
+                    <div class="v4-tree-items" id="trashTree"></div>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Workspace View -->
+        <section class="v4-workspace" id="workspacePanel" aria-label="Workspace">
+            <div class="v4-workspace-toolbar" id="workspaceToolbar">
+                <div class="v4-workspace-breadcrumb" id="breadcrumb">
+                    <span class="v4-breadcrumb-item active">My Drops</span>
+                </div>
+                <div class="v4-workspace-controls" id="workspaceControls">
+                    <button type="button" class="v4-view-btn active" data-view="grid" title="Grid view">
+                        <svg viewBox="0 0 24 24" width="16" height="16"><rect x="3" y="3" width="7" height="7" stroke="currentColor" stroke-width="2" fill="none"/><rect x="14" y="3" width="7" height="7" stroke="currentColor" stroke-width="2" fill="none"/><rect x="3" y="14" width="7" height="7" stroke="currentColor" stroke-width="2" fill="none"/><rect x="14" y="14" width="7" height="7" stroke="currentColor" stroke-width="2" fill="none"/></svg>
+                    </button>
+                    <button type="button" class="v4-view-btn" data-view="list" title="List view">
+                        <svg viewBox="0 0 24 24" width="16" height="16"><line x1="8" y1="6" x2="21" y2="6" stroke="currentColor" stroke-width="2"/><line x1="8" y1="12" x2="21" y2="12" stroke="currentColor" stroke-width="2"/><line x1="8" y1="18" x2="21" y2="18" stroke="currentColor" stroke-width="2"/><line x1="3" y1="6" x2="3.01" y2="6" stroke="currentColor" stroke-width="2"/><line x1="3" y1="12" x2="3.01" y2="12" stroke="currentColor" stroke-width="2"/><line x1="3" y1="18" x2="3.01" y2="18" stroke="currentColor" stroke-width="2"/></svg>
+                    </button>
+                </div>
+            </div>
+            <div class="v4-workspace-content" id="workspaceContent">
+                <div class="v4-workspace-empty" id="workspaceEmpty">
+                    <svg viewBox="0 0 24 24" width="48" height="48" stroke="var(--muted)" stroke-width="1" fill="none"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg>
+                    <h3>Loading your Drops...</h3>
+                    <p>Please wait while we fetch your workspace.</p>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- ===== Create Drop Dialog ===== -->
+    <dialog class="v4-dialog" id="createDropDialog">
+        <form id="createDropForm" class="stack">
+            <h2>Create New Drop</h2>
+            <p class="subtle">A Drop is a workspace for your files, documents, and projects.</p>
+            <label class="field-label" for="newDropName">Drop Name</label>
+            <input type="text" id="newDropName" class="details" placeholder="e.g. My Project" required minlength="1" maxlength="64" autofocus />
+            <label class="field-label" for="newDropDesc">Description <span class="subtle">(optional)</span></label>
+            <textarea id="newDropDesc" class="details" rows="2" placeholder="What is this Drop about?"></textarea>
+            <div class="row" style="justify-content:flex-end;">
+                <button type="button" class="button-link" id="cancelCreateDrop">Cancel</button>
+                <button type="submit" class="redirect" id="submitCreateDrop">Create Drop</button>
+            </div>
+            <div id="createDropError" class="alert" style="display:none;"></div>
+        </form>
+    </dialog>
+
+    <!-- ===== Share Drop Dialog ===== -->
+    <dialog class="v4-dialog" id="shareDropDialog">
+        <form id="shareDropForm" class="stack">
+            <h2>Share Drop</h2>
+            <p class="subtle" id="shareDropName">Share with a contact</p>
+            <label class="field-label" for="shareContactName">Contact Name</label>
+            <input type="text" id="shareContactName" class="details" list="shareContactSuggestions" placeholder="Type a contact name..." required autocomplete="off" />
+            <datalist id="shareContactSuggestions"></datalist>
+            <label class="field-label" for="sharePermission">Permission</label>
+            <select id="sharePermission" class="details">
+                <option value="viewer">Can view</option>
+                <option value="editor">Can edit</option>
+            </select>
+            <p class="subtle">Viewers can see files. Editors can add, edit, and delete files.</p>
+            <div class="row" style="justify-content:flex-end;">
+                <button type="button" class="button-link" id="cancelShareDrop">Cancel</button>
+                <button type="submit" class="redirect" id="submitShareDrop">Share</button>
+            </div>
+            <div id="shareDropError" class="alert" style="display:none;"></div>
+        </form>
+    </dialog>
+
+    <!-- ===== Account Settings Dialog ===== -->
+    <dialog class="v4-dialog" id="accountSettingsDialog">
+        <form method="post" action="/account/settings" enctype="multipart/form-data" class="stack">
+            <h2>Account Settings</h2>
+            <div class="v4-dialog-grid">
+                <img src="{{if .UserPFP}}{{.UserPFP}}{{else}}/pfp/default.png{{end}}" alt="" class="settings-avatar" />
+                <div class="stack">
+                    <label class="field-label" for="bio">Bio</label>
+                    <textarea id="bio" name="bio" class="details account-bio" maxlength="512">{{.UserBio}}</textarea>
+                    <label class="field-label" for="profilePicture">Profile Picture</label>
+                    <input id="profilePicture" name="profile_picture" type="file" accept="image/png,image/jpeg,image/gif,image/webp" />
+                </div>
+            </div>
+            <div class="row" style="justify-content:flex-end;">
+                <button type="button" class="button-link" id="cancelAccountSettings">Cancel</button>
+                <button type="submit" class="redirect">Save Settings</button>
+            </div>
+        </form>
+    </dialog>
+
+    <!-- ===== Toast Notification ===== -->
+    <div id="toastContainer" class="v4-toast-container" aria-live="polite"></div>
+
+    <script src="/assets/v4.js"></script>
+    <script>
+        window.__INKDROP_INIT__ = {
+            userName: "{{.Name}}",
+            userPFP: "{{.UserPFP}}",
+            userBio: "{{.UserBio}}",
+            currentDropID: "{{.CurrentDropID}}",
+            currentDropName: "{{.CurrentDropName}}",
+            apiBase: "/api/v4"
+        };
+    </script>
+</body>
+</html>

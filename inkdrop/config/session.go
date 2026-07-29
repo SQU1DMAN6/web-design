@@ -29,7 +29,7 @@ func InitSession() error {
 	sessionManager.Cookie.HttpOnly = true
 	sessionManager.Cookie.Persist = true
 	sessionManager.Cookie.Path = "/"
-	sessionManager.Cookie.SameSite = http.SameSiteStrictMode
+	sessionManager.Cookie.SameSite = http.SameSiteLaxMode
 	sessionManager.Cookie.Secure = false
 	return nil
 }

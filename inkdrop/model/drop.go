@@ -2,34 +2,42 @@ package model
 
 import (
 	"context"
-	"encoding/json"
+	"database/sql"
+	"fmt"
+	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/uptrace/bun"
 )
 
 type DropVisibility string
 
 const (
-	DropVisibilityPrivate DropVisibility = "private"
-	DropVisibilityPublic  DropVisibility = "public"
-	DropVisibilityShared  DropVisibility = "shared"
+	DropVisibilityPrivate  DropVisibility = "private"
+	DropVisibilityShared   DropVisibility = "shared"
+	DropVisibilityContacts DropVisibility = "contacts"
+	DropVisibilityPublic   DropVisibility = "public"
 )
 
 type Drop struct {
-	ID          string         `bun:",pk" json:"id"`
-	Name        string         `bun:",notnull" json:"name"`
-	OwnerID     int64          `bun:",notnull" json:"owner_id"`
-	Description string         `bun:",nullzero" json:"description"`
-	Visibility  DropVisibility `bun:",notnull,default:'private'" json:"visibility"`
-	StoragePath string         `bun:",notnull" json:"storage_path"`
-	Settings    string         `bun:",nullzero" json:"-"` // JSON blob
+	ID          string        `bun:",pk" json:"id"`
+	Name        string        `bun:",notnull" json:"name"`
+	OwnerID     int64         `bun:",notnull" json:"owner_id"`
+	Description string        `bun:",notnull" json:"description"`
+	Visibility  DropVisibility `bun:",notnull" json:"visibility"`
+	Settings    string        `bun:",notnull" json:"settings"`
+	StoragePath string        `bun:",notnull" json:"storage_path"`
+	CreatedAt   int64         `bun:",notnull" json:"created_at"`
+	UpdatedAt   int64         `bun:",notnull" json:"updated_at"`
+}
 
-	CreatedAt int64 `bun:",notnull" json:"created_at"`
-	UpdatedAt int64 `bun:",notnull" json:"updated_at"`
-
-	// Parsed settings (not stored directly in DB)
-	ParsedSettings DropSettings `bun:"-" json:"settings,omitempty"`
+type DropMember struct {
+	ID        int64     `bun:",pk,autoincrement" json:"id"`
+	DropID    string    `bun:",notnull" json:"drop_id"`
+	UserID    int64     `bun:",notnull" json:"user_id"`
+	Role      DropRole  `bun:",notnull" json:"role"`
+	CreatedAt time.Time `bun:",nullzero,notnull,default:current_timestamp" json:"created_at"`
 }
 
 type DropSettings struct {
@@ -37,49 +45,18 @@ type DropSettings struct {
 	AllowUploads  bool `json:"allow_uploads"`
 }
 
-func DefaultDropSettings() DropSettings {
-	return DropSettings{
-		AllowComments: true,
-		AllowUploads:  false,
-	}
-}
-
-func (d *Drop) ParseSettings() DropSettings {
-	ds := DefaultDropSettings()
-	if d.Settings == "" {
-		return ds
-	}
-	if err := json.Unmarshal([]byte(d.Settings), &ds); err != nil {
-		return DefaultDropSettings()
-	}
-	return ds
-}
-
-func (d *Drop) MarshalSettings(settings DropSettings) string {
-	b, err := json.Marshal(settings)
-	if err != nil {
-		return "{}"
-	}
-	return string(b)
-}
-
 type DropRole string
 
 const (
-	DropRoleOwner  DropRole = "owner"
-	DropRoleEditor DropRole = "editor"
 	DropRoleViewer DropRole = "viewer"
+	DropRoleEditor DropRole = "editor"
+	DropRoleOwner  DropRole = "owner"
 )
 
-type DropMember struct {
-	DropID string   `bun:",pk" json:"drop_id"`
-	UserID int64    `bun:",pk" json:"user_id"`
-	Role   DropRole `bun:",notnull,default:'viewer'" json:"role"`
-}
+var ErrDropNotFound = fmt.Errorf("drop not found")
 
 func ModelDrop(db *bun.DB) error {
 	ctx := context.Background()
-
 	_, err := db.NewCreateTable().
 		Model((*Drop)(nil)).
 		IfNotExists().
@@ -87,7 +64,6 @@ func ModelDrop(db *bun.DB) error {
 	if err != nil {
 		return err
 	}
-
 	_, err = db.NewCreateTable().
 		Model((*DropMember)(nil)).
 		IfNotExists().
@@ -95,25 +71,82 @@ func ModelDrop(db *bun.DB) error {
 	if err != nil {
 		return err
 	}
+	return ensureDropColumns(db.DB)
+}
 
-	// Create indexes
-	if _, err := db.ExecContext(ctx, "CREATE INDEX IF NOT EXISTS idx_drops_owner ON drops(owner_id)"); err != nil {
-		return err
+func ensureDropColumns(sqldb *sql.DB) error {
+	defs := map[string]map[string]string{
+		"drops": {
+			"settings": "TEXT NOT NULL DEFAULT ''",
+		},
 	}
-	if _, err := db.ExecContext(ctx, "CREATE INDEX IF NOT EXISTS idx_drops_visibility ON drops(visibility)"); err != nil {
-		return err
+	for table, cols := range defs {
+		for col, def := range cols {
+			rows, err := sqldb.Query(fmt.Sprintf("PRAGMA table_info(%s)", table))
+			if err != nil {
+				return err
+			}
+			found := false
+			for rows.Next() {
+				var cid int
+				var name string
+				var columnType string
+				var notNull int
+				var defaultValue interface{}
+				var pk int
+				if err := rows.Scan(&cid, &name, &columnType, &notNull, &defaultValue, &pk); err != nil {
+					rows.Close()
+					return err
+				}
+				if strings.EqualFold(name, col) {
+					found = true
+					break
+				}
+			}
+			rows.Close()
+			if !found {
+				if _, err := sqldb.Exec(fmt.Sprintf("ALTER TABLE %s ADD COLUMN %s %s", table, col, def)); err != nil {
+					return err
+				}
+			}
+		}
 	}
-	if _, err := db.ExecContext(ctx, "CREATE INDEX IF NOT EXISTS idx_drop_members_user ON drop_members(user_id)"); err != nil {
-		return err
-	}
-	if _, err := db.ExecContext(ctx, "CREATE INDEX IF NOT EXISTS idx_drop_members_drop ON drop_members(drop_id)"); err != nil {
-		return err
-	}
-
 	return nil
 }
 
-// GetDropByID retrieves a drop by its UUID.
+// GenerateDropID returns a new unique drop identifier.
+func GenerateDropID() string {
+	return "drop_" + uuid.New().String()
+}
+
+func CreateDrop(db *bun.DB, d *Drop) error {
+	if d.ID == "" {
+		d.ID = GenerateDropID()
+	}
+	now := time.Now().Unix()
+	d.CreatedAt = now
+	d.UpdatedAt = now
+	if strings.TrimSpace(d.Settings) == "" {
+		d.Settings = "{}"
+	}
+	ctx := context.Background()
+	_, err := db.NewInsert().Model(d).Exec(ctx)
+	return err
+}
+
+func UpdateDrop(db *bun.DB, d *Drop) error {
+	d.UpdatedAt = time.Now().Unix()
+	ctx := context.Background()
+	_, err := db.NewUpdate().Model(d).Where("id = ?", d.ID).Exec(ctx)
+	return err
+}
+
+func DeleteDropByID(db *bun.DB, id string) error {
+	ctx := context.Background()
+	_, err := db.NewDelete().Model((*Drop)(nil)).Where("id = ?", id).Exec(ctx)
+	return err
+}
+
 func GetDropByID(db *bun.DB, id string) (*Drop, error) {
 	var drop Drop
 	ctx := context.Background()
@@ -121,18 +154,28 @@ func GetDropByID(db *bun.DB, id string) (*Drop, error) {
 	if err != nil {
 		return nil, err
 	}
-	drop.ParsedSettings = drop.ParseSettings()
 	return &drop, nil
 }
 
-// GetDropsByUser returns all drops where the user is an owner or member.
-func GetDropsByUser(db *bun.DB, userID int64) ([]*Drop, error) {
-	var drops []*Drop
+func GetDropByName(db *bun.DB, name string) (*Drop, error) {
+	var drop Drop
 	ctx := context.Background()
+	err := db.NewSelect().Model(&drop).Where("name = ?", name).Scan(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return &drop, nil
+}
+
+func GetDropsByUser(db *bun.DB, userID int64) ([]*Drop, error) {
+	ctx := context.Background()
+	var drops []*Drop
 	err := db.NewSelect().
 		Model(&drops).
-		Where("id IN (SELECT drop_id FROM drop_members WHERE user_id = ?)", userID).
-		OrderExpr("updated_at DESC").
+		ColumnExpr("drops.*").
+		Join("JOIN drop_members ON drop_members.drop_id = drops.id").
+		Where("drop_members.user_id = ?", userID).
+		Order("drops.updated_at DESC").
 		Scan(ctx)
 	if err != nil {
 		return nil, err
@@ -140,64 +183,52 @@ func GetDropsByUser(db *bun.DB, userID int64) ([]*Drop, error) {
 	return drops, nil
 }
 
-// CreateDrop inserts a new drop record.
-func CreateDrop(db *bun.DB, drop *Drop) error {
-	now := time.Now().Unix()
-	drop.CreatedAt = now
-	drop.UpdatedAt = now
-	if drop.Visibility == "" {
-		drop.Visibility = DropVisibilityPrivate
-	}
-	drop.Settings = drop.MarshalSettings(DefaultDropSettings())
-	ctx := context.Background()
-	_, err := db.NewInsert().Model(drop).Exec(ctx)
-	return err
-}
-
-// UpdateDrop updates drop metadata.
-func UpdateDrop(db *bun.DB, drop *Drop) error {
-	drop.UpdatedAt = time.Now().Unix()
-	ctx := context.Background()
-	_, err := db.NewUpdate().Model(drop).Where("id = ?", drop.ID).Exec(ctx)
-	return err
-}
-
-// DeleteDropByID removes a drop and its members.
-func DeleteDropByID(db *bun.DB, id string) error {
-	ctx := context.Background()
-	// Delete members first
-	if _, err := db.NewDelete().Model((*DropMember)(nil)).Where("drop_id = ?", id).Exec(ctx); err != nil {
-		return err
-	}
-	// Delete the drop
-	_, err := db.NewDelete().Model((*Drop)(nil)).Where("id = ?", id).Exec(ctx)
-	return err
-}
-
-// AddDropMember adds a user to a drop with a specific role.
 func AddDropMember(db *bun.DB, member *DropMember) error {
+	member.CreatedAt = time.Now()
 	ctx := context.Background()
-	_, err := db.NewInsert().Model(member).On("CONFLICT(drop_id, user_id) DO UPDATE SET role = ?", member.Role).Exec(ctx)
+	_, err := db.NewInsert().Model(member).Exec(ctx)
 	return err
 }
 
-// RemoveDropMember removes a user from a drop.
 func RemoveDropMember(db *bun.DB, dropID string, userID int64) error {
 	ctx := context.Background()
-	_, err := db.NewDelete().
-		Model((*DropMember)(nil)).
-		Where("drop_id = ? AND user_id = ?", dropID, userID).
+	_, err := db.NewDelete().Model((*DropMember)(nil)).
+		Where("drop_id = ?", dropID).
+		Where("user_id = ?", userID).
 		Exec(ctx)
 	return err
 }
 
-// GetDropMembers returns all members of a drop.
-func GetDropMembers(db *bun.DB, dropID string) ([]*DropMember, error) {
-	var members []*DropMember
+func UpdateDropMemberRole(db *bun.DB, dropID string, userID int64, role DropRole) error {
 	ctx := context.Background()
-	err := db.NewSelect().
-		Model(&members).
+	_, err := db.NewUpdate().Model((*DropMember)(nil)).
+		Set("role = ?", role).
 		Where("drop_id = ?", dropID).
+		Where("user_id = ?", userID).
+		Exec(ctx)
+	return err
+}
+
+func GetUserDropRole(db *bun.DB, dropID string, userID int64) (DropRole, error) {
+	ctx := context.Background()
+	var member DropMember
+	err := db.NewSelect().Model(&member).
+		Where("drop_id = ?", dropID).
+		Where("user_id = ?", userID).
+		Limit(1).
+		Scan(ctx)
+	if err != nil {
+		return "", err
+	}
+	return member.Role, nil
+}
+
+func GetDropMembers(db *bun.DB, dropID string) ([]*DropMember, error) {
+	ctx := context.Background()
+	var members []*DropMember
+	err := db.NewSelect().Model(&members).
+		Where("drop_id = ?", dropID).
+		Order("user_id ASC").
 		Scan(ctx)
 	if err != nil {
 		return nil, err
@@ -205,16 +236,18 @@ func GetDropMembers(db *bun.DB, dropID string) ([]*DropMember, error) {
 	return members, nil
 }
 
-// GetUserDropRole returns the role of a user in a drop.
-func GetUserDropRole(db *bun.DB, dropID string, userID int64) (DropRole, error) {
-	var member DropMember
-	ctx := context.Background()
-	err := db.NewSelect().
-		Model(&member).
-		Where("drop_id = ? AND user_id = ?", dropID, userID).
-		Scan(ctx)
-	if err != nil {
-		return "", err
+func (d *Drop) MarshalSettings(in DropSettings) string {
+	if in.AllowComments || in.AllowUploads {
+		return fmt.Sprintf(`{"allow_comments":%v,"allow_uploads":%v}`, in.AllowComments, in.AllowUploads)
 	}
-	return member.Role, nil
+	return "{}"
+}
+
+func (d *Drop) UnmarshalSettings() DropSettings {
+	out := DropSettings{}
+	if strings.TrimSpace(d.Settings) == "" {
+		return out
+	}
+	fmt.Sscanf(d.Settings, `{"allow_comments":%t,"allow_uploads":%t}`, &out.AllowComments, &out.AllowUploads)
+	return out
 }

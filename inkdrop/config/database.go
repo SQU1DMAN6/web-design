@@ -5,6 +5,9 @@ import (
 	"fmt"
 	"inkdrop/model"
 	"log"
+	"os"
+	"path/filepath"
+	"strings"
 
 	"github.com/uptrace/bun"
 	"github.com/uptrace/bun/dialect/sqlitedialect"
@@ -14,7 +17,9 @@ import (
 var db *bun.DB
 
 func ConnectDatabase() {
-	sqldb, err := sql.Open(sqliteshim.ShimName, "file:database.db?cache=shared&mode=rwc")
+	dsn := databaseDSN()
+	fmt.Println("Database DSN:", dsn)
+	sqldb, err := sql.Open(sqliteshim.ShimName, dsn)
 	if err != nil {
 		panic(err)
 	}
@@ -24,13 +29,34 @@ func ConnectDatabase() {
 	fmt.Println("Database connected.")
 	db = bun.NewDB(sqldb, sqlitedialect.New())
 
-	// Initialize all models (tables created if not exist)
-	model.ModelUser(db)
-	model.ModelDrop(db)
-	model.ModelFile(db)
-	model.ModelActivity(db)
+	if err := model.ModelUser(db); err != nil {
+		log.Printf("WARNING: model.ModelUser: %v", err)
+	}
+	if err := model.ModelDrop(db); err != nil {
+		log.Printf("WARNING: model.ModelDrop: %v", err)
+	}
+	if err := model.ModelFile(db); err != nil {
+		log.Printf("WARNING: model.ModelFile: %v", err)
+	}
+	if err := model.ModelActivity(db); err != nil {
+		log.Printf("WARNING: model.ModelActivity: %v", err)
+	}
 }
 
 func GetDB() *bun.DB {
 	return db
+}
+
+func databaseDSN() string {
+	rootDir := strings.TrimSpace(os.Getenv("FTR_ROOT_DIR"))
+	if rootDir == "" {
+		if wd, err := os.Getwd(); err == nil {
+			rootDir = wd
+		} else {
+			rootDir = "/srv/ftr"
+		}
+	}
+	path := filepath.Join(filepath.Clean(rootDir), "database.db")
+	abs := filepath.ToSlash(path)
+	return "file:" + abs + "?cache=shared&mode=rwc"
 }

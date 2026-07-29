@@ -21,6 +21,8 @@ type FrontEndParams struct {
 	IsTrashView               bool
 	UserBio                   string
 	UserPFP                   string
+	CurrentDropID             string
+	CurrentDropName           string
 	AcceptedContacts          []string
 	PendingIncomingContacts   []map[string]interface{}
 	PendingOutgoingContacts   []map[string]interface{}

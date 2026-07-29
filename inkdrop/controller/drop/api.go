@@ -2,7 +2,9 @@ package drop
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
+	"os"
 
 	"inkdrop/apicommon"
 	"inkdrop/model"
@@ -21,6 +23,7 @@ func Init(ds *service.DropService) {
 // ListDrops handles GET /api/v4/drops
 func ListDrops(w http.ResponseWriter, r *http.Request) {
 	userName := apicommon.GetUserName(r)
+	fmt.Fprintf(os.Stderr, "[listdrops] context_user=%q session_user=%q\n", userName, "")
 	if userName == "" {
 		apicommon.WriteError(w, http.StatusUnauthorized, "AUTH_REQUIRED", "Authentication required")
 		return

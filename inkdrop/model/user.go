@@ -148,10 +148,12 @@ func HashPassword(password string) (string, error) {
 }
 
 func CheckPassword(db *bun.DB, identifier, plainTextPassword string) (*User, error) {
+	fmt.Println("Login lookup identifier:", identifier)
 	user, err := GetUserByEmail(identifier, db)
 	if err != nil {
 		user, err = GetUserByName(identifier, db)
 		if err != nil {
+			fmt.Println("Login lookup miss:", err)
 			return nil, err
 		}
 	}
@@ -476,8 +478,6 @@ func ListContactRequests(db *bun.DB, username string) (incoming []ContactRequest
 	return incoming, outgoing, err
 }
 
-// CancelContactRequest deletes a pending outgoing contact request.
-// The requester must be the current user.
 func CancelContactRequest(db *bun.DB, requester string, recipient string) error {
 	requester = strings.TrimSpace(requester)
 	recipient = strings.TrimSpace(recipient)
@@ -501,8 +501,6 @@ func CancelContactRequest(db *bun.DB, requester string, recipient string) error 
 	return nil
 }
 
-// RemoveAcceptedContact deletes an accepted contact relationship between two users.
-// It removes the row regardless of which direction it was created in.
 func RemoveAcceptedContact(db *bun.DB, username string, contactName string) error {
 	username = strings.TrimSpace(username)
 	contactName = strings.TrimSpace(contactName)

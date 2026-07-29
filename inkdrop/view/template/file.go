@@ -9,4 +9,7 @@ var (
 	IndexMainBrowseRepository = Parse("themes/index/browse.html", "themes/index/template.html")
 	LiveEditTextFile          = Parse("themes/live-edit/livetext.html")
 	DocumentEditFile          = Parse("themes/doc-edit/document.html")
+
+	// InkDrop 4.0
+	V4Shell = Parse("themes/v4/shell.html")
 )

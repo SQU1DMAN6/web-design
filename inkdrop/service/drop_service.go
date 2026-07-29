@@ -3,14 +3,14 @@ package service
 import (
 	"errors"
 	"fmt"
-	"inkdrop/config"
-	"inkdrop/model"
-	"inkdrop/storage/filesystem"
 	"os"
 	"path/filepath"
 	"strings"
 
-	"github.com/google/uuid"
+	"inkdrop/config"
+	"inkdrop/model"
+	"inkdrop/repository"
+	"inkdrop/storage/filesystem"
 )
 
 // DropService handles all drop business logic.
@@ -29,14 +29,14 @@ func NewDropService(store *filesystem.Store) *DropService {
 func (s *DropService) CreateDrop(name, ownerName, description string) (*model.Drop, error) {
 	db := config.GetDB()
 
-	// Get the owner user
+	// Get the owner
 	owner, err := model.GetUserByName(ownerName, db)
 	if err != nil {
 		return nil, fmt.Errorf("owner not found: %w", err)
 	}
 
 	// Generate a unique ID
-	dropID := uuid.New().String()
+	dropID := model.GenerateDropID()
 
 	// Create the drop record
 	drop := &model.Drop{
@@ -79,10 +79,22 @@ func (s *DropService) CreateDrop(name, ownerName, description string) (*model.Dr
 	return drop, nil
 }
 
-// GetDrop retrieves a drop by ID.
+// GetDrop retrieves a drop by ID, auto-migrating legacy drops if needed.
 func (s *DropService) GetDrop(id string) (*model.Drop, error) {
 	db := config.GetDB()
-	return model.GetDropByID(db, id)
+	drop, err := model.GetDropByID(db, id)
+	if err == nil {
+		return drop, nil
+	}
+	if !isLegacyMissingError(err) {
+		return nil, err
+	}
+
+	// Try legacy migration by legacy path if the ID looks like user/drop
+	if legacyDrop := s.tryLegacyMigrationByID(id); legacyDrop != nil {
+		return legacyDrop, nil
+	}
+	return nil, err
 }
 
 // GetUserDrops returns all drops accessible to a user.
@@ -92,7 +104,20 @@ func (s *DropService) GetUserDrops(userName string) ([]*model.Drop, error) {
 	if err != nil {
 		return nil, fmt.Errorf("user not found: %w", err)
 	}
-	return model.GetDropsByUser(db, user.ID)
+	drops, err := model.GetDropsByUser(db, user.ID)
+	if err == nil {
+		return drops, nil
+	}
+
+	// If the schema/query fails because drops aren't initialized, try recovery
+	if isLegacyMissingError(err) {
+		_ = repository.EnsureDropsSchema()
+		drops, err = model.GetDropsByUser(db, user.ID)
+		if err == nil {
+			return drops, nil
+		}
+	}
+	return nil, err
 }
 
 // UpdateDropSettings updates drop metadata and settings.
@@ -154,7 +179,7 @@ func (s *DropService) MigrateFromLegacy(userName, dropName string) (*model.Drop,
 	}
 
 	// Generate new ID
-	dropID := uuid.New().String()
+	dropID := model.GenerateDropID()
 
 	// Create the drop record
 	drop := &model.Drop{
@@ -237,4 +262,57 @@ func (s *DropService) GetDropByLegacyPath(userName, dropName string) (*model.Dro
 		}
 	}
 	return nil, fmt.Errorf("drop %s/%s not found", userName, dropName)
+}
+
+// GetOrMigrateDrop returns an existing 4.0 drop or auto-migrates a legacy drop on first access.
+func (s *DropService) GetOrMigrateDrop(userName, dropName string) (*model.Drop, error) {
+	db := config.GetDB()
+	user, err := model.GetUserByName(userName, db)
+	if err != nil {
+		return nil, fmt.Errorf("user not found: %w", err)
+	}
+
+	// Check existing 4.0 drops for this user
+	drops, err := model.GetDropsByUser(db, user.ID)
+	if err == nil {
+		for _, d := range drops {
+			if strings.EqualFold(d.Name, dropName) {
+				return d, nil
+			}
+		}
+	} else if !isLegacyMissingError(err) {
+		return nil, err
+	}
+
+	// If not found, attempt legacy migration
+	return s.MigrateFromLegacy(userName, dropName)
+}
+
+func (s *DropService) tryLegacyMigrationByID(id string) *model.Drop {
+	parts := strings.SplitN(id, "/", 2)
+	if len(parts) != 2 {
+		return nil
+	}
+	userName := parts[0]
+	dropName := parts[1]
+	if userName == "" || dropName == "" {
+		return nil
+	}
+	drop, err := s.MigrateFromLegacy(userName, dropName)
+	if err != nil {
+		return nil
+	}
+	return drop
+}
+
+func isLegacyMissingError(err error) bool {
+	if err == nil {
+		return false
+	}
+	if strings.Contains(err.Error(), "no such column") ||
+		strings.Contains(err.Error(), "no such table") ||
+		strings.Contains(err.Error(), "database is closed") {
+		return true
+	}
+	return false
 }

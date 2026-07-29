@@ -4,6 +4,9 @@ import (
 	routes "inkdrop"
 	"inkdrop/api"
 	"inkdrop/config"
+	controller_legacy "inkdrop/controller/legacy"
+	"inkdrop/controller/login"
+	"inkdrop/controller/register"
 	"inkdrop/repository"
 	"inkdrop/service"
 	"inkdrop/storage/filesystem"
@@ -17,6 +20,12 @@ import (
 func BootApp() {
 	r := chi.NewRouter()
 	config.ConnectDatabase()
+
+	// Ensure all database tables and columns exist before anything else
+	if err := repository.EnsureDropsSchema(); err != nil {
+		log.Fatalf("failed to ensure drops schema: %v", err)
+	}
+
 	if err := repository.EnsureStorageLayout(); err != nil {
 		log.Fatalf("failed to initialize InkDrop storage under %s: %v", repository.RootDir, err)
 	}
@@ -33,9 +42,6 @@ func BootApp() {
 	RegisterMiddleWares(r)
 	RegisterStatic(r)
 
-	// Register legacy routes (InkDrop 3.x compatibility)
-	routes.RegisterRoutes(r)
-
 	// Initialize v4 services
 	inkdropRoot := repository.RootDir
 	store := filesystem.NewStore(inkdropRoot)
@@ -44,17 +50,31 @@ func BootApp() {
 	fileSvc := service.NewFileService(store, permSvc)
 	searchSvc := service.NewSearchService(permSvc)
 
-	// Register v4 API routes
+	// v4 frontend at root
+	compatHandler := controller_legacy.NewLegacyCompatHandler(dropSvc)
+	r.Get("/", compatHandler.V4Shell)
+	r.Get("/v4/drop/{dropID}", compatHandler.V4Shell)
+
+	// v4 API routes
 	api.RegisterV4Routes(r, dropSvc, fileSvc, permSvc, searchSvc)
 
-	// The TUS upload handler is served outside the main chi router
-	// because the TUS protocol requires trailing slashes in URLs,
-	// which conflicts with the StripSlashes middleware on the main router.
-	// We wrap it with the session manager so auth checks still work.
+	// Auth routes remain at root (must work for both v3/v4)
+	r.Get("/login", login.LoginMain)
+	r.Post("/login", login.LoginMainPost)
+	r.Get("/register", register.RegisterMain)
+	r.Post("/register", register.RegisterMainPost)
+	r.Get("/logout", login.LoginLogout)
+	r.Post("/account/settings", controller_legacy.RedirectToAccountSettings)
+	r.Get("/api/account", controller_legacy.RedirectToAccountAPI)
+
+	// Legacy 3.x app routes under /legacy/ prefix
+	r.Route("/legacy", func(r chi.Router) {
+		routes.RegisterRoutes(r)
+	})
+
+	// TUS upload handler
 	tusHandler := ss.LoadAndSave(routes.NewTUSHandler())
 
-	// Top-level dispatcher: route /upload* to the TUS handler,
-	// everything else to the main chi router.
 	top := http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		if strings.HasPrefix(req.URL.Path, "/upload") {
 			tusHandler.ServeHTTP(w, req)
