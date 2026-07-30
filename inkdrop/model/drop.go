@@ -3,6 +3,7 @@ package model
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
@@ -20,16 +21,62 @@ const (
 	DropVisibilityPublic   DropVisibility = "public"
 )
 
+// dropJSON is used for JSON serialization with Unix timestamps.
+type dropJSON struct {
+	ID          string        `json:"id"`
+	Name        string        `json:"name"`
+	OwnerID     int64         `json:"owner_id"`
+	Description string        `json:"description"`
+	Visibility  DropVisibility `json:"visibility"`
+	Settings    string        `json:"settings"`
+	StoragePath string        `json:"storage_path"`
+	CreatedAt   int64         `json:"created_at"`
+	UpdatedAt   int64         `json:"updated_at"`
+}
+
+// MarshalJSON serializes Drop as dropJSON with Unix timestamps.
+func (d *Drop) MarshalJSON() ([]byte, error) {
+	return json.Marshal(dropJSON{
+		ID:          d.ID,
+		Name:        d.Name,
+		OwnerID:     d.OwnerID,
+		Description: d.Description,
+		Visibility:  d.Visibility,
+		Settings:    d.Settings,
+		StoragePath: d.StoragePath,
+		CreatedAt:   d.CreatedAt.Unix(),
+		UpdatedAt:   d.UpdatedAt.Unix(),
+	})
+}
+
+// UnmarshalJSON deserializes Drop from dropJSON with Unix timestamps.
+func (d *Drop) UnmarshalJSON(data []byte) error {
+	var j dropJSON
+	if err := json.Unmarshal(data, &j); err != nil {
+		return err
+	}
+	d.ID = j.ID
+	d.Name = j.Name
+	d.OwnerID = j.OwnerID
+	d.Description = j.Description
+	d.Visibility = j.Visibility
+	d.Settings = j.Settings
+	d.StoragePath = j.StoragePath
+	d.CreatedAt = time.Unix(j.CreatedAt, 0)
+	d.UpdatedAt = time.Unix(j.UpdatedAt, 0)
+	return nil
+}
+
 type Drop struct {
-	ID          string        `bun:",pk" json:"id"`
-	Name        string        `bun:",notnull" json:"name"`
-	OwnerID     int64         `bun:",notnull" json:"owner_id"`
-	Description string        `bun:",notnull" json:"description"`
-	Visibility  DropVisibility `bun:",notnull" json:"visibility"`
-	Settings    string        `bun:",notnull" json:"settings"`
-	StoragePath string        `bun:",notnull" json:"storage_path"`
-	CreatedAt   int64         `bun:",notnull" json:"created_at"`
-	UpdatedAt   int64         `bun:",notnull" json:"updated_at"`
+	ID          string        `bun:",pk" json:"-"`
+	Name        string        `bun:",notnull" json:"-"`
+	OwnerID     int64         `bun:",notnull" json:"-"`
+	Description string        `bun:",notnull" json:"-"`
+	Visibility  DropVisibility `bun:",notnull" json:"-"`
+	Settings    string        `bun:",notnull" json:"-"`
+	StoragePath string        `bun:",notnull" json:"-"`
+	CreatedAt   time.Time     `bun:",nullzero,notnull,default:current_timestamp" json:"-"`
+	UpdatedAt   time.Time     `bun:",nullzero,notnull,default:current_timestamp" json:"-"`
 }
 
 type DropMember struct {
@@ -123,7 +170,7 @@ func CreateDrop(db *bun.DB, d *Drop) error {
 	if d.ID == "" {
 		d.ID = GenerateDropID()
 	}
-	now := time.Now().Unix()
+	now := time.Now()
 	d.CreatedAt = now
 	d.UpdatedAt = now
 	if strings.TrimSpace(d.Settings) == "" {
@@ -135,7 +182,7 @@ func CreateDrop(db *bun.DB, d *Drop) error {
 }
 
 func UpdateDrop(db *bun.DB, d *Drop) error {
-	d.UpdatedAt = time.Now().Unix()
+	d.UpdatedAt = time.Now()
 	ctx := context.Background()
 	_, err := db.NewUpdate().Model(d).Where("id = ?", d.ID).Exec(ctx)
 	return err
@@ -170,13 +217,15 @@ func GetDropByName(db *bun.DB, name string) (*Drop, error) {
 func GetDropsByUser(db *bun.DB, userID int64) ([]*Drop, error) {
 	ctx := context.Background()
 	var drops []*Drop
-	err := db.NewSelect().
-		Model(&drops).
-		ColumnExpr("drops.*").
-		Join("JOIN drop_members ON drop_members.drop_id = drops.id").
-		Where("drop_members.user_id = ?", userID).
-		Order("drops.updated_at DESC").
-		Scan(ctx)
+	// Use raw SQL with explicit aliases to avoid bun's table alias mangling.
+	err := db.NewRaw(`
+		SELECT d.id, d.name, d.owner_id, d.description, d.visibility,
+		       d.settings, d.storage_path, d.created_at, d.updated_at
+		FROM drops d
+		JOIN drop_members dm ON dm.drop_id = d.id
+		WHERE dm.user_id = ?
+		ORDER BY d.updated_at DESC
+	`, userID).Scan(ctx, &drops)
 	if err != nil {
 		return nil, err
 	}

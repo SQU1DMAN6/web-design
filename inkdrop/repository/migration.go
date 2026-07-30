@@ -23,24 +23,23 @@ func EnsureDropsSchema() error {
 		visibility TEXT NOT NULL DEFAULT 'private',
 		settings TEXT NOT NULL DEFAULT '{}',
 		storage_path TEXT NOT NULL,
-		created_at INTEGER NOT NULL DEFAULT 0,
-		updated_at INTEGER NOT NULL DEFAULT 0
+		created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+		updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 	)`)
 	if err != nil {
 		return fmt.Errorf("create drops table: %w", err)
 	}
 
-	// Ensure required columns exist
+	// Ensure required columns exist (skip PRIMARY KEY columns — SQLite can't ALTER TABLE to add them)
 	required := map[string]string{
-		"id":           "TEXT NOT NULL DEFAULT ''",
 		"name":         "TEXT NOT NULL DEFAULT ''",
 		"owner_id":     "INTEGER NOT NULL DEFAULT 0",
 		"description":  "TEXT NOT NULL DEFAULT ''",
 		"visibility":   "TEXT NOT NULL DEFAULT 'private'",
 		"settings":     "TEXT NOT NULL DEFAULT '{}'",
 		"storage_path": "TEXT NOT NULL DEFAULT ''",
-		"created_at":   "INTEGER NOT NULL DEFAULT 0",
-		"updated_at":   "INTEGER NOT NULL DEFAULT 0",
+		"created_at":   "TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP",
+		"updated_at":   "TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP",
 	}
 
 	rows, err := sqldb.Query("PRAGMA table_info(drops)")
@@ -100,9 +99,8 @@ func EnsureDropsSchema() error {
 		return fmt.Errorf("create drop_members user index: %w", err)
 	}
 
-	// Ensure drop_members columns exist (in case table was created by bun with different schema)
+	// Ensure drop_members columns exist (skip PRIMARY KEY — can't ALTER TABLE to add it)
 	memberRequired := map[string]string{
-		"id":         "INTEGER PRIMARY KEY AUTOINCREMENT",
 		"drop_id":    "TEXT NOT NULL",
 		"user_id":    "INTEGER NOT NULL",
 		"role":       "TEXT NOT NULL DEFAULT 'viewer'",
