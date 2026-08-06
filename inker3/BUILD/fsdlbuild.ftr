@@ -1,6 +1,0 @@
-PACKAGE_NAME=FtR Inker
-VERSION=3.2.0
-TARGET_ARCHITECTURE=x64
-TARGET_OS=windows
-DESCRIPTION=FtR Inker - Native Windows Desktop Client for InkDrop
-AUTHOR=Quan Thai
