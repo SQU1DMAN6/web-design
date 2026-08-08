@@ -1,8 +1,7 @@
-inkdrop/connect.php
-fileshare_OLD/connect.php
 *.DS_Store*
 inkdrop/database.db
 *node_modules*/
+**/node_modules
 *dist*/
 inker3/BUILD/*.msi
 inker3/BUILD/*.exe
@@ -15,5 +14,7 @@ inker3/lib/winfsp_native.node
 inker3/native/build/
 inker3/native/node_modules/
 
-*Thumbs.db*
-*.DS_Store*
+**/Thumbs.db
+**/.DS_Store
+
+doc/
