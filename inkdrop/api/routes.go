@@ -5,8 +5,10 @@ import (
 
 	"inkdrop/apicommon"
 	"inkdrop/controller/collaboration"
+	"inkdrop/controller/contacts"
 	"inkdrop/controller/drop"
 	"inkdrop/controller/file"
+	"inkdrop/model"
 	"inkdrop/service"
 	"inkdrop/ws"
 
@@ -36,32 +38,57 @@ func RegisterV4Routes(r chi.Router, dropSvc *service.DropService, fileSvc *servi
 			r.Post("/drops", drop.CreateDrop)
 			r.Post("/drops/migrate", drop.MigrateDrop)
 
-			// Single drop operations
+			// Single drop endpoint
 			r.Route("/drop/{id}", func(r chi.Router) {
-				r.Get("/", drop.GetDrop)
-				r.Put("/", drop.UpdateDrop)
-				r.Delete("/", drop.DeleteDrop)
+				// Viewer-level access for reading drop metadata, files, members, activity
+				r.Group(func(r chi.Router) {
+					r.Use(RequirePermission(permSvc, model.DropRoleViewer))
+					r.Get("/", drop.GetDrop)
+					r.Get("/files", file.ListFiles)
+					r.Get("/files/{fileId}", file.GetFile)
+					r.Get("/files/{fileId}/content", file.ReadFileContent)
+					r.Get("/files/{fileId}/download", file.DownloadFile)
+					r.Get("/files/{fileId}/preview", file.PreviewFile)
+					r.Get("/trash", file.ListTrash)
+					r.Get("/members", collaboration.GetMembers)
+					r.Get("/activity", GetDropActivity)
+				})
 
-				// Files
-				r.Get("/files", file.ListFiles)
-				r.Post("/files", file.CreateFile)
-				r.Get("/files/{fileId}", file.GetFile)
-				r.Get("/files/{fileId}/content", file.ReadFileContent)
-				r.Put("/files/{fileId}", file.UpdateFile)
-				r.Delete("/files/{fileId}", file.DeleteFile)
-				r.Post("/files/{fileId}/rename", file.RenameFile)
-				r.Post("/files/{fileId}/move", file.MoveFile)
+				// Editor-level access for file modifications
+				r.Group(func(r chi.Router) {
+					r.Use(RequirePermission(permSvc, model.DropRoleEditor))
+					r.Post("/files", file.CreateFile)
+					r.Post("/folders", file.CreateFolder)
+					r.Post("/upload", file.UploadFile)
+					r.Put("/files/{fileId}", file.UpdateFile)
+					r.Delete("/files/{fileId}", file.DeleteFile)
+					r.Post("/files/{fileId}/rename", file.RenameFile)
+					r.Post("/files/{fileId}/move", file.MoveFile)
+					r.Post("/files/{fileId}/trash", file.TrashFile)
+					r.Post("/files/{fileId}/restore", file.RestoreFile)
+					r.Post("/trash/empty", file.EmptyTrash)
+				})
 
-				// Members / sharing
-				r.Get("/members", collaboration.GetMembers)
-				r.Post("/members", collaboration.AddMember)
-				r.Delete("/members/{userId}", collaboration.RemoveMember)
-				r.Put("/members/{userId}/role", collaboration.UpdateRole)
-				r.Post("/share", collaboration.ShareDrop)
-
-				// Activity
-				r.Get("/activity", GetDropActivity)
+				// Owner-level access for drop management and sharing
+				r.Group(func(r chi.Router) {
+					r.Use(RequirePermission(permSvc, model.DropRoleOwner))
+					r.Put("/", drop.UpdateDrop)
+					r.Delete("/", drop.DeleteDrop)
+					r.Post("/members", collaboration.AddMember)
+					r.Delete("/members/{userId}", collaboration.RemoveMember)
+					r.Put("/members/{userId}/role", collaboration.UpdateRole)
+					r.Post("/share", collaboration.ShareDrop)
+				})
 			})
+		})
+
+		// Contacts (authenticated)
+		r.Group(func(r chi.Router) {
+			r.Use(AuthMiddleware)
+			r.Get("/contacts", contacts.ListContactsV4)
+			r.Post("/contacts", contacts.AddContactV4)
+			r.Delete("/contacts/{name}", contacts.RemoveContactV4)
+			r.Get("/contacts/search", contacts.SearchUsersV4)
 		})
 
 		// Search (authenticated)

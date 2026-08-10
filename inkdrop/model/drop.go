@@ -23,15 +23,15 @@ const (
 
 // dropJSON is used for JSON serialization with Unix timestamps.
 type dropJSON struct {
-	ID          string        `json:"id"`
-	Name        string        `json:"name"`
-	OwnerID     int64         `json:"owner_id"`
-	Description string        `json:"description"`
+	ID          string         `json:"id"`
+	Name        string         `json:"name"`
+	OwnerID     int64          `json:"owner_id"`
+	Description string         `json:"description"`
 	Visibility  DropVisibility `json:"visibility"`
-	Settings    string        `json:"settings"`
-	StoragePath string        `json:"storage_path"`
-	CreatedAt   int64         `json:"created_at"`
-	UpdatedAt   int64         `json:"updated_at"`
+	Settings    string         `json:"settings"`
+	StoragePath string         `json:"storage_path"`
+	CreatedAt   int64          `json:"created_at"`
+	UpdatedAt   int64          `json:"updated_at"`
 }
 
 // MarshalJSON serializes Drop as dropJSON with Unix timestamps.
@@ -68,15 +68,15 @@ func (d *Drop) UnmarshalJSON(data []byte) error {
 }
 
 type Drop struct {
-	ID          string        `bun:",pk" json:"-"`
-	Name        string        `bun:",notnull" json:"-"`
-	OwnerID     int64         `bun:",notnull" json:"-"`
-	Description string        `bun:",notnull" json:"-"`
+	ID          string         `bun:",pk" json:"-"`
+	Name        string         `bun:",notnull" json:"-"`
+	OwnerID     int64          `bun:",notnull" json:"-"`
+	Description string         `bun:",notnull" json:"-"`
 	Visibility  DropVisibility `bun:",notnull" json:"-"`
-	Settings    string        `bun:",notnull" json:"-"`
-	StoragePath string        `bun:",notnull" json:"-"`
-	CreatedAt   time.Time     `bun:",nullzero,notnull,default:current_timestamp" json:"-"`
-	UpdatedAt   time.Time     `bun:",nullzero,notnull,default:current_timestamp" json:"-"`
+	Settings    string         `bun:",notnull" json:"-"`
+	StoragePath string         `bun:",notnull" json:"-"`
+	CreatedAt   time.Time      `bun:",nullzero,notnull,default:current_timestamp" json:"-"`
+	UpdatedAt   time.Time      `bun:",nullzero,notnull,default:current_timestamp" json:"-"`
 }
 
 type DropMember struct {
@@ -230,6 +230,113 @@ func GetDropsByUser(db *bun.DB, userID int64) ([]*Drop, error) {
 		return nil, err
 	}
 	return drops, nil
+}
+
+// GetPublicDrops returns all drops with public visibility.
+func GetPublicDrops(db *bun.DB) ([]*Drop, error) {
+	ctx := context.Background()
+	var drops []*Drop
+	err := db.NewRaw(`
+		SELECT d.id, d.name, d.owner_id, d.description, d.visibility,
+		       d.settings, d.storage_path, d.created_at, d.updated_at
+		FROM drops d
+		WHERE d.visibility = 'public'
+		ORDER BY d.updated_at DESC
+	`).Scan(ctx, &drops)
+	if err != nil {
+		return nil, err
+	}
+	return drops, nil
+}
+
+// GetContactVisibleDrops returns drops owned by users who have an accepted
+// contact relationship with the given user, where the drop visibility is 'contacts'.
+func GetContactVisibleDrops(db *bun.DB, userID int64) ([]*Drop, error) {
+	ctx := context.Background()
+	var drops []*Drop
+	err := db.NewRaw(`
+		SELECT d.id, d.name, d.owner_id, d.description, d.visibility,
+		       d.settings, d.storage_path, d.created_at, d.updated_at
+		FROM drops d
+		WHERE d.visibility = 'contacts'
+		  AND d.owner_id IN (
+			SELECT u.id
+			FROM contact_requests cr
+			JOIN users u ON u.name = CASE
+				WHEN cr.requester = ? THEN cr.recipient
+				ELSE cr.requester
+			END
+			WHERE cr.status = 'accepted'
+			  AND (cr.requester = ? OR cr.recipient = ?)
+		  )
+		ORDER BY d.updated_at DESC
+	`, userNameForID(db, userID), userNameForID(db, userID), userNameForID(db, userID)).Scan(ctx, &drops)
+	if err != nil {
+		return nil, err
+	}
+	return drops, nil
+}
+
+// CanAccessDrop determines whether a user can access a drop.
+// Access is granted if:
+//   - The user is a member of the drop
+//   - The drop is public
+//   - The drop is 'contacts' visibility and the user has an accepted contact
+//     relationship with the drop owner
+func CanAccessDrop(db *bun.DB, dropID string, userID int64) (bool, error) {
+	ctx := context.Background()
+
+	// Check membership first
+	var member DropMember
+	err := db.NewSelect().Model(&member).
+		Where("drop_id = ?", dropID).
+		Where("user_id = ?", userID).
+		Limit(1).
+		Scan(ctx)
+	if err == nil {
+		return true, nil
+	}
+	if err != sql.ErrNoRows {
+		// Check if the error is "no rows" from bun
+		if !strings.Contains(err.Error(), "no rows") {
+			return false, err
+		}
+	}
+
+	// Check drop visibility
+	var drop Drop
+	err = db.NewSelect().Model(&drop).Where("id = ?", dropID).Scan(ctx)
+	if err != nil {
+		return false, err
+	}
+
+	// Public drops are accessible to everyone
+	if drop.Visibility == DropVisibilityPublic {
+		return true, nil
+	}
+
+	// Contacts visibility: check accepted contact relationship with owner
+	if drop.Visibility == DropVisibilityContacts {
+		userName := userNameForID(db, userID)
+		ownerName := userNameForID(db, drop.OwnerID)
+		if userName == "" || ownerName == "" {
+			return false, nil
+		}
+		var count int
+		err := db.NewRaw(`
+			SELECT COUNT(*)
+			FROM contact_requests cr
+			WHERE cr.status = 'accepted'
+			  AND ((cr.requester = ? AND cr.recipient = ?)
+			    OR (cr.requester = ? AND cr.recipient = ?))
+		`, userName, ownerName, ownerName, userName).Scan(ctx, &count)
+		if err != nil {
+			return false, err
+		}
+		return count > 0, nil
+	}
+
+	return false, nil
 }
 
 func AddDropMember(db *bun.DB, member *DropMember) error {

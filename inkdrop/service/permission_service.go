@@ -16,15 +16,26 @@ func NewPermissionService() *PermissionService {
 
 // CheckPermission checks if a user has at least the required role for a drop.
 // Returns true if the user has sufficient permissions.
+// For read-only access (viewer), public drops and contact-visible drops are
+// also accessible even without an explicit membership.
 func (s *PermissionService) CheckPermission(userID int64, dropID string, requiredRole model.DropRole) bool {
 	db := config.GetDB()
 
 	role, err := model.GetUserDropRole(db, dropID, userID)
-	if err != nil {
-		return false
+	if err == nil {
+		return roleWeight(role) >= roleWeight(requiredRole)
 	}
 
-	return roleWeight(role) >= roleWeight(requiredRole)
+	// If the user is not a member, check if the drop is publicly accessible
+	// for viewer-level access.
+	if requiredRole == model.DropRoleViewer {
+		canAccess, err := model.CanAccessDrop(db, dropID, userID)
+		if err == nil && canAccess {
+			return true
+		}
+	}
+
+	return false
 }
 
 // AddMember adds a user to a drop with a specific role.

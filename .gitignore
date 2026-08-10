@@ -17,4 +17,7 @@ inker3/native/node_modules/
 **/Thumbs.db
 **/.DS_Store
 
+inkdrop/sessions/
+inkdrop/sessions/*
+
 doc/

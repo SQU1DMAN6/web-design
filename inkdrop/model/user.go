@@ -169,6 +169,15 @@ func CheckPassword(db *bun.DB, identifier, plainTextPassword string) (*User, err
 	return user, nil
 }
 
+// userNameForID returns the username for a user ID, or "" if not found.
+func userNameForID(db *bun.DB, id int64) string {
+	user, err := GetUserByID(int(id), db)
+	if err != nil || user == nil {
+		return ""
+	}
+	return user.Name
+}
+
 func GetUserByID(id int, db *bun.DB) (*User, error) {
 	var userModel User
 	ctx := context.Background()

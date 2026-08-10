@@ -29,7 +29,7 @@ const (
 )
 
 var (
-	GlobalInkDropRootDir = "/srv/ftr"
+	GlobalInkDropRootDir    = "/srv/ftr"
 	GlobalInkDropRootDirMac = "/srv/ftr"
 
 	RootDir     string

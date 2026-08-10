@@ -156,8 +156,8 @@ func AutoMigrateLegacyDrop(userName, dropName string) error {
 
 	// Write 4.0 marker
 	v4 := map[string]interface{}{
-		"version":     "4.0",
-		"migrated":    true,
+		"version":  "4.0",
+		"migrated": true,
 		"legacy": map[string]interface{}{
 			"owners":      meta.Owners,
 			"description": meta.Description,

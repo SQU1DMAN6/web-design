@@ -98,26 +98,73 @@ func (s *DropService) GetDrop(id string) (*model.Drop, error) {
 }
 
 // GetUserDrops returns all drops accessible to a user.
+// This includes:
+//   - Drops where the user is a member
+//   - Public drops
+//   - Drops with 'contacts' visibility owned by accepted contacts
 func (s *DropService) GetUserDrops(userName string) ([]*model.Drop, error) {
 	db := config.GetDB()
 	user, err := model.GetUserByName(userName, db)
 	if err != nil {
 		return nil, fmt.Errorf("user not found: %w", err)
 	}
-	drops, err := model.GetDropsByUser(db, user.ID)
-	if err == nil {
-		return drops, nil
-	}
 
-	// If the schema/query fails because drops aren't initialized, try recovery
-	if isLegacyMissingError(err) {
-		_ = repository.EnsureDropsSchema()
-		drops, err = model.GetDropsByUser(db, user.ID)
-		if err == nil {
-			return drops, nil
+	// Get drops where the user is a member
+	memberDrops, err := model.GetDropsByUser(db, user.ID)
+	if err != nil {
+		if isLegacyMissingError(err) {
+			_ = repository.EnsureDropsSchema()
+			memberDrops, err = model.GetDropsByUser(db, user.ID)
+			if err != nil {
+				return nil, err
+			}
+		} else {
+			return nil, err
 		}
 	}
-	return nil, err
+
+	// Get public drops
+	publicDrops, err := model.GetPublicDrops(db)
+	if err != nil {
+		// If the query fails (e.g. missing column), fall back to member drops only
+		publicDrops = nil
+	}
+
+	// Get contact-visible drops
+	contactDrops, err := model.GetContactVisibleDrops(db, user.ID)
+	if err != nil {
+		contactDrops = nil
+	}
+
+	// Merge all drops, deduplicating by ID
+	seen := make(map[string]bool)
+	var all []*model.Drop
+	for _, d := range memberDrops {
+		if d != nil && !seen[d.ID] {
+			seen[d.ID] = true
+			all = append(all, d)
+		}
+	}
+	for _, d := range publicDrops {
+		if d != nil && !seen[d.ID] {
+			seen[d.ID] = true
+			all = append(all, d)
+		}
+	}
+	for _, d := range contactDrops {
+		if d != nil && !seen[d.ID] {
+			seen[d.ID] = true
+			all = append(all, d)
+		}
+	}
+
+	return all, nil
+}
+
+// CanAccess checks whether a user can access a drop.
+func (s *DropService) CanAccess(userID int64, dropID string) (bool, error) {
+	db := config.GetDB()
+	return model.CanAccessDrop(db, dropID, userID)
 }
 
 // UpdateDropSettings updates drop metadata and settings.

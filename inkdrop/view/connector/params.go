@@ -5,6 +5,8 @@ import "html/template"
 type FrontEndParams struct {
 	Title                     string
 	Name                      string
+	UserID                    int64
+	UserEmail                 string
 	Message                   string
 	Message2                  string
 	Message3                  string

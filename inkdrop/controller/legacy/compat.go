@@ -34,6 +34,8 @@ func (h *LegacyCompatHandler) V4Shell(w http.ResponseWriter, r *http.Request) {
 	db := config.GetDB()
 	user, err := model.GetUserByName(userName, db)
 	if err == nil && user != nil {
+		p.UserID = user.ID
+		p.UserEmail = user.Email
 		p.UserBio = user.Bio
 		p.UserPFP = model.ResolveProfilePicture(user.PFP, user.Name)
 	}

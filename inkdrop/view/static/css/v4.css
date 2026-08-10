@@ -15,8 +15,7 @@
     justify-content: space-between;
     gap: 16px;
     padding: 8px 20px;
-    max-width: 1600px;
-    margin: 0 auto;
+    width: 100%;
 }
 
 .v4-nav-left {
@@ -101,8 +100,7 @@
     display: flex;
     gap: 2px;
     padding: 0 20px 6px;
-    max-width: 1600px;
-    margin: 0 auto;
+    width: 100%;
     overflow-x: auto;
 }
 
@@ -133,8 +131,7 @@
     display: grid;
     grid-template-columns: 280px 240px minmax(0, 1fr);
     gap: 1px;
-    max-width: 1600px;
-    margin: 0 auto;
+    width: 100%;
     min-height: calc(100vh - 100px);
     background: var(--border);
 }
@@ -328,6 +325,13 @@
     height: 16px;
     flex-shrink: 0;
     color: var(--muted);
+    display: grid;
+    place-items: center;
+}
+
+.v4-tree-item-icon svg {
+    width: 16px;
+    height: 16px;
 }
 
 .v4-tree-item.folder .v4-tree-item-icon {
@@ -471,8 +475,16 @@
 }
 
 .v4-file-card-icon {
-    font-size: 32px;
-    line-height: 1;
+    width: 48px;
+    height: 48px;
+    display: grid;
+    place-items: center;
+    color: var(--muted);
+}
+
+.v4-file-card-icon svg {
+    width: 32px;
+    height: 32px;
 }
 
 .v4-file-card-name {
@@ -524,8 +536,16 @@
 }
 
 .v4-file-list-icon {
-    font-size: 18px;
-    text-align: center;
+    width: 16px;
+    height: 16px;
+    display: grid;
+    place-items: center;
+    color: var(--muted);
+}
+
+.v4-file-list-icon svg {
+    width: 16px;
+    height: 16px;
 }
 
 .v4-file-list-name {
@@ -733,6 +753,139 @@
     color: var(--blue);
 }
 
+/* ===== Member List ===== */
+.v4-member-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    max-height: 400px;
+    overflow-y: auto;
+}
+
+.v4-member-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 12px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    gap: 12px;
+}
+
+.v4-member-info {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex: 1;
+}
+
+.v4-member-avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: var(--blue-soft);
+    color: var(--blue);
+    display: grid;
+    place-items: center;
+    font-weight: 700;
+    font-size: 13px;
+    flex-shrink: 0;
+}
+
+.v4-member-details {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.v4-member-name {
+    font-weight: 600;
+    font-size: 14px;
+}
+
+.v4-member-role {
+    font-size: 12px;
+    color: var(--muted);
+}
+
+.v4-member-actions {
+    display: flex;
+    gap: 6px;
+}
+
+.v4-member-actions select {
+    padding: 4px 8px;
+    font-size: 12px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--panel);
+    color: var(--text);
+}
+
+.v4-member-actions button {
+    padding: 4px 10px;
+    font-size: 12px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--panel);
+    color: var(--text);
+    cursor: pointer;
+}
+
+.v4-member-actions button:hover {
+    background: var(--hover);
+}
+
+.v4-member-actions button.danger {
+    color: var(--red);
+    border-color: rgba(239, 68, 68, 0.3);
+}
+
+.v4-member-actions button.danger:hover {
+    background: rgba(239, 68, 68, 0.1);
+}
+
+/* ===== Drop Actions in Panel ===== */
+.v4-drop-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 12px;
+}
+
+.v4-drop-action-btn {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--panel);
+    color: var(--text);
+    font-size: 13px;
+    cursor: pointer;
+    transition: background 0.15s;
+}
+
+.v4-drop-action-btn:hover {
+    background: var(--hover);
+}
+
+.v4-drop-action-btn svg {
+    flex-shrink: 0;
+}
+
+.v4-drop-action-danger {
+    color: var(--red);
+    border-color: var(--red);
+}
+
+.v4-drop-action-danger:hover {
+    background: var(--red);
+    color: white;
+}
+
 /* ===== Toast Notifications ===== */
 .v4-toast-container {
     position: fixed;
@@ -853,6 +1006,71 @@
     flex: 1;
     font-weight: 700;
     font-size: 14px;
+}
+
+/* ===== Context Menu ===== */
+.v4-context-menu {
+    position: fixed;
+    z-index: 1000;
+    min-width: 180px;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    box-shadow: 0 12px 32px rgba(15, 23, 42, 0.15);
+    padding: 4px;
+    font-size: 13px;
+}
+
+.v4-context-menu-item {
+    display: block;
+    width: 100%;
+    text-align: left;
+    padding: 8px 12px;
+    border: none;
+    background: transparent;
+    color: var(--text);
+    font-size: 13px;
+    cursor: pointer;
+    border-radius: 4px;
+    transition: background 0.12s;
+}
+
+.v4-context-menu-item:hover {
+    background: var(--hover);
+}
+
+.v4-context-menu-item.danger {
+    color: var(--red);
+}
+
+.v4-context-menu-item.danger:hover {
+    background: rgba(239, 68, 68, 0.1);
+}
+
+.v4-context-menu-divider {
+    height: 1px;
+    background: var(--border);
+    margin: 4px 8px;
+}
+
+/* ===== File Selection ===== */
+.v4-file-card.selected {
+    border-color: var(--blue);
+    background: var(--blue-soft);
+    box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.2);
+}
+
+.v4-file-list-item.selected {
+    background: var(--blue-soft);
+    border-color: var(--blue);
+}
+
+/* ===== Drag and Drop ===== */
+.v4-file-card.drag-over,
+.v4-file-list-item.drag-over {
+    border-color: var(--blue);
+    background: var(--blue-soft);
+    box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.3);
 }
 
 /* ===== Responsive ===== */

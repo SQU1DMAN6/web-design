@@ -145,6 +145,67 @@
         </form>
     </dialog>
 
+    <!-- ===== New Folder Dialog ===== -->
+    <dialog class="v4-dialog" id="newFolderDialog">
+        <form id="newFolderForm" class="stack">
+            <h2>New Folder</h2>
+            <p class="subtle">Create a new folder in the current directory.</p>
+            <label class="field-label" for="newFolderName">Folder Name</label>
+            <input type="text" id="newFolderName" class="details" placeholder="e.g. Documents" required minlength="1" maxlength="255" autofocus />
+            <div class="row" style="justify-content:flex-end;">
+                <button type="button" class="button-link" id="cancelNewFolder">Cancel</button>
+                <button type="submit" class="redirect" id="submitNewFolder">Create Folder</button>
+            </div>
+            <div id="newFolderError" class="alert" style="display:none;"></div>
+        </form>
+    </dialog>
+
+    <!-- ===== Rename Dialog ===== -->
+    <dialog class="v4-dialog" id="renameDialog">
+        <form id="renameForm" class="stack">
+            <h2>Rename</h2>
+            <p class="subtle" id="renameItemLabel">Rename item</p>
+            <label class="field-label" for="renameInput">New Name</label>
+            <input type="text" id="renameInput" class="details" required minlength="1" maxlength="255" autofocus />
+            <div class="row" style="justify-content:flex-end;">
+                <button type="button" class="button-link" id="cancelRename">Cancel</button>
+                <button type="submit" class="redirect" id="submitRename">Rename</button>
+            </div>
+            <div id="renameError" class="alert" style="display:none;"></div>
+        </form>
+    </dialog>
+
+    <!-- ===== Move Dialog ===== -->
+    <dialog class="v4-dialog" id="moveDialog">
+        <form id="moveForm" class="stack">
+            <h2>Move to Folder</h2>
+            <p class="subtle" id="moveItemLabel">Move item to a different folder</p>
+            <label class="field-label" for="moveDestination">Destination</label>
+            <select id="moveDestination" class="details"></select>
+            <div class="row" style="justify-content:flex-end;">
+                <button type="button" class="button-link" id="cancelMove">Cancel</button>
+                <button type="submit" class="redirect" id="submitMove">Move</button>
+            </div>
+            <div id="moveError" class="alert" style="display:none;"></div>
+        </form>
+    </dialog>
+
+    <!-- ===== Upload Dialog ===== -->
+    <dialog class="v4-dialog" id="uploadDialog">
+        <form id="uploadForm" class="stack">
+            <h2>Upload Files</h2>
+            <p class="subtle">Upload files to the current directory.</p>
+            <label class="field-label" for="uploadFileInput">Select Files</label>
+            <input type="file" id="uploadFileInput" class="details" multiple />
+            <div class="row" style="justify-content:flex-end;">
+                <button type="button" class="button-link" id="cancelUpload">Cancel</button>
+                <button type="submit" class="redirect" id="submitUpload">Upload</button>
+            </div>
+            <div id="uploadError" class="alert" style="display:none;"></div>
+            <div id="uploadProgress" class="subtle" style="display:none;"></div>
+        </form>
+    </dialog>
+
     <!-- ===== Share Drop Dialog ===== -->
     <dialog class="v4-dialog" id="shareDropDialog">
         <form id="shareDropForm" class="stack">
@@ -164,6 +225,79 @@
                 <button type="submit" class="redirect" id="submitShareDrop">Share</button>
             </div>
             <div id="shareDropError" class="alert" style="display:none;"></div>
+        </form>
+    </dialog>
+
+    <!-- ===== Drop Settings Dialog ===== -->
+    <dialog class="v4-dialog" id="dropSettingsDialog">
+        <form id="dropSettingsForm" class="stack">
+            <h2>Drop Settings</h2>
+            <label class="field-label" for="settingDropName">Drop Name</label>
+            <input type="text" id="settingDropName" class="details" required />
+            
+            <label class="field-label" for="settingDropDescription">Description</label>
+            <textarea id="settingDropDescription" class="details" rows="3" style="resize: vertical;"></textarea>
+            
+            <label class="field-label" for="settingDropVisibility">Visibility</label>
+            <select id="settingDropVisibility" class="details">
+                <option value="private">Private</option>
+                <option value="public">Public</option>
+            </select>
+            <p class="subtle">Private drops are only visible to you and people you share with.</p>
+            
+            <div class="row" style="justify-content:flex-end;">
+                <button type="button" class="button-link" id="cancelDropSettings">Cancel</button>
+                <button type="submit" class="redirect">Save Changes</button>
+            </div>
+            <div id="dropSettingsError" class="alert" style="display:none;"></div>
+        </form>
+    </dialog>
+
+    <!-- ===== Delete Drop Dialog ===== -->
+    <dialog class="v4-dialog" id="deleteDropDialog">
+        <form id="deleteDropForm" class="stack">
+            <h2 style="color: var(--red);">Delete Drop</h2>
+            <p>Are you sure you want to delete <strong id="deleteDropName"></strong>?</p>
+            <p class="subtle">This will permanently remove the drop and all its contents. This action cannot be undone.</p>
+            <div class="row" style="justify-content:flex-end;">
+                <button type="button" class="button-link" id="cancelDeleteDrop">Cancel</button>
+                <button type="submit" class="redirect" style="background: var(--red);">Delete Drop</button>
+            </div>
+        </form>
+    </dialog>
+
+    <!-- ===== Member Management Dialog ===== -->
+    <dialog class="v4-dialog" id="memberManageDialog">
+        <form id="memberManageForm" class="stack">
+            <h2>Manage Members</h2>
+            <div id="memberList" class="v4-member-list"></div>
+            <div class="row" style="justify-content:flex-end; margin-top: 16px;">
+                <button type="button" class="button-link" id="closeMemberManage">Close</button>
+            </div>
+        </form>
+    </dialog>
+
+    <!-- ===== Add Member Dialog ===== -->
+    <dialog class="v4-dialog" id="addMemberDialog">
+        <form id="addMemberForm" class="stack">
+            <h2>Add Member</h2>
+            <label class="field-label" for="addMemberName">Username</label>
+            <input type="text" id="addMemberName" class="details" list="userSuggestions" placeholder="Type a username..." required autocomplete="off" />
+            <datalist id="userSuggestions"></datalist>
+            
+            <label class="field-label" for="addMemberRole">Permission</label>
+            <select id="addMemberRole" class="details">
+                <option value="viewer">Viewer</option>
+                <option value="editor">Editor</option>
+                <option value="owner">Owner</option>
+            </select>
+            <p class="subtle">Viewers can view files. Editors can create and edit. Owners have full control.</p>
+            
+            <div class="row" style="justify-content:flex-end;">
+                <button type="button" class="button-link" id="cancelAddMember">Cancel</button>
+                <button type="submit" class="redirect">Add Member</button>
+            </div>
+            <div id="addMemberError" class="alert" style="display:none;"></div>
         </form>
     </dialog>
 
@@ -194,6 +328,7 @@
     <script>
         window.__INKDROP_INIT__ = {
             userName: "{{.Name}}",
+            userID: {{.UserID}},
             userPFP: "{{.UserPFP}}",
             userBio: "{{.UserBio}}",
             currentDropID: "{{.CurrentDropID}}",
