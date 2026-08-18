@@ -1,5 +1,5 @@
 PACKAGE_NAME=FtR
-VERSION=3.2.0
+VERSION=3.3.0
 TARGET_ARCHITECTURE=all
 TARGET_OS=linux
 DESCRIPTION=Official FtR manager drop for the FtR cloud drop manager

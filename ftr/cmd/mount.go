@@ -37,6 +37,7 @@ type RemoteFS struct {
 	server          *fs.Server
 	defaultUid      uint32
 	defaultGid      uint32
+	tempDir         string
 }
 
 type RemoteDir struct {
@@ -153,6 +154,14 @@ Writes are uploaded back to the remote Drop when file handles are closed.
 			return err
 		}
 
+		// Create a dedicated temp directory for per-file download/upload handles
+		tmpDownloadDir, err := os.MkdirTemp("", "ftr-mount-*")
+		if err != nil {
+			return fmt.Errorf("failed to create temp directory: %w", err)
+		}
+		rfs.tempDir = tmpDownloadDir
+		defer os.RemoveAll(tmpDownloadDir)
+
 		mountOpts := []fuse.MountOption{
 			fuse.FSName("ftr"),
 			fuse.Subtype("ftrfs"),
@@ -209,7 +218,7 @@ func currentUserIds() (uint32, uint32) {
 func NewRemoteFS(client *api.Client, user, repo string, fileList []api.RepoEntry) (*RemoteFS, error) {
 	refreshInterval := mountRefreshInterval
 	if refreshInterval <= 0 {
-		refreshInterval = 500 * time.Millisecond
+		refreshInterval = 2 * time.Second
 	}
 	defaultUid, defaultGid := currentUserIds()
 	rfs := &RemoteFS{
@@ -245,9 +254,15 @@ func (rfs *RemoteFS) Statfs(ctx context.Context, req *fuse.StatfsRequest, resp *
 
 func (rfs *RemoteFS) cacheTTL() time.Duration {
 	if rfs.refreshInterval <= 0 {
-		return 500 * time.Millisecond
+		return 2 * time.Second
 	}
-	return rfs.refreshInterval
+	rfs.mu.Lock()
+	ttl := rfs.refreshInterval
+	rfs.mu.Unlock()
+	if ttl <= 0 {
+		return 2 * time.Second
+	}
+	return ttl
 }
 
 func (rfs *RemoteFS) setServer(server *fs.Server) {
@@ -286,6 +301,13 @@ func (rfs *RemoteFS) refreshTreeIfNeeded() error {
 	}
 	rfs.mu.Unlock()
 
+	// Non-blocking: if a background refresh is already in progress,
+	// skip this refresh and serve stale (cached) data. FUSE operations
+	// must never block on network requests.
+	if !rfs.refreshMu.TryLock() {
+		return nil
+	}
+	defer rfs.refreshMu.Unlock()
 	return rfs.refreshTree(true)
 }
 
@@ -796,9 +818,9 @@ func (d *RemoteDir) Attr(ctx context.Context, a *fuse.Attr) error {
 }
 
 func (d *RemoteDir) Lookup(ctx context.Context, req *fuse.LookupRequest, resp *fuse.LookupResponse) (fs.Node, error) {
-	if err := d.fsys.refreshTreeIfNeeded(); err != nil {
-		return nil, err
-	}
+	// Do NOT call refreshTreeIfNeeded here — FUSE operations must never block on
+	// network requests. The background watchRemoteChanges goroutine handles
+	// periodic refreshes and notifies the kernel of changes via FUSE notifications.
 	d.refreshEntriesFromRoot()
 
 	d.mu.Lock()
@@ -812,9 +834,9 @@ func (d *RemoteDir) Lookup(ctx context.Context, req *fuse.LookupRequest, resp *f
 }
 
 func (d *RemoteDir) ReadDirAll(ctx context.Context) ([]fuse.Dirent, error) {
-	if err := d.fsys.refreshTreeIfNeeded(); err != nil {
-		return nil, err
-	}
+	// Do NOT call refreshTreeIfNeeded here — FUSE operations must never block on
+	// network requests. The background watchRemoteChanges goroutine handles
+	// periodic refreshes and notifies the kernel of changes via FUSE notifications.
 	d.refreshEntriesFromRoot()
 
 	d.mu.Lock()
@@ -1017,7 +1039,12 @@ func (f *RemoteFile) Setattr(ctx context.Context, req *fuse.SetattrRequest, resp
 
 	// Handle size changes (truncate)
 	if req.Valid.Size() {
-		tempFile, err := os.CreateTemp("", "ftr-mount-setattr-*")
+		// Use the mount's dedicated temp directory for download/upload handles
+		tempDir := f.fsys.tempDir
+		if tempDir == "" {
+			tempDir = os.TempDir()
+		}
+		tempFile, err := os.CreateTemp(tempDir, "ftr-mount-setattr-*")
 		if err != nil {
 			return err
 		}
@@ -1078,7 +1105,12 @@ func (f *RemoteFile) openHandle(flags fuse.OpenFlags, created bool) (fs.Handle, 
 		return nil, fuse.Errno(syscall.EROFS)
 	}
 
-	tempFile, err := os.CreateTemp("", "ftr-mount-*")
+	// Use the mount's dedicated temp directory for download/upload handles
+	tempDir := f.fsys.tempDir
+	if tempDir == "" {
+		tempDir = os.TempDir()
+	}
+	tempFile, err := os.CreateTemp(tempDir, "ftr-mount-*")
 	if err != nil {
 		return nil, fmt.Errorf("failed to create temporary file: %w", err)
 	}
@@ -1200,6 +1232,6 @@ var mountRefreshInterval time.Duration
 
 func init() {
 	mountCmd.Flags().BoolVar(&mountReadOnly, "readonly", false, "Mount Drop read-only")
-	mountCmd.Flags().DurationVar(&mountRefreshInterval, "refresh-interval", 500*time.Millisecond, "How often the mounted Drop checks for remote changes")
+	mountCmd.Flags().DurationVar(&mountRefreshInterval, "refresh-interval", 5*time.Second, "How often the mounted Drop checks for remote changes")
 	rootCmd.AddCommand(mountCmd)
 }
